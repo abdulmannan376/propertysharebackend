@@ -8,6 +8,7 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   loggedIn: { type: Boolean, required: true },
   role: { type: String, required: true },
+  emailVerificationCode: {type: Number},
   emailVerified: {type: Boolean, required: true},
   favouriteList: { type: [String], default: [] },
   wishList: { type: [Object], default: [] },
