@@ -1,4 +1,5 @@
 const Users = require("../models/UserSchema");
+const UserDefaultSettings = require("../models/UserDefaultSettingSchema");
 const jwt = require("jsonwebtoken");
 const CryptoJS = require("crypto-js");
 const nodemailer = require("nodemailer");
@@ -11,9 +12,12 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const currentDateMilliseconds = Date.now();
+const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
+
 function sendVerficationEmail(user, res) {
   const mailOptions = {
-    from: "anam.sal60@gmail.com",
+    from: "balaj.ali707@gmail.com",
     to: user.email, // The recipient's email address
     subject: `Email Verification Code: ${user.emailVerificationCode}`,
     text: `Hello, welcome to our service! Please add this code ${user.emailVerificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\nRapids AI Team`,
@@ -33,6 +37,32 @@ function sendVerficationEmail(user, res) {
   });
 }
 
+function sendEmail(recipient, subject, body, res, resBody) {
+  const mailOptions = {
+    from: "balaj.ali707@gmail.com",
+    to: recipient,
+    subject: subject,
+    text: body,
+  };
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.log("Error: ", {
+        function: "sendEmail",
+        fileLocation: "controllers/UsersController.js",
+        timestamp: currentDateString,
+      });
+      res
+        .status(400)
+        .json({ message: "Some error occured. Try again.", success: false });
+    } else {
+      // console.log(
+      //   `success in function: sendEmail, file location: controllers/UsersController.js, timestamp: ${currentDateString}`
+      // );
+      res.status(201).json(resBody);
+    }
+  });
+}
+
 const genNewVerificationCode = async (req, res) => {
   try {
     const { email } = req.body;
@@ -47,7 +77,14 @@ const genNewVerificationCode = async (req, res) => {
 
     if (!userFound.emailVerified) {
       userFound.emailVerificationCode = verificationCode;
-      await userFound.save().then(() => sendVerficationEmail(userFound, res));
+      await userFound.save().then(() => {
+        const subject = `Email Verification Code: ${userFound.emailVerificationCode}`;
+        const emailBody = `Hello, welcome to our service! Please add this code ${userFound.emailVerificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\nRapids AI Team`;
+        sendEmail(userFound.email, subject, emailBody, res, {
+          message: `A verification code sent to email.`,
+          success: true,
+        });
+      });
     } else {
       return res
         .status(200)
@@ -92,6 +129,40 @@ const verifyEmailVerficationCode = async (req, res) => {
       });
     }
   } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "verifyEmailVerficationCode",
+      fileLocation: "controllers/UsersController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const userLogout = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const userFound = await Users.findOne({ email: email });
+    if (!userFound) {
+      return res.status(400).json({
+        message: "No user data.",
+        success: false,
+      });
+    }
+
+    userFound.loggedIn = false;
+
+    await userFound.save();
+
+    res.status(200).json({ mesaage: "Logged out", success: true });
+  } catch (error) {
+    console.log("Error: ", {
+      function: "userLogout",
+      fileLocation: "controllers/UsersController.js",
+      timestamp: currentDateString,
+    });
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error, success: false });
@@ -113,8 +184,8 @@ const userLogin = async (req, res) => {
       userFound.password,
       process.env.PASSWORD_SECRET
     );
-    const userPassword = bytes.toString(CryptoJS.enc.Utf8)
-    console.log("userPassword: ", userPassword)
+    const userPassword = bytes.toString(CryptoJS.enc.Utf8);
+    console.log("userPassword: ", userPassword);
     if (userPassword !== password) {
       return res
         .status(400)
@@ -132,13 +203,28 @@ const userLogin = async (req, res) => {
 
     userFound.loggedIn = true;
 
-    await userFound.save();
+    await userFound.save().then(() => {
+      console.log(1);
+      const subject = `Login activity.`;
+      const emailBody = `Dear ${userFound.name},\nYou have successfully logged in your account`;
+      sendEmail(userFound.email, subject, emailBody, res, {
+        message: "Logged in",
+        token: token,
+        body: {
+          name: userFound.name,
+          email: userFound.email,
+          role: userFound.role,
+          username: userFound.username,
+        },
+        success: true,
+      });
+    });
 
-    res.status(200).json({ message: "Logged in", success: true, token: token });
+    // res.status(200).json({ message: "Logged in", success: true, token: token });
   } catch (error) {
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: "Internal Server error", error: error, success: false });
   }
 };
 
@@ -165,6 +251,7 @@ const userSignUp = async (req, res) => {
     const { password } = body;
     const verificationCode = Math.round(Math.random() * 1000000);
     body.password = CryptoJS.AES.encrypt(password, process.env.PASSWORD_SECRET);
+    const newUserDefaultSetting = new UserDefaultSettings();
     const newUser = new Users({
       name: body.name,
       username: body.username,
@@ -174,9 +261,17 @@ const userSignUp = async (req, res) => {
       loggedIn: false,
       emailVerified: false,
       emailVerificationCode: verificationCode,
+      userDefaultSettingID: newUserDefaultSetting._id,
     });
 
-    newUser.save().then(() => sendVerficationEmail(newUser, res));
+    newUser.save().then(() => {
+      const subject = `Email Verification Code: ${verificationCode}`;
+      const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\nRapids AI Team`;
+      sendEmail(body.email, subject, emailBody, res, {
+        message: `A verification code sent to email.`,
+        success: true,
+      });
+    });
 
     // res.status(201).json({ message: "User signed up.", success: true });
   } catch (error) {
@@ -191,4 +286,5 @@ module.exports = {
   verifyEmailVerficationCode,
   genNewVerificationCode,
   userLogin,
+  userLogout,
 };
