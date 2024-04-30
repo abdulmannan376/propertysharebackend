@@ -1,4 +1,5 @@
 const PropertyRequest = require("../models/PropertyRequestSchema");
+const JWTController = require("../helpers/jwtController");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -61,4 +62,46 @@ const fetchCoordinatesOfProperties = async (req, res) => {
   }
 };
 
-module.exports = { addPropertyRequest, fetchCoordinatesOfProperties };
+const addNewProperty = async (req, res) => {
+  try {
+    const body = req.body;
+    const isTokenValid = await JWTController.verifyJWT(body.token);
+    if (!isTokenValid) {
+      // await session.abortTransaction();
+      // session.endSession();
+      return res
+        .status(403)
+        .json({ message: "Not authorized.", success: false });
+    }
+
+    res.status(201).json({ message: "success", success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "addNewProperty",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const addPropertyImages = async (req, res) => {
+  try {
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "addPropertyImages",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+module.exports = {
+  addPropertyRequest,
+  fetchCoordinatesOfProperties,
+  addNewProperty,
+};

@@ -35,10 +35,10 @@ PropertyRequestSchema.pre("save", async function (next) {
       today.getMonth() + 1,
       2
     )}${padNumber(today.getDate(), 2)}`;
-    const prefix = "PRID"; // Customize this prefix as needed
+    const prefix = "PRID"; // Property Requested ID
 
     // Find the last document created today with a similar prefix
-    const lastEntry = await mongoose.models["property_requests"]
+    const lastEntry = await mongoose.models["property_requestes"]
       ?.findOne({ requestID: new RegExp("^" + prefix + dateString) })
       .sort("-requestID");
 
