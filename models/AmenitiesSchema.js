@@ -81,3 +81,6 @@ const PropertyAmenitiesSchema = new mongoose.Schema({
     }
   }
 });
+
+const PropertyAmenities = mongoose.model("property_amenities", PropertyAmenitiesSchema)
+module.exports = PropertyAmenities

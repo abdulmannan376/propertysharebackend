@@ -10,7 +10,11 @@ const UserSchema = new mongoose.Schema({
   role: { type: String, required: true, enum: ["admin", "user"] },
   emailVerificationCode: { type: Number },
   emailVerified: { type: Boolean, required: true },
-  userDefaultSettingID: { type: mongoose.Types.ObjectId, required: true },
+  userDefaultSettingID: {
+    type: mongoose.Types.ObjectId,
+    ref: "user_default_settings",
+    required: true,
+  },
   favouriteList: { type: [String], default: [] },
   wishList: { type: [Object], default: [] },
 });

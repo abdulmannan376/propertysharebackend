@@ -11,6 +11,22 @@ const PropertySchema = new mongoose.Schema({
     },
     required: true,
   },
+  propertyType: {
+    type: String,
+    required: true,
+    enum: [
+      "Mansion",
+      "Villa",
+      "Apartment",
+      "Suite",
+      "Condo",
+      "Townhouse",
+      "Bungalow",
+      "Cabin",
+      "Studio",
+      "Single family home",
+    ],
+  },
   area: { type: Number, required: true },
   totalStakes: { type: Number, default: 25 },
   stakesOccupied: { type: Number, required: true, default: 0 },
@@ -21,6 +37,7 @@ const PropertySchema = new mongoose.Schema({
       streetNumber: Number,
       zipCode: Number,
       city: String,
+      state: String,
       country: String,
       addressInString: String,
     },
@@ -31,14 +48,19 @@ const PropertySchema = new mongoose.Schema({
     enum: ["Featured", "Non-Featured"],
     default: "Non-Featured",
   },
+  listingStatus: {
+    type: String,
+    enum: ["draft", "live", "pending approval", "hidden"],
+  },
+  startDurationFrom: { type: Date, required: true },
   publishedBy: { type: String, required: true, desc: "username" },
   publisherRole: { type: String, enum: ["admin", "user"], default: "user" },
   viewedCount: { type: Number, default: 0 },
   detail: { type: String, required: true },
   attributesID: { type: mongoose.Types.ObjectId },
-  imageDirURL: { type: String, required: true },
-  propertyID: { type: String, required: true },
-  amenitiesID: { type: mongoose.Types.ObjectId },
+  imageDirURL: { type: String },
+  propertyID: { type: String },
+  amenitiesID: { type: mongoose.Types.ObjectId, ref: "PropertyAmenitiesSchema" },
 });
 
 // Helper function to pad the sequence number
@@ -56,12 +78,12 @@ PropertySchema.pre("save", async function (next) {
       today.getMonth() + 1,
       2
     )}${padNumber(today.getDate(), 2)}`;
-    const prefix = "PLID"; // Property Listed ID
+    const prefix = "PLID"; // Property Listing ID
 
     // Find the last document created today with a similar prefix
     const lastEntry = await mongoose.models["properties"]
       ?.findOne({ propertyID: new RegExp("^" + prefix + dateString) })
-      .sort("-requestID");
+      .sort("-propertyID");
 
     let nextSeqNumber = 1; // Default sequence number
     if (lastEntry) {

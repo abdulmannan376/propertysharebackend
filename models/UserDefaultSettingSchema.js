@@ -10,7 +10,7 @@ const UserDefaultSettingSchema = new mongoose.Schema({
 });
 
 const UserDefaultSettings = mongoose.model(
-  "user default settings",
+  "user_default_settings",
   UserDefaultSettingSchema
 );
 

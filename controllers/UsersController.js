@@ -2,15 +2,7 @@ const Users = require("../models/UserSchema");
 const UserDefaultSettings = require("../models/UserDefaultSettingSchema");
 const jwt = require("jsonwebtoken");
 const CryptoJS = require("crypto-js");
-const nodemailer = require("nodemailer");
-
-const transporter = nodemailer.createTransport({
-  service: "Gmail",
-  auth: {
-    user: "balaj.ali707@gmail.com",
-    pass: "zyyo rgfk dsrr wxfx",
-  },
-});
+const { sendEmail } = require("../helpers/emailController");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -33,32 +25,6 @@ function sendVerficationEmail(user, res) {
         message: `A verification code sent to email.`,
         success: true,
       });
-    }
-  });
-}
-
-function sendEmail(recipient, subject, body, res, resBody) {
-  const mailOptions = {
-    from: "balaj.ali707@gmail.com",
-    to: recipient,
-    subject: subject,
-    text: body,
-  };
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      console.log("Error: ", {
-        function: "sendEmail",
-        fileLocation: "controllers/UsersController.js",
-        timestamp: currentDateString,
-      });
-      res
-        .status(400)
-        .json({ message: "Some error occured. Try again.", success: false });
-    } else {
-      // console.log(
-      //   `success in function: sendEmail, file location: controllers/UsersController.js, timestamp: ${currentDateString}`
-      // );
-      res.status(201).json(resBody);
     }
   });
 }
@@ -264,6 +230,7 @@ const userSignUp = async (req, res) => {
       userDefaultSettingID: newUserDefaultSetting._id,
     });
 
+    await newUserDefaultSetting.save();
     newUser.save().then(() => {
       const subject = `Email Verification Code: ${verificationCode}`;
       const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\nRapids AI Team`;
@@ -281,10 +248,38 @@ const userSignUp = async (req, res) => {
   }
 };
 
+const getUserDefaultSetting = async (req, res) => {
+  try {
+    const { key } = req.params;
+    const userFound = await Users.findOne({ username: key })
+      .populate("userDefaultSettingID")
+      .exec();
+    if (!userFound) {
+      res.status(400).json({ message: "Try again.", success: false });
+    }
+
+    res.status(200).json({
+      message: "Fetched",
+      body: userFound.userDefaultSettingID,
+      success: true,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "getUserDefaultSetting",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
 module.exports = {
   userSignUp,
   verifyEmailVerficationCode,
   genNewVerificationCode,
   userLogin,
   userLogout,
+  getUserDefaultSetting,
 };

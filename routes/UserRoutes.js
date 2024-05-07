@@ -7,6 +7,7 @@ router.put("/verify-email", UsersController.verifyEmailVerficationCode)
 router.put("/gen-new-verification-code", UsersController.genNewVerificationCode)
 router.post("/user-login", UsersController.userLogin)
 router.put("/user-logout", UsersController.userLogout)
+router.get("/get-default-settings/:key", UsersController.getUserDefaultSetting)
 
 module.exports = router
 

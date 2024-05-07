@@ -13,7 +13,7 @@ async function verifyJWT(token) {
         return decoded;
       }
     );
-    const userFound = await Users.findOne({ username: user.username, role: "admin" });
+    const userFound = await Users.findOne({ username: user.username});
     if (!userFound) {
       return false;
     }
