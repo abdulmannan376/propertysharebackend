@@ -94,8 +94,6 @@ PropertySchema.pre("save", async function (next) {
 
     // Generate the full custom ID
     this.propertyID = `${prefix}${dateString}${padNumber(nextSeqNumber, 4)}`;
-
-    this.slug = slugify(this.title, { lower: true, strict: true });
   }
   next();
 });

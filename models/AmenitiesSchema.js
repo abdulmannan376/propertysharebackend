@@ -3,84 +3,119 @@ const mongoose = require("mongoose");
 const PropertyAmenitiesSchema = new mongoose.Schema({
   mainFeatures: {
     type: {
-      yearBuilt: Number,
-      windowsType: String,
-      floorCount: Number,
-      parkingspace: Number,
-      centralAC: Boolean,
-      electricityBackup: Boolean,
-      elevators: Number,
-      lobbyInBuilding: Boolean,
-      centralHeating: Boolean,
-      wasteDisposal: Boolean,
-      serviceElevator: Boolean,
-      other: String,
-    }
+      inputs: {
+        yearBuilt: Number,
+        floorCount: Number,
+        parkingSpace: Number,
+        elevators: Number,
+      },
+      tags: {
+        type: [String],
+        enum: [
+          "doubleGlazedWindows",
+          "centralAC",
+          "electricityBackup",
+          "lobby",
+          "centralHeating",
+          "wasteDisposal",
+          "serviceElevator",
+          "other",
+        ],
+      },
+    },
   },
   roomDetails: {
     type: {
-      beds: Number,
-      baths: Number,
-      drawingRoom: Boolean,
-      studyRoom: Boolean,
-      gym: Boolean,
-      lounge: Boolean,
-      servantQuater: Number,
-      kitchen: Number,
-      powderRoom: Boolean,
-      steamRoom: Boolean,
-      other: String,
-    }
+      inputs: {
+        beds: Number,
+        baths: Number,
+        servantQuater: Number,
+        kitchen: Number,
+      },
+      tags: {
+        type: [String],
+        enum: [
+          "drawingRoom",
+          "studyRoom",
+          "gym",
+          "lounge",
+          "powderRoom",
+          "steamRoom",
+          "other",
+        ],
+      },
+    },
   },
   business: {
     type: {
-      internet: Boolean,
-      conferenceRoom: Boolean,
-      cableTV: Boolean,
-      satelliteTV: Boolean,
-      intercom: Boolean,
-      mediaRoom: Boolean,
-      atmMachine: Boolean,
-      other: String,
-    }
+      tags: {
+        type: [String],
+        enum: [
+          "internet",
+          "conferenceRoom",
+          "cableTV",
+          "satelliteTV",
+          "intercom",
+          "mediaRoom",
+          "atmMachine",
+          "other",
+        ],
+      },
+    },
   },
   community: {
     type: {
-        communityLawn: Boolean,
-        communityGarden: Boolean,
-        firstAid: Boolean,
-        medicalCentre: Boolean,
-        barbequeArea: Boolean,
-        campFireArea: Boolean,
-        swimmingPool: Boolean,
-        dayCareCentre: Boolean,
-        mosque: Boolean,
-        prayerArea: Boolean,
-        communityGym: Boolean,
-        kidsPlayArea: Boolean,
-        communityCentre: Boolean,
-        other: String
-    }
+      tags: {
+        type: [String],
+        enum: [
+          "communityLawn",
+          "communityGarden",
+          "firstAid",
+          "medicalCentre",
+          "barbequeArea",
+          "campFireArea",
+          "swimmingPool",
+          "dayCareCentre",
+          "mosque",
+          "prayerArea",
+          "communityGym",
+          "kids PlayArea",
+          "communityCentre",
+          "other",
+        ],
+      },
+    },
   },
   healthAndRecreational: {
     type: {
-        sauna: Boolean,
-        jacuzzi: Boolean,
-        other: String
-    }
+      tags: {
+        type: [String],
+        enum: ["sauna", "jacuzzi", "other"],
+      },
+    },
   },
   nearbyFacilitiesAndLocations: {
     type: {
-        schools: Boolean,
-        restaurants: Boolean,
-        hospitals: Boolean,
+      inputs: {
         distanceFromAirport: Number,
-        shoppingMalls: Boolean,
-        publicTransport: Boolean,
-        other: String
-    }
-  }
+      },
+      tags: {
+        type: [String],
+        enum: [
+          "schools",
+          "restaurants",
+          "hospitals",
+          "shoppingMalls",
+          "publicTransport",
+          "other",
+        ],
+      },
+    },
+  },
 });
 
-const PropertyAmenities = mongoose.model("property_amenities", PropertyAmenitiesSchema)
-module.exports = PropertyAmenities
+const PropertyAmenities = mongoose.model(
+  "property_amenities",
+  PropertyAmenitiesSchema
+);
+module.exports = PropertyAmenities;
