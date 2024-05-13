@@ -3,7 +3,7 @@ const slugify = require("slugify");
 
 const PropertySchema = new mongoose.Schema({
   title: { type: String, required: true },
-  slug: { type: String, unique: true },
+  slug: { type: String, unique: false },
   coordinates: {
     type: {
       latitude: String,
@@ -59,8 +59,12 @@ const PropertySchema = new mongoose.Schema({
   detail: { type: String, required: true },
   attributesID: { type: mongoose.Types.ObjectId },
   imageDirURL: { type: String },
+  imageCount: { type: Number },
   propertyID: { type: String },
-  amenitiesID: { type: mongoose.Types.ObjectId, ref: "PropertyAmenitiesSchema" },
+  amenitiesID: {
+    type: mongoose.Types.ObjectId,
+    ref: "PropertyAmenitiesSchema",
+  },
 });
 
 // Helper function to pad the sequence number
