@@ -3,7 +3,7 @@ const slugify = require("slugify");
 
 const PropertySchema = new mongoose.Schema({
   title: { type: String, required: true },
-  slug: { type: String, unique: false },
+  slug: { type: String, unique: true },
   coordinates: {
     type: {
       latitude: String,
@@ -58,8 +58,8 @@ const PropertySchema = new mongoose.Schema({
   viewedCount: { type: Number, default: 0 },
   detail: { type: String, required: true },
   attributesID: { type: mongoose.Types.ObjectId },
-  imageDirURL: { type: String },
-  imageCount: { type: Number },
+  imageDirURL: { type: String, default: "" },
+  imageCount: { type: Number, default: 0 },
   propertyID: { type: String },
   amenitiesID: {
     type: mongoose.Types.ObjectId,

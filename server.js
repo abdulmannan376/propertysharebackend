@@ -6,7 +6,7 @@ const port = process.env.PORT || 5000;
 const userRoutes = require("./routes/UserRoutes");
 const propertyRoutes = require("./routes/PropertyRoutes");
 const upload = require("./middleware/multerConfig");
-const path = require('path');
+const path = require("path");
 
 app.use(cors());
 app.use(express.json());
@@ -17,7 +17,7 @@ app.use("/user", userRoutes);
 app.use("/property", propertyRoutes);
 
 // Serve images as static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.post(
   "/upload-property-images",
@@ -29,7 +29,11 @@ app.post(
       return res.status(400).send("No files uploaded.");
     }
     let fileNames = req.files.map((file) => file.filename);
+
+    
     res.send(`Files uploaded successfully!`);
+
+
   }
 );
 

@@ -133,38 +133,19 @@ const updateProperty = async (req, res) => {
     let propertyAmenitiesFound;
 
     console.log("formPhase: ", body.formPhase, typeof body.formPhase);
-    if (body.formPhase == 2) {
-      propertyAmenitiesFound = await PropertyAmenities.findOneAndUpdate(
-        { _id: propertyFound.amenitiesID },
-        {
-          mainFeatures: body.amenities.mainFeatures,
-          roomDetails: body.amenities.roomDetails,
-          business: body.amenities.business,
-          community: body.amenities.community,
-          healthAndRecreational: body.amenities.healthAndRecreational,
-          nearbyFacilitiesAndLocations:
-            body.amenities.nearbyFacilitiesAndLocations,
-        }
-      );
-    } else if (body.formPhase == 3) {
-    } else {
-      propertyAmenitiesFound = new PropertyAmenities();
-    }
-
-    (propertyFound.title = body.title),
-      (propertyFound.coordinates = {
-        latitude: body.coordinates.lat,
-        longitude: body.coordinates.long,
-      }),
-      (propertyFound.detail = body.overview),
-      (propertyFound.totalStakes = body.numOfShares),
-      (propertyFound.valueOfProperty = body.totalPrice),
-      (propertyFound.area = body.areaSize),
-      (propertyFound.startDurationFrom = body.startDate),
-      (propertyFound.propertyType = body.propertyType),
-      (propertyFound.beds = body.numOfBeds),
-      (propertyFound.baths = body.numOfBaths),
-      (propertyFound.addressOfProperty = {
+    if (body.formPhase === 1) {
+      (propertyFound.title = body.title),
+        (propertyFound.coordinates = {
+          latitude: body.coordinates.lat,
+          longitude: body.coordinates.long,
+        });
+      propertyFound.detail = body.overview;
+      propertyFound.totalStakes = body.numOfShares;
+      propertyFound.valueOfProperty = body.totalPrice;
+      propertyFound.area = body.areaSize;
+      propertyFound.startDurationFrom = body.startDate;
+      propertyFound.propertyType = body.propertyType;
+      propertyFound.addressOfProperty = {
         houseNumber: body.houseNumber,
         streetNumber: body.streetNumber,
         zipCode: body.zipCode,
@@ -172,9 +153,24 @@ const updateProperty = async (req, res) => {
         state: body.state,
         city: body.city,
         addressInString: body.fullAddress,
-      }),
-      (propertyFound.listingStatus = listingStatus),
+      };
+      propertyFound.listingStatus = listingStatus;
+    } else if (body.formPhase == 2) {
+      propertyAmenitiesFound = await PropertyAmenities.findOneAndUpdate(
+        { _id: propertyFound.amenitiesID },
+        {
+          mainFeatures: body.amenities.mainFeatures,
+          roomDetails: body.amenities.roomsDetails,
+          business: body.amenities.business,
+          community: body.amenities.community,
+          healthAndRecreational: body.amenities.healthAndRecreational,
+          nearbyFacilitiesAndLocations:
+            body.amenities.nearbyFacilitiesAndLocations,
+        }
+      );
       await propertyAmenitiesFound.save();
+    }
+
     await propertyFound.save().then(() => {
       if (listingStatus === "live") {
         const subject = `Property (${propertyFound.propertyID}) status of listing.`;
@@ -232,22 +228,7 @@ const addNewProperty = async (req, res) => {
       listingStatus = "draft";
     }
 
-    let newAmenities;
-
-    if (body.formPhase == 2) {
-      newAmenities = new PropertyAmenities({
-        mainFeatures: body.amenities.mainFeatures,
-        roomDetails: body.amenities.roomDetails,
-        business: body.amenities.business,
-        community: body.amenities.community,
-        healthAndRecreational: body.amenities.healthAndRecreational,
-        nearbyFacilitiesAndLocations:
-          body.amenities.nearbyFacilitiesAndLocations,
-      });
-    } else if (body.formPhase == 3) {
-    } else {
-      newAmenities = new PropertyAmenities();
-    }
+    const newAmenities = new PropertyAmenities();
 
     const slug = slugify(body.title, { lower: true, strict: true });
 
@@ -289,6 +270,7 @@ const addNewProperty = async (req, res) => {
         sendEmail(body.email, subject, emailBody, res, {
           message: `Successfull.`,
           success: true,
+          body: newProperty,
         });
       } else if (listingStatus === "pending approval") {
         const subject = `Property (${newProperty.propertyID}) status of listing.`;
@@ -296,6 +278,7 @@ const addNewProperty = async (req, res) => {
         sendEmail(body.email, subject, emailBody, res, {
           message: `Successfull.`,
           success: true,
+          body: newProperty,
         });
       } else if (listingStatus === "draft") {
         const subject = `Property (${newProperty.propertyID}) status of listing.`;
@@ -303,6 +286,7 @@ const addNewProperty = async (req, res) => {
         sendEmail(body.email, subject, emailBody, res, {
           message: `Successfull.`,
           success: true,
+          body: newProperty,
         });
       }
     });
@@ -320,6 +304,44 @@ const addNewProperty = async (req, res) => {
 
 const addPropertyImages = async (req, res) => {
   try {
+    const body = req.body;
+    const files = req.files;
+    const propertyFound = await Properties.findOne({
+      propertyID: body.propertyID,
+    });
+    
+    if (!propertyFound) {
+      return res.status(400).json({ message: "Error occured", success: false });
+    }
+    console.log("body: ", body)
+
+    let listingStatus = "";
+    if (body.userRole === "admin") {
+      listingStatus = "live";
+    } else if (body.userRole === "user") {
+      listingStatus = "pending approval";
+    }
+
+    propertyFound.imageDirURL = `uploads/${body.propertyID}`;
+    propertyFound.imageCount = files.length;
+
+    await propertyFound.save().then(() => {
+      if (listingStatus === "live") {
+        const subject = `Property (${body.propertyID}) status of listing.`;
+        const emailBody = `Hello ${body.userName},\nYour property with title: ${propertyFound.title}, is successfully live on our platform and is ready for operations from the start date: ${propertyFound.startDate}. \nRegards,\nBunny Beach House.`;
+        sendEmail(body.email, subject, emailBody, res, {
+          message: `Successfull.`,
+          success: true,
+        });
+      } else if (listingStatus === "pending approval") {
+        const subject = `Property (${body.propertyID}) status of listing.`;
+        const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully sent for approval. Our team will review your request and get back to you for further proceedings. \nRegards,\nBunny Beach House.`;
+        sendEmail(body.email, subject, emailBody, res, {
+          message: `Successfull.`,
+          success: true,
+        });
+      }
+    });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
       function: "addPropertyImages",
@@ -337,4 +359,5 @@ module.exports = {
   addNewProperty,
   getPropertyByUsername,
   updateProperty,
+  addPropertyImages,
 };

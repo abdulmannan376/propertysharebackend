@@ -275,6 +275,31 @@ const getUserDefaultSetting = async (req, res) => {
   }
 };
 
+const getUserDetails = async (req, res) => {
+  try {
+    const { key } = req.params;
+
+    const userFound = await Users.findOne({ username: key }).select('-password');
+
+    if (!userFound) {
+      return res.status(400).json({ message: "Try Again", success: false });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Success", success: true, body: userFound });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "getUserDetails",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
 module.exports = {
   userSignUp,
   verifyEmailVerficationCode,
@@ -282,4 +307,5 @@ module.exports = {
   userLogin,
   userLogout,
   getUserDefaultSetting,
+  getUserDetails
 };
