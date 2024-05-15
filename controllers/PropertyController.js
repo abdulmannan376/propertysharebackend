@@ -175,21 +175,24 @@ const updateProperty = async (req, res) => {
       if (listingStatus === "live") {
         const subject = `Property (${propertyFound.propertyID}) status of listing.`;
         const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully live on our platform and is ready for operations from the start date: ${body.startDate}. \nRegards,\nBunny Beach House.`;
-        sendEmail(body.email, subject, emailBody, res, {
+        sendEmail(body.email, subject, emailBody);
+        return res.status(200).json({
           message: `Successfull.`,
           success: true,
         });
       } else if (listingStatus === "pending approval") {
         const subject = `Property (${propertyFound.propertyID}) status of listing.`;
         const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully sent for approval. Our team will review your request and get back to you for further proceedings. \nRegards,\nBunny Beach House.`;
-        sendEmail(body.email, subject, emailBody, res, {
+        sendEmail(body.email, subject, emailBody);
+        return res.status(200).json({
           message: `Successfull.`,
           success: true,
         });
       } else if (listingStatus === "draft") {
         const subject = `Property (${propertyFound.propertyID}) status of listing.`;
         const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully saved. \nPlease complete it quick with all the details as this draft will be deleted after 7 days. \nRegards,\nBunny Beach House.`;
-        sendEmail(body.email, subject, emailBody, res, {
+        sendEmail(body.email, subject, emailBody);
+        return res.status(200).json({
           message: `Successfull.`,
           success: true,
         });
@@ -267,7 +270,8 @@ const addNewProperty = async (req, res) => {
       if (listingStatus === "live") {
         const subject = `Property (${newProperty.propertyID}) status of listing.`;
         const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully live on our platform and is ready for operations from the start date: ${body.startDate}. \nRegards,\nBunny Beach House.`;
-        sendEmail(body.email, subject, emailBody, res, {
+        sendEmail(body.email, subject, emailBody);
+        return res.status(200).json({
           message: `Successfull.`,
           success: true,
           body: newProperty,
@@ -275,7 +279,8 @@ const addNewProperty = async (req, res) => {
       } else if (listingStatus === "pending approval") {
         const subject = `Property (${newProperty.propertyID}) status of listing.`;
         const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully sent for approval. Our team will review your request and get back to you for further proceedings. \nRegards,\nBunny Beach House.`;
-        sendEmail(body.email, subject, emailBody, res, {
+        sendEmail(body.email, subject, emailBody);
+        return res.status(200).json({
           message: `Successfull.`,
           success: true,
           body: newProperty,
@@ -283,7 +288,8 @@ const addNewProperty = async (req, res) => {
       } else if (listingStatus === "draft") {
         const subject = `Property (${newProperty.propertyID}) status of listing.`;
         const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully saved. \nPlease complete it quick with all the details as this draft will be deleted after 7 days. \nRegards,\nBunny Beach House.`;
-        sendEmail(body.email, subject, emailBody, res, {
+        sendEmail(body.email, subject, emailBody);
+        return res.status(200).json({
           message: `Successfull.`,
           success: true,
           body: newProperty,
@@ -309,11 +315,11 @@ const addPropertyImages = async (req, res) => {
     const propertyFound = await Properties.findOne({
       propertyID: body.propertyID,
     });
-    
+
     if (!propertyFound) {
       return res.status(400).json({ message: "Error occured", success: false });
     }
-    console.log("body: ", body)
+    console.log("body: ", body);
 
     let listingStatus = "";
     if (body.userRole === "admin") {
@@ -329,14 +335,16 @@ const addPropertyImages = async (req, res) => {
       if (listingStatus === "live") {
         const subject = `Property (${body.propertyID}) status of listing.`;
         const emailBody = `Hello ${body.userName},\nYour property with title: ${propertyFound.title}, is successfully live on our platform and is ready for operations from the start date: ${propertyFound.startDate}. \nRegards,\nBunny Beach House.`;
-        sendEmail(body.email, subject, emailBody, res, {
+        sendEmail(body.email, subject, emailBody);
+        return res.status(200).json({
           message: `Successfull.`,
           success: true,
         });
       } else if (listingStatus === "pending approval") {
         const subject = `Property (${body.propertyID}) status of listing.`;
         const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully sent for approval. Our team will review your request and get back to you for further proceedings. \nRegards,\nBunny Beach House.`;
-        sendEmail(body.email, subject, emailBody, res, {
+        sendEmail(body.email, subject, emailBody);
+        return res.status(200).json({
           message: `Successfull.`,
           success: true,
         });

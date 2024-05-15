@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
 
-function sendEmail(recipient, subject, body, res, resBody) {
+function sendEmail(recipient, subject, body) {
   const mailOptions = {
     from: "balaj.ali707@gmail.com",
     to: recipient,
@@ -21,18 +21,15 @@ function sendEmail(recipient, subject, body, res, resBody) {
   transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
       console.log(`Error: ${error}`, "location: ", {
-        function: "addNewProperty",
+        function: "sendMail",
         fileLocation: "controllers/PropertyController.js",
         timestamp: currentDateString,
       });
-      res
-        .status(400)
-        .json({ message: "Some error occured. Try again.", success: false });
     } else {
       // console.log(
       //   `success in function: sendEmail, file location: controllers/UsersController.js, timestamp: ${currentDateString}`
       // );
-      res.status(201).json(resBody);
+      console.log(`Mail with Subject: ${subject}, sent to ${recipient}`);
     }
   });
 }

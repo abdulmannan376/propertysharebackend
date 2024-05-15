@@ -1,5 +1,6 @@
 const Users = require("../models/UserSchema");
 const UserDefaultSettings = require("../models/UserDefaultSettingSchema");
+const UserProfile = require("../models/userProfileSchema");
 const jwt = require("jsonwebtoken");
 const CryptoJS = require("crypto-js");
 const { sendEmail } = require("../helpers/emailController");
@@ -46,7 +47,8 @@ const genNewVerificationCode = async (req, res) => {
       await userFound.save().then(() => {
         const subject = `Email Verification Code: ${userFound.emailVerificationCode}`;
         const emailBody = `Hello, welcome to our service! Please add this code ${userFound.emailVerificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\nRapids AI Team`;
-        sendEmail(userFound.email, subject, emailBody, res, {
+        sendEmail(userFound.email, subject, emailBody);
+        res.status(200).json({
           message: `A verification code sent to email.`,
           success: true,
         });
@@ -170,10 +172,10 @@ const userLogin = async (req, res) => {
     userFound.loggedIn = true;
 
     await userFound.save().then(() => {
-      console.log(1);
       const subject = `Login activity.`;
       const emailBody = `Dear ${userFound.name},\nYou have successfully logged in your account`;
-      sendEmail(userFound.email, subject, emailBody, res, {
+      sendEmail(userFound.email, subject, emailBody);
+      res.status(200).json({
         message: "Logged in",
         token: token,
         body: {
@@ -218,6 +220,7 @@ const userSignUp = async (req, res) => {
     const verificationCode = Math.round(Math.random() * 1000000);
     body.password = CryptoJS.AES.encrypt(password, process.env.PASSWORD_SECRET);
     const newUserDefaultSetting = new UserDefaultSettings();
+    const newUserProfile = new UserProfile();
     const newUser = new Users({
       name: body.name,
       username: body.username,
@@ -228,13 +231,16 @@ const userSignUp = async (req, res) => {
       emailVerified: false,
       emailVerificationCode: verificationCode,
       userDefaultSettingID: newUserDefaultSetting._id,
+      userProfile: newUserProfile._id,
     });
 
     await newUserDefaultSetting.save();
+    await newUserProfile.save();
     newUser.save().then(() => {
       const subject = `Email Verification Code: ${verificationCode}`;
       const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\nRapids AI Team`;
-      sendEmail(body.email, subject, emailBody, res, {
+      sendEmail(body.email, subject, emailBody);
+      res.status(201).json({
         message: `A verification code sent to email.`,
         success: true,
       });
@@ -279,7 +285,9 @@ const getUserDetails = async (req, res) => {
   try {
     const { key } = req.params;
 
-    const userFound = await Users.findOne({ username: key }).select('-password');
+    const userFound = await Users.findOne({ username: key })
+      .select("-password")
+      .populate("userProfile").exec();
 
     if (!userFound) {
       return res.status(400).json({ message: "Try Again", success: false });
@@ -307,5 +315,5 @@ module.exports = {
   userLogin,
   userLogout,
   getUserDefaultSetting,
-  getUserDetails
+  getUserDetails,
 };

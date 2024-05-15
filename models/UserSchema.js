@@ -15,8 +15,11 @@ const UserSchema = new mongoose.Schema({
     ref: "user_default_settings",
     required: true,
   },
-  favouriteList: { type: [String], default: [] },
-  wishList: { type: [Object], default: [] },
+  userProfile: {
+    type: mongoose.Types.ObjectId,
+    ref: "user_profiles",
+    required: true,
+  },
 });
 
 const Users = mongoose.model("users", UserSchema);
