@@ -287,7 +287,8 @@ const getUserDetails = async (req, res) => {
 
     const userFound = await Users.findOne({ username: key })
       .select("-password")
-      .populate("userProfile").exec();
+      .populate("userProfile")
+      .exec();
 
     if (!userFound) {
       return res.status(400).json({ message: "Try Again", success: false });
@@ -308,6 +309,50 @@ const getUserDetails = async (req, res) => {
   }
 };
 
+const updateUserAccountSetting = async (req, res) => {
+  try {
+    const body = req.body;
+    const { key } = req.params;
+    const userFound = await Users.findOne({ username: key });
+
+    if (!userFound) {
+      return res
+        .status(400)
+        .json({ message: "Error. Try Again", success: false });
+    }
+
+    const userDefaultSetting = await UserDefaultSettings.findOne({
+      _id: userFound.userDefaultSettingID,
+    });
+    console.log("userFound: ", userFound);
+    userDefaultSetting.currencySymbol = body.currencySymbol;
+    userDefaultSetting.currencyShortName = body.currencyShortName;
+    userDefaultSetting.languageChoosen = body.languageChoosen;
+    userDefaultSetting.areaUnit = body.areaUnit;
+    userDefaultSetting.notifyUpdates = body.notifyUpdates;
+    userDefaultSetting.notifyMessages = body.notifyMessages;
+
+    await userDefaultSetting.save().then(() => {
+      const subject = `Account Settings Updated`;
+      const emailBody = `Dear ${userFound.name}, \nYour account settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.`;
+      sendEmail(userFound.email, subject, emailBody);
+      res.status(201).json({
+        message: `Changes updated.`,
+        success: true,
+      });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "updateUserAccountSetting",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
 module.exports = {
   userSignUp,
   verifyEmailVerficationCode,
@@ -316,4 +361,5 @@ module.exports = {
   userLogout,
   getUserDefaultSetting,
   getUserDetails,
+  updateUserAccountSetting,
 };
