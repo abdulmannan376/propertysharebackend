@@ -4,6 +4,7 @@ const UserProfile = require("../models/userProfileSchema");
 const jwt = require("jsonwebtoken");
 const CryptoJS = require("crypto-js");
 const { sendEmail } = require("../helpers/emailController");
+const { sendUpdateNotification } = require("./notificationController");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -335,7 +336,7 @@ const updateUserAccountSetting = async (req, res) => {
     await userDefaultSetting.save().then(() => {
       const subject = `Account Settings Updated`;
       const emailBody = `Dear ${userFound.name}, \nYour account settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.`;
-      sendEmail(userFound.email, subject, emailBody);
+      sendUpdateNotification(subject, emailBody, body.notifyUpdates, key)
       res.status(201).json({
         message: `Changes updated.`,
         success: true,
@@ -344,6 +345,71 @@ const updateUserAccountSetting = async (req, res) => {
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
       function: "updateUserAccountSetting",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const changeUserLoginPassword = async (req, res) => {
+  try {
+    const body = req.body;
+    const { key } = req.params;
+
+    const userFound = await Users.findOne({ username: key });
+
+    if (!userFound) {
+      return res
+        .status(400)
+        .json({ message: "Error. Try Again", success: false });
+    }
+
+    const userDefaultSetting = await UserDefaultSettings.findOne({
+      _id: userFound.userDefaultSettingID,
+    });
+
+    const bytes = CryptoJS.AES.decrypt(
+      userFound.password,
+      process.env.PASSWORD_SECRET
+    );
+    const userCurrentPassword = bytes.toString(CryptoJS.enc.Utf8);
+
+    if (userCurrentPassword !== body.currentPassword) {
+      return res
+        .status(400)
+        .json({ message: "Current password not matched.", success: false });
+    }
+
+    userDefaultSetting.lastPassword.push(userCurrentPassword);
+
+    if (userDefaultSetting.lastPassword.includes(body.newPassword)) {
+      return res
+        .status(400)
+        .json({ message: "Password already used.", success: false });
+    }
+    const newPassword = CryptoJS.AES.encrypt(
+      body.newPassword,
+      process.env.PASSWORD_SECRET
+    );
+
+    userFound.password = newPassword;
+
+    await userDefaultSetting.save();
+    userFound.save().then(() => {
+      const subject = `Login Password Changed.`;
+      const emailBody = `Dear ${userFound.name}, \nYour login password have been changed. If you have done, this is the confirmation email if not then please contact our support for further assistance. \nThankyou.`;
+      sendEmail(userFound.email, subject, emailBody);
+      res.status(201).json({
+        message: `Changes updated.`,
+        success: true,
+      });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "changeUserLoginPassword",
       fileLocation: "controllers/UserController.js",
       timestamp: currentDateString,
     });
@@ -362,4 +428,5 @@ module.exports = {
   getUserDefaultSetting,
   getUserDetails,
   updateUserAccountSetting,
+  changeUserLoginPassword,
 };

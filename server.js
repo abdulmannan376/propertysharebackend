@@ -5,6 +5,7 @@ const app = express();
 const port = process.env.PORT || 5000;
 const userRoutes = require("./routes/UserRoutes");
 const propertyRoutes = require("./routes/PropertyRoutes");
+const notificationRoutes = require("./routes/notificationRoutes")
 const upload = require("./middleware/multerConfig");
 const path = require("path");
 
@@ -15,6 +16,8 @@ require("./middleware/dbConnect");
 
 app.use("/user", userRoutes);
 app.use("/property", propertyRoutes);
+app.use("/notification", notificationRoutes)
+
 
 // Serve images as static files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));

@@ -10,6 +10,7 @@ router.put("/user-logout", UsersController.userLogout)
 router.get("/get-default-settings/:key", UsersController.getUserDefaultSetting)
 router.get("/get-user-detail/:key", UsersController.getUserDetails)
 router.put("/update-account-settings/:key", UsersController.updateUserAccountSetting)
+router.put("/change-login-password/:key", UsersController.changeUserLoginPassword)
 
 module.exports = router
 

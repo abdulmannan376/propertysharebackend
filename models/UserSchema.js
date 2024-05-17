@@ -20,6 +20,7 @@ const UserSchema = new mongoose.Schema({
     ref: "user_profiles",
     required: true,
   },
+  notificationByIDList: { type: [mongoose.Types.ObjectId], default: [] },
 });
 
 const Users = mongoose.model("users", UserSchema);
