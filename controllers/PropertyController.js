@@ -134,12 +134,12 @@ const updateProperty = async (req, res) => {
 
     console.log("formPhase: ", body.formPhase, typeof body.formPhase);
     if (body.formPhase === 1) {
-      (propertyFound.title = body.title),
-        (propertyFound.coordinates = {
-          latitude: body.coordinates.lat,
-          longitude: body.coordinates.long,
-        });
-      propertyFound.detail = body.overview;
+      propertyFound.title = body.title;
+      (propertyFound.location = {
+        type: "Point",
+        coordinates: [body.coordinates.long, body.coordinates.lat],
+      }),
+        (propertyFound.detail = body.overview);
       propertyFound.totalStakes = body.numOfShares;
       propertyFound.valueOfProperty = body.totalPrice;
       propertyFound.area = body.areaSize;
@@ -238,9 +238,9 @@ const addNewProperty = async (req, res) => {
     const newProperty = new PropertyListing({
       title: body.title,
       slug: slug,
-      coordinates: {
-        latitude: body.coordinates.lat,
-        longitude: body.coordinates.long,
+      location: {
+        type: "Point",
+        coordinates: [body.coordinates.long, body.coordinates.lat],
       },
       detail: body.overview,
       totalStakes: body.numOfShares,
@@ -361,6 +361,213 @@ const addPropertyImages = async (req, res) => {
       .json({ message: "Internal Server Error", error: error, success: false });
   }
 };
+
+const getFeaturedProperty = async (req, res) => {
+  try {
+    const body = JSON.parse(req.params.key);
+    const { coordinates, propertyType, beds, area, price, page } = body;
+    const matchQuery = { status: "Featured" }; // Default match query
+
+    console.log("body: ", body);
+    // Adding dynamic filters based on the request body
+    if (propertyType && propertyType !== "")
+      matchQuery.propertyType = propertyType;
+    if (beds && beds !== "") matchQuery.beds = beds;
+    if (area && area !== "") matchQuery.area = { $lte: area };
+    if (price && price !== "") matchQuery.price = { $lte: price };
+
+    const pipeline = [];
+
+    const propertiesPerPage = 8;
+    const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
+
+    // If coordinates are provided and they are not empty
+    if (coordinates && coordinates.length === 2) {
+      pipeline.push({
+        $geoNear: {
+          near: { type: "Point", coordinates: coordinates.map(Number) },
+          distanceField: "distance",
+          maxDistance: 3000, // 3 kilometers in meters
+          spherical: true,
+        },
+      });
+    }
+
+    pipeline.push({ $match: matchQuery });
+
+    // Add pagination to the pipeline
+    pipeline.push({ $skip: skipDocuments }, { $limit: propertiesPerPage });
+
+    const properties = await Properties.aggregate(pipeline);
+
+    const propertyPromises = properties.map(async (propertyData) => {
+      let property = await Properties.findById(propertyData._id); // Retrieve the full Mongoose document
+      if (property) {
+        property.viewedCount++;
+        return property.save(); // Now .save() is available
+      }
+    });
+
+    const allProperties = await Promise.all(propertyPromises);
+
+    res.status(200).json({
+      message: "Fetched featured properties successfully",
+      success: true,
+      body: allProperties,
+      page: page,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "getFeaturedProperty",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const getMostViewedProperties = async (req, res) => {
+  try {
+    const body = JSON.parse(req.params.key); // Parsing the key from params which should be a JSON string
+    const { coordinates, propertyType, beds, area, price, page } = body;
+    const matchQuery = { viewedCount: { $gte: 20 } }; // Using viewedCount greater than or equal to 20
+
+    console.log("body: ", body);
+    // Adding dynamic filters based on the request body
+    if (propertyType && propertyType !== "")
+      matchQuery.propertyType = propertyType;
+    if (beds && beds !== "") matchQuery.beds = beds;
+    if (area && area !== "") matchQuery.area = { $lte: area };
+    if (price && price !== "") matchQuery.price = { $lte: price };
+
+    const pipeline = [];
+
+    const propertiesPerPage = 8;
+    const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
+
+    // If coordinates are provided and they are not empty
+    if (coordinates && coordinates.length === 2) {
+      pipeline.push({
+        $geoNear: {
+          near: { type: "Point", coordinates: coordinates.map(Number) },
+          distanceField: "distance",
+          maxDistance: 3000, // 3 kilometers in meters
+          spherical: true,
+        },
+      });
+    }
+
+    pipeline.push({ $match: matchQuery });
+
+    // Add pagination to the pipeline
+    pipeline.push({ $skip: skipDocuments }, { $limit: propertiesPerPage });
+
+    const properties = await Properties.aggregate(pipeline);
+
+    const propertyPromises = properties.map(async (propertyData) => {
+      let property = await Properties.findById(propertyData._id); // Retrieve the full Mongoose document
+      if (property) {
+        property.viewedCount++;
+        return property.save(); // Now .save() is available
+      }
+    });
+
+    const allProperties = await Promise.all(propertyPromises);
+
+    res.status(200).json({
+      message: "Fetched properties with high view counts successfully",
+      success: true,
+      body: allProperties,
+      page: page,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "getMostViewedProperties",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: new Date().toISOString(),
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const getRecentlyAddedProperties = async (req, res) => {
+  try {
+    const body = JSON.parse(req.params.key);
+    const { coordinates, propertyType, beds, area, price, page } = body;
+
+    // Calculate the date 5 days ago
+    const fiveDaysAgo = new Date();
+    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+
+    // Match query to find properties added within the last 5 days
+    const matchQuery = {
+      createdAt: { $gte: fiveDaysAgo },
+    };
+
+    console.log("body: ", body);
+    // Adding dynamic filters based on the request body
+    if (propertyType && propertyType !== "")
+      matchQuery.propertyType = propertyType;
+    if (beds && beds !== "") matchQuery.beds = beds;
+    if (area && area !== "") matchQuery.area = { $lte: area };
+    if (price && price !== "") matchQuery.price = { $lte: price };
+
+    const propertiesPerPage = 8;
+    const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
+
+    const pipeline = [];
+
+    // If coordinates are provided and they are not empty
+    if (coordinates && coordinates.length === 2) {
+      pipeline.push({
+        $geoNear: {
+          near: { type: "Point", coordinates: coordinates.map(Number) },
+          distanceField: "distance",
+          maxDistance: 3000, // 3 kilometers in meters
+          spherical: true,
+        },
+      });
+    }
+
+    pipeline.push({ $match: matchQuery });
+
+    // Add pagination to the pipeline
+    pipeline.push({ $skip: skipDocuments }, { $limit: propertiesPerPage });
+
+    const properties = await Properties.aggregate(pipeline);
+
+    const propertyPromises = properties.map(async (propertyData) => {
+      let property = await Properties.findById(propertyData._id); // Retrieve the full Mongoose document
+      if (property) {
+        property.viewedCount++;
+        return property.save(); // Now .save() is available
+      }
+    });
+
+    const allProperties = await Promise.all(propertyPromises);
+
+    res.status(200).json({
+      message: "Fetched recently added properties successfully",
+      success: true,
+      body: allProperties,
+      page: page,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "getRecentlyAddedProperties",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: new Date().toISOString(),
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
 module.exports = {
   addPropertyRequest,
   fetchCoordinatesOfProperties,
@@ -368,4 +575,7 @@ module.exports = {
   getPropertyByUsername,
   updateProperty,
   addPropertyImages,
+  getFeaturedProperty,
+  getMostViewedProperties,
+  getRecentlyAddedProperties,
 };

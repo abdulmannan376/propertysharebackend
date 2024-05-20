@@ -20,4 +20,17 @@ router.post(
   PropertyController.addPropertyImages
 );
 
+router.get(
+  "/get-featured-property/:key",
+  PropertyController.getFeaturedProperty
+);
+router.get(
+  "/get-most-viewed-property/:key",
+  PropertyController.getMostViewedProperties
+);
+router.get(
+  "/get-recently-added-property/:key",
+  PropertyController.getRecentlyAddedProperties
+);
+
 module.exports = router;

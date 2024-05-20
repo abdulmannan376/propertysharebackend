@@ -4,12 +4,16 @@ const slugify = require("slugify");
 const PropertySchema = new mongoose.Schema({
   title: { type: String, required: true },
   slug: { type: String, unique: true },
-  coordinates: {
+  location: {
     type: {
-      latitude: String,
-      longitude: String,
+      type: String, // Don't do `{ location: { type: String } }`
+      enum: ["Point"], // 'location.type' must be 'Point'
+      required: true,
     },
-    required: true,
+    coordinates: {
+      type: [Number], // Array of numbers, [longitude, latitude]
+      required: true,
+    },
   },
   propertyType: {
     type: String,
