@@ -362,24 +362,102 @@ const addPropertyImages = async (req, res) => {
   }
 };
 
+// const getFeaturedProperty = async (req, res) => {
+
+//   try {
+//     const body = JSON.parse(req.params.key);
+//     const { coordinates, propertyType, beds, area, price, page } = body;
+//     const matchQuery = { status: "Featured" }; // Default match query
+
+//     console.log("body: ", body);
+//     // Adding dynamic filters based on the request body
+//     if (propertyType && propertyType !== "")
+//       matchQuery.propertyType = propertyType;
+//     if (beds && beds !== "") matchQuery.beds = beds;
+//     if (area && area !== "") matchQuery.area = { $lte: area };
+//     if (price && price !== "") matchQuery.price = { $lte: price };
+
+//     const pipeline = [];
+
+//     const propertiesPerPage = 8;
+//     const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
+
+//     // If coordinates are provided and they are not empty
+//     if (coordinates && coordinates.length === 2) {
+//       pipeline.push({
+//         $geoNear: {
+//           near: { type: "Point", coordinates: coordinates.map(Number) },
+//           distanceField: "distance",
+//           maxDistance: 3000, // 3 kilometers in meters
+//           spherical: true,
+//         },
+//       });
+//     }
+
+//     pipeline.push({ $match: matchQuery });
+
+//     // Add pagination to the pipeline
+//     pipeline.push({ $skip: skipDocuments }, { $limit: propertiesPerPage });
+
+//     const properties = await Properties.aggregate(pipeline);
+
+//     const propertyPromises = properties.map(async (propertyData) => {
+//       let property = await Properties.findById(propertyData._id); // Retrieve the full Mongoose document
+//       if (property) {
+//         property.viewedCount++;
+//         return property.save(); // Now .save() is available
+//       }
+//     });
+
+//     const allProperties = await Promise.all(propertyPromises);
+
+//     res.status(200).json({
+//       message: "Fetched featured properties successfully",
+//       success: true,
+//       body: allProperties,
+//       page: page,
+//     });
+//   } catch (error) {
+//     console.log(`Error: ${error}`, "location: ", {
+//       function: "getFeaturedProperty",
+//       fileLocation: "controllers/PropertyController.js",
+//       timestamp: currentDateString,
+//     });
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error, success: false });
+//   }
+// };
+
 const getFeaturedProperty = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key);
     const { coordinates, propertyType, beds, area, price, page } = body;
     const matchQuery = { status: "Featured" }; // Default match query
 
-    console.log("body: ", body);
+    // console.log("body: ", body);
     // Adding dynamic filters based on the request body
-    if (propertyType && propertyType !== "")
-      matchQuery.propertyType = propertyType;
-    if (beds && beds !== "") matchQuery.beds = beds;
-    if (area && area !== "") matchQuery.area = { $lte: area };
-    if (price && price !== "") matchQuery.price = { $lte: price };
+    if (propertyType && propertyType.length > 0)
+      matchQuery.propertyType = { $in: propertyType };
+    if (area && area.length === 2) {
+      if (area[0] !== "0") {
+        matchQuery.area = { $gte: parseFloat(area[0]) };
+      }
+      if (area[1] !== "ANY") {
+        matchQuery.area = { ...matchQuery.area, $lte: parseFloat(area[1]) };
+      }
+    }
+
+    if (price && price.length === 2) {
+      if (price[0] !== "0") {
+        matchQuery.price = { $gte: parseFloat(price[0]) };
+      }
+      if (price[1] !== "ANY") {
+        matchQuery.price = { ...matchQuery.price, $lte: parseFloat(price[1]) };
+      }
+    }
 
     const pipeline = [];
-
-    const propertiesPerPage = 8;
-    const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
 
     // If coordinates are provided and they are not empty
     if (coordinates && coordinates.length === 2) {
@@ -389,15 +467,52 @@ const getFeaturedProperty = async (req, res) => {
           distanceField: "distance",
           maxDistance: 3000, // 3 kilometers in meters
           spherical: true,
+          query: matchQuery,
         },
       });
     }
 
     pipeline.push({ $match: matchQuery });
 
+    // Lookup to join with the PropertyAmenities collection
+    pipeline.push({
+      $lookup: {
+        from: "property_amenities",
+        localField: "amenitiesID",
+        foreignField: "_id",
+        as: "amenities",
+      },
+    });
+
+    // Unwind the result to deconstruct the amenities array
+    pipeline.push({
+      $unwind: {
+        path: "$amenities",
+        includeArrayIndex: "string",
+        preserveNullAndEmptyArrays: false,
+      },
+    });
+
+    // Adding dynamic filter for beds if specified
+    if (beds && beds.length > 0) {
+      pipeline.push({
+        $match: {
+          "amenities.roomDetails.inputs.beds": { $in: beds.map(Number) },
+        },
+      });
+    }
+
+    const propertiesPerPage = 8;
+    const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
+
+    const pipelineForTotalData = [...pipeline];
+
     // Add pagination to the pipeline
     pipeline.push({ $skip: skipDocuments }, { $limit: propertiesPerPage });
 
+    console.log(pipeline);
+
+    const propertiesTotal = await Properties.aggregate(pipelineForTotalData);
     const properties = await Properties.aggregate(pipeline);
 
     const propertyPromises = properties.map(async (propertyData) => {
@@ -415,12 +530,13 @@ const getFeaturedProperty = async (req, res) => {
       success: true,
       body: allProperties,
       page: page,
+      totalPages: Math.floor(propertiesTotal.length / 8) + 1,
     });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
       function: "getFeaturedProperty",
       fileLocation: "controllers/PropertyController.js",
-      timestamp: currentDateString,
+      timestamp: new Date().toISOString(),
     });
     res
       .status(500)
@@ -432,15 +548,29 @@ const getMostViewedProperties = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key); // Parsing the key from params which should be a JSON string
     const { coordinates, propertyType, beds, area, price, page } = body;
-    const matchQuery = { viewedCount: { $gte: 20 } }; // Using viewedCount greater than or equal to 20
+    const matchQuery = { viewedCount: { $gte: 5 } }; // Using viewedCount greater than or equal to 20
 
     console.log("body: ", body);
     // Adding dynamic filters based on the request body
-    if (propertyType && propertyType !== "")
-      matchQuery.propertyType = propertyType;
-    if (beds && beds !== "") matchQuery.beds = beds;
-    if (area && area !== "") matchQuery.area = { $lte: area };
-    if (price && price !== "") matchQuery.price = { $lte: price };
+    if (propertyType && propertyType.length > 0)
+      matchQuery.propertyType = { $in: propertyType };
+    if (area && area.length === 2) {
+      if (area[0] !== "0") {
+        matchQuery.area = { $gte: parseFloat(area[0]) };
+      }
+      if (area[1] !== "ANY") {
+        matchQuery.area = { ...matchQuery.area, $lte: parseFloat(area[1]) };
+      }
+    }
+
+    if (price && price.length === 2) {
+      if (price[0] !== "0") {
+        matchQuery.price = { $gte: parseFloat(price[0]) };
+      }
+      if (price[1] !== "ANY") {
+        matchQuery.price = { ...matchQuery.price, $lte: parseFloat(price[1]) };
+      }
+    }
 
     const pipeline = [];
 
@@ -461,9 +591,40 @@ const getMostViewedProperties = async (req, res) => {
 
     pipeline.push({ $match: matchQuery });
 
+    // Lookup to join with the PropertyAmenities collection
+    pipeline.push({
+      $lookup: {
+        from: "property_amenities",
+        localField: "amenitiesID",
+        foreignField: "_id",
+        as: "amenities",
+      },
+    });
+
+    // Unwind the result to deconstruct the amenities array
+    pipeline.push({
+      $unwind: {
+        path: "$amenities",
+        includeArrayIndex: "string",
+        preserveNullAndEmptyArrays: false,
+      },
+    });
+
+    // Adding dynamic filter for beds if specified
+    if (beds && beds.length > 0) {
+      pipeline.push({
+        $match: {
+          "amenities.roomDetails.inputs.beds": { $in: beds.map(Number) },
+        },
+      });
+    }
+
+    const pipelineForTotalData = [...pipeline];
+
     // Add pagination to the pipeline
     pipeline.push({ $skip: skipDocuments }, { $limit: propertiesPerPage });
 
+    const propertiesTotal = await Properties.aggregate(pipelineForTotalData);
     const properties = await Properties.aggregate(pipeline);
 
     const propertyPromises = properties.map(async (propertyData) => {
@@ -481,6 +642,7 @@ const getMostViewedProperties = async (req, res) => {
       success: true,
       body: allProperties,
       page: page,
+      totalPages: Math.floor(propertiesTotal.length / 8) + 1,
     });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
@@ -510,11 +672,25 @@ const getRecentlyAddedProperties = async (req, res) => {
 
     console.log("body: ", body);
     // Adding dynamic filters based on the request body
-    if (propertyType && propertyType !== "")
-      matchQuery.propertyType = propertyType;
-    if (beds && beds !== "") matchQuery.beds = beds;
-    if (area && area !== "") matchQuery.area = { $lte: area };
-    if (price && price !== "") matchQuery.price = { $lte: price };
+    if (propertyType && propertyType.length > 0)
+      matchQuery.propertyType = { $in: propertyType };
+    if (area && area.length === 2) {
+      if (area[0] !== "0") {
+        matchQuery.area = { $gte: parseFloat(area[0]) };
+      }
+      if (area[1] !== "ANY") {
+        matchQuery.area = { ...matchQuery.area, $lte: parseFloat(area[1]) };
+      }
+    }
+
+    if (price && price.length === 2) {
+      if (price[0] !== "0") {
+        matchQuery.price = { $gte: parseFloat(price[0]) };
+      }
+      if (price[1] !== "ANY") {
+        matchQuery.price = { ...matchQuery.price, $lte: parseFloat(price[1]) };
+      }
+    }
 
     const propertiesPerPage = 8;
     const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
@@ -535,9 +711,38 @@ const getRecentlyAddedProperties = async (req, res) => {
 
     pipeline.push({ $match: matchQuery });
 
+    // Lookup to join with the PropertyAmenities collection
+    pipeline.push({
+      $lookup: {
+        from: "property_amenities",
+        localField: "amenitiesID",
+        foreignField: "_id",
+        as: "amenities",
+      },
+    });
+
+    // Unwind the result to deconstruct the amenities array
+    pipeline.push({
+      $unwind: {
+        path: "$amenities",
+        includeArrayIndex: "string",
+        preserveNullAndEmptyArrays: false,
+      },
+    });
+
+    // Adding dynamic filter for beds if specified
+    if (beds && beds.length > 0) {
+      pipeline.push({
+        $match: {
+          "amenities.roomDetails.inputs.beds": { $in: beds.map(Number) },
+        },
+      });
+    }
+    const pipelineForTotalData = [...pipeline];
     // Add pagination to the pipeline
     pipeline.push({ $skip: skipDocuments }, { $limit: propertiesPerPage });
 
+    const propertiesTotal = await Properties.aggregate(pipelineForTotalData);
     const properties = await Properties.aggregate(pipeline);
 
     const propertyPromises = properties.map(async (propertyData) => {
@@ -555,6 +760,7 @@ const getRecentlyAddedProperties = async (req, res) => {
       success: true,
       body: allProperties,
       page: page,
+      totalPages: Math.floor(propertiesTotal.length / 8) + 1,
     });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
