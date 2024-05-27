@@ -523,12 +523,12 @@ const getFeaturedProperty = async (req, res) => {
       }
     });
 
-    const allProperties = await Promise.all(propertyPromises);
+    await Promise.all(propertyPromises);
 
     res.status(200).json({
       message: "Fetched featured properties successfully",
       success: true,
-      body: allProperties,
+      body: properties,
       page: page,
       totalPages: Math.floor(propertiesTotal.length / 8) + 1,
     });
@@ -640,7 +640,7 @@ const getMostViewedProperties = async (req, res) => {
     res.status(200).json({
       message: "Fetched properties with high view counts successfully",
       success: true,
-      body: allProperties,
+      body: properties,
       page: page,
       totalPages: Math.floor(propertiesTotal.length / 8) + 1,
     });
@@ -753,18 +753,106 @@ const getRecentlyAddedProperties = async (req, res) => {
       }
     });
 
-    const allProperties = await Promise.all(propertyPromises);
+    await Promise.all(propertyPromises);
 
     res.status(200).json({
       message: "Fetched recently added properties successfully",
       success: true,
-      body: allProperties,
+      body: properties,
       page: page,
       totalPages: Math.floor(propertiesTotal.length / 8) + 1,
     });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
       function: "getRecentlyAddedProperties",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: new Date().toISOString(),
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const getPropertiesByType = async (req, res) => {
+  try {
+    console.log(JSON.parse(req.params.key));
+    const { propertyType } = JSON.parse(req.params.key);
+
+    const matchQuery = {};
+
+    if (propertyType && propertyType.length > 0)
+      matchQuery.propertyType = { $in: propertyType };
+
+    const pipeline = [];
+    pipeline.push({ $match: matchQuery });
+
+    const properties = await Properties.aggregate(pipeline);
+
+    const coordinates = [];
+
+    properties.map((property) => {
+      coordinates.push(property.location.coordinates);
+    });
+
+    res.status(200).json({
+      message: "Fetched coordinates successfully",
+      success: true,
+      body: coordinates,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getPropertiesByType",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: new Date().toISOString(),
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const getPropertiesByAvailableShares = async (req, res) => {
+  try {
+    console.log(JSON.parse(req.params.key));
+    const { availableShares } = JSON.parse(req.params.key);
+
+    let matchQuery = {};
+
+    if (availableShares && availableShares.length > 0) {
+      if (availableShares && availableShares.length > 0) {
+        if (availableShares.includes("Fully Available")) {
+          matchQuery.stakesOccupied = { $gte: 0, $lt: 3 };
+        } else if (availableShares.includes("Partially Available")) {
+          matchQuery = {
+            $expr: {
+              $and: [
+                { $gt: ["$stakesOccupied", 0] },
+                { $lt: ["$stakesOccupied", "$totalStakes"] },
+              ],
+            },
+          };
+        } else if (availableShares.includes("Sold")) {
+          matchQuery.stakesOccupied = { $eq: "$totalStakes" };
+        }
+      }
+    }
+    const properties = await Properties.aggregate([{ $match: matchQuery }]);
+
+    const coordinates = [];
+
+    properties.map((property) => {
+      coordinates.push(property.location.coordinates);
+    });
+
+    res.status(200).json({
+      message: "Fetched coordinates successfully",
+      success: true,
+      body: coordinates,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getPropertiesByAvailableShares",
       fileLocation: "controllers/PropertyController.js",
       timestamp: new Date().toISOString(),
     });
@@ -784,4 +872,6 @@ module.exports = {
   getFeaturedProperty,
   getMostViewedProperties,
   getRecentlyAddedProperties,
+  getPropertiesByType,
+  getPropertiesByAvailableShares,
 };

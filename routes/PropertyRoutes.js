@@ -33,4 +33,14 @@ router.get(
   PropertyController.getRecentlyAddedProperties
 );
 
+router.get(
+  "/get-property-by-type/:key",
+  PropertyController.getPropertiesByType
+);
+
+router.get(
+  "/get-property-by-available-shares/:key",
+  PropertyController.getPropertiesByAvailableShares
+);
+
 module.exports = router;
