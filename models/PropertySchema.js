@@ -68,7 +68,7 @@ const PropertySchema = new mongoose.Schema(
     propertyID: { type: String },
     amenitiesID: {
       type: mongoose.Types.ObjectId,
-      ref: "PropertyAmenitiesSchema",
+      ref: "property_amenities",
     },
   },
   { timestamps: true }

@@ -862,6 +862,31 @@ const getPropertiesByAvailableShares = async (req, res) => {
   }
 };
 
+const getPropertyByID = async (req, res) => {
+  try {
+    const { key } = req.params;
+
+    const propertyFound = await Properties.findOne({ propertyID: key })
+      .populate("amenitiesID")
+      .exec();
+
+    if (!propertyFound) {
+      return res.status(400).json({ message: "Try Again", success: false });
+    }
+
+    res.status(200).json({ message: "Fetch property data", body: propertyFound, success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getPropertyByID",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: new Date().toISOString(),
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
 module.exports = {
   addPropertyRequest,
   fetchCoordinatesOfProperties,
@@ -874,4 +899,5 @@ module.exports = {
   getRecentlyAddedProperties,
   getPropertiesByType,
   getPropertiesByAvailableShares,
+  getPropertyByID,
 };

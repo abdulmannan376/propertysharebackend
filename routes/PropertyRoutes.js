@@ -43,4 +43,6 @@ router.get(
   PropertyController.getPropertiesByAvailableShares
 );
 
+router.get("/get-property-by-id/:key", PropertyController.getPropertyByID);
+
 module.exports = router;
