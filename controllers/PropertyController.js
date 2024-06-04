@@ -5,6 +5,7 @@ const JWTController = require("../helpers/jwtController");
 const { sendEmail } = require("../helpers/emailController");
 const Properties = require("../models/PropertySchema");
 const { default: slugify } = require("slugify");
+const { promises } = require("nodemailer/lib/xoauth2");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -85,11 +86,22 @@ const getPropertyByUsername = async (req, res) => {
       publishedBy: key,
     });
 
-    console.log("propertiesByUsername: ", propertiesByUsername);
+    const propertiesWithAmenitiesPromises = propertiesByUsername.map((property) => {
+      const propertyWithAmenities = property.populate("amenitiesID");
+      return propertyWithAmenities;
+    });
+
+    const propertiesWithAmenities = await Promise.all(propertiesWithAmenitiesPromises)
+
+    console.log("propertiesByUsername: ", propertiesWithAmenities);
 
     res
       .status(200)
-      .json({ message: "Fetched", body: propertiesByUsername, success: true });
+      .json({
+        message: "Fetched",
+        body: propertiesWithAmenities,
+        success: true,
+      });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
       function: "getPropertyByUsername",
@@ -105,6 +117,7 @@ const getPropertyByUsername = async (req, res) => {
 const updateProperty = async (req, res) => {
   try {
     const body = req.body;
+    console.log("body: ", body);
     const { id } = req.params;
     const isTokenValid = await JWTController.verifyJWT(body.token);
     if (!isTokenValid) {
@@ -330,6 +343,7 @@ const addPropertyImages = async (req, res) => {
 
     propertyFound.imageDirURL = `uploads/${body.propertyID}`;
     propertyFound.imageCount = files.length;
+    propertyFound.listingStatus = listingStatus
 
     await propertyFound.save().then(() => {
       if (listingStatus === "live") {
@@ -502,7 +516,7 @@ const getFeaturedProperty = async (req, res) => {
       });
     }
 
-    const propertiesPerPage = 8;
+    const propertiesPerPage = 4;
     const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
 
     const pipelineForTotalData = [...pipeline];
@@ -574,7 +588,7 @@ const getMostViewedProperties = async (req, res) => {
 
     const pipeline = [];
 
-    const propertiesPerPage = 8;
+    const propertiesPerPage = 4;
     const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
 
     // If coordinates are provided and they are not empty
@@ -692,7 +706,7 @@ const getRecentlyAddedProperties = async (req, res) => {
       }
     }
 
-    const propertiesPerPage = 8;
+    const propertiesPerPage = 4;
     const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
 
     const pipeline = [];
@@ -874,7 +888,13 @@ const getPropertyByID = async (req, res) => {
       return res.status(400).json({ message: "Try Again", success: false });
     }
 
-    res.status(200).json({ message: "Fetch property data", body: propertyFound, success: true });
+    res
+      .status(200)
+      .json({
+        message: "Fetch property data",
+        body: propertyFound,
+        success: true,
+      });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "getPropertyByID",
