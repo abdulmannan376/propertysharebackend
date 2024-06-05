@@ -479,7 +479,7 @@ const getFeaturedProperty = async (req, res) => {
         $geoNear: {
           near: { type: "Point", coordinates: coordinates.map(Number) },
           distanceField: "distance",
-          maxDistance: 3000, // 3 kilometers in meters
+          maxDistance: 20000, // 3 kilometers in meters
           spherical: true,
           query: matchQuery,
         },
@@ -597,7 +597,7 @@ const getMostViewedProperties = async (req, res) => {
         $geoNear: {
           near: { type: "Point", coordinates: coordinates.map(Number) },
           distanceField: "distance",
-          maxDistance: 3000, // 3 kilometers in meters
+          maxDistance: 20000, // 3 kilometers in meters
           spherical: true,
         },
       });
@@ -717,7 +717,7 @@ const getRecentlyAddedProperties = async (req, res) => {
         $geoNear: {
           near: { type: "Point", coordinates: coordinates.map(Number) },
           distanceField: "distance",
-          maxDistance: 3000, // 3 kilometers in meters
+          maxDistance: 20000, // 3 kilometers in meters
           spherical: true,
         },
       });

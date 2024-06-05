@@ -38,8 +38,8 @@ const PropertySchema = new mongoose.Schema(
     valueOfProperty: { type: Number, required: true },
     addressOfProperty: {
       type: {
-        houseNumber: Number,
-        streetNumber: Number,
+        houseNumber: String,
+        streetNumber: String,
         zipCode: Number,
         city: String,
         state: String,
