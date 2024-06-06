@@ -5,8 +5,8 @@ const upload = require("../middleware/multerConfig");
 
 router.post("/add-property-request", PropertyController.addPropertyRequest);
 router.get(
-  "/fetch-coordinates-of-property/:id/:key",
-  PropertyController.fetchCoordinatesOfProperties
+  "/fetch-coordinates-of-property",
+  PropertyController.fetchCoordinatesOfRequestes
 );
 router.post("/add-new-property", PropertyController.addNewProperty);
 router.get(

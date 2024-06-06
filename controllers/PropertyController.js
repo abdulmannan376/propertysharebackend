@@ -39,25 +39,22 @@ const addPropertyRequest = async (req, res) => {
   }
 };
 
-const fetchCoordinatesOfProperties = async (req, res) => {
+const fetchCoordinatesOfRequestes = async (req, res) => {
   try {
-    const { id, key } = req.params;
-    if (id === "All requests") {
-      // Query to fetch only the coordinates from all PropertyRequest documents
-      const coordinates = await PropertyRequest.find(
-        {},
-        "coordinates -_id"
-      ).exec();
+    // Query to fetch only the coordinates from all PropertyRequest documents
+    const coordinates = await PropertyRequest.find(
+      {},
+      "coordinates -_id"
+    ).exec();
 
-      // Return the coordinates to the client
-      res.status(200).json({
-        message: "Coordinates fetched successfully",
-        data: coordinates,
-        success: true,
-      });
-    }
+    // Return the coordinates to the client
+    res.status(200).json({
+      message: "Coordinates fetched successfully",
+      data: coordinates,
+      success: true,
+    });
   } catch (error) {
-    console.log(`Error: ${error}`, "location: ", {
+    console.log(`Error: ${error}`, "\nlocation: ", {
       function: "fetchCoordinatesOfRequestedProperties",
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
@@ -86,22 +83,24 @@ const getPropertyByUsername = async (req, res) => {
       publishedBy: key,
     });
 
-    const propertiesWithAmenitiesPromises = propertiesByUsername.map((property) => {
-      const propertyWithAmenities = property.populate("amenitiesID");
-      return propertyWithAmenities;
-    });
+    const propertiesWithAmenitiesPromises = propertiesByUsername.map(
+      (property) => {
+        const propertyWithAmenities = property.populate("amenitiesID");
+        return propertyWithAmenities;
+      }
+    );
 
-    const propertiesWithAmenities = await Promise.all(propertiesWithAmenitiesPromises)
+    const propertiesWithAmenities = await Promise.all(
+      propertiesWithAmenitiesPromises
+    );
 
     console.log("propertiesByUsername: ", propertiesWithAmenities);
 
-    res
-      .status(200)
-      .json({
-        message: "Fetched",
-        body: propertiesWithAmenities,
-        success: true,
-      });
+    res.status(200).json({
+      message: "Fetched",
+      body: propertiesWithAmenities,
+      success: true,
+    });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
       function: "getPropertyByUsername",
@@ -343,7 +342,7 @@ const addPropertyImages = async (req, res) => {
 
     propertyFound.imageDirURL = `uploads/${body.propertyID}`;
     propertyFound.imageCount = files.length;
-    propertyFound.listingStatus = listingStatus
+    propertyFound.listingStatus = listingStatus;
 
     await propertyFound.save().then(() => {
       if (listingStatus === "live") {
@@ -834,21 +833,19 @@ const getPropertiesByAvailableShares = async (req, res) => {
     let matchQuery = {};
 
     if (availableShares && availableShares.length > 0) {
-      if (availableShares && availableShares.length > 0) {
-        if (availableShares.includes("Fully Available")) {
-          matchQuery.stakesOccupied = { $gte: 0, $lt: 3 };
-        } else if (availableShares.includes("Partially Available")) {
-          matchQuery = {
-            $expr: {
-              $and: [
-                { $gt: ["$stakesOccupied", 0] },
-                { $lt: ["$stakesOccupied", "$totalStakes"] },
-              ],
-            },
-          };
-        } else if (availableShares.includes("Sold")) {
-          matchQuery.stakesOccupied = { $eq: "$totalStakes" };
-        }
+      if (availableShares.includes("Fully Available")) {
+        matchQuery.stakesOccupied = { $gte: 0, $lt: 3 };
+      } else if (availableShares.includes("Partially Available")) {
+        matchQuery = {
+          $expr: {
+            $and: [
+              { $gt: ["$stakesOccupied", 0] },
+              { $lt: ["$stakesOccupied", "$totalStakes"] },
+            ],
+          },
+        };
+      } else if (availableShares.includes("Sold")) {
+        matchQuery.stakesOccupied = { $eq: "$totalStakes" };
       }
     }
     const properties = await Properties.aggregate([{ $match: matchQuery }]);
@@ -888,13 +885,11 @@ const getPropertyByID = async (req, res) => {
       return res.status(400).json({ message: "Try Again", success: false });
     }
 
-    res
-      .status(200)
-      .json({
-        message: "Fetch property data",
-        body: propertyFound,
-        success: true,
-      });
+    res.status(200).json({
+      message: "Fetch property data",
+      body: propertyFound,
+      success: true,
+    });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "getPropertyByID",
@@ -909,7 +904,7 @@ const getPropertyByID = async (req, res) => {
 
 module.exports = {
   addPropertyRequest,
-  fetchCoordinatesOfProperties,
+  fetchCoordinatesOfRequestes,
   addNewProperty,
   getPropertyByUsername,
   updateProperty,
