@@ -1,6 +1,7 @@
 const PropertyRequest = require("../models/PropertyRequestSchema");
 const PropertyListing = require("../models/PropertySchema");
 const PropertyAmenities = require("../models/AmenitiesSchema");
+const PropertyShare = require("../models/PropertyShareSchema");
 const JWTController = require("../helpers/jwtController");
 const { sendEmail } = require("../helpers/emailController");
 const Properties = require("../models/PropertySchema");
@@ -222,6 +223,56 @@ const updateProperty = async (req, res) => {
   }
 };
 
+const testGenerateShareID = async (req, res) => {
+  const startDurationFrom = new Date("2024-06-12");
+
+  for (let i = 0; i <= 20; i++) {
+    let newPropertyShare;
+    console.log("i: ", i);
+    if (i === 0) {
+      const startDate = new Date(startDurationFrom);
+      const endDate = new Date();
+      endDate.setDate(startDurationFrom.getDate() + 14);
+
+      // newPropertyShare = new PropertyShare({
+      //   availableInDuration: {
+      //     startDate: startDate,
+      //     endDate: endDate,
+      //   },
+      // });
+      console.log(
+        JSON.stringify({
+          startDate: startDate,
+          endDate: endDate,
+        })
+      );
+    } else {
+      const startDate = new Date();
+      const startAt = i * 14;
+      startDate.setDate(startDurationFrom.getDate() + startAt);
+      const endDate = new Date();
+      const endAt = (i + 1) * 14;
+      endDate.setDate(startDurationFrom.getDate() + endAt);
+      console.log(
+        JSON.stringify({
+          startDate: startDate,
+          endDate: endDate,
+        })
+      );
+      // newPropertyShare = new PropertyShare({
+      //   availableInDuration: {
+      //     startDate: startDate,
+      //     endDate: endDate,
+      //   },
+      // });
+    }
+    // await newPropertyShare.save();
+    // newProperty.shareDocIDList.push(newPropertyShare._id);
+  }
+
+  return res.status(200);
+};
+
 const addNewProperty = async (req, res) => {
   try {
     const body = req.body;
@@ -278,6 +329,41 @@ const addNewProperty = async (req, res) => {
     });
 
     await newAmenities.save();
+    await newProperty.save();
+    const startDurationFrom = new Date(body.startDate);
+    const shareDocIDList = [];
+
+    for (let i = 0; i <= 20; i++) {
+      const startAt = i * 14;
+      const endAt = (i + 1) * 14;
+
+      const startDate = new Date(startDurationFrom);
+      startDate.setDate(startDurationFrom.getDate() + startAt);
+      const endDate = new Date(startDurationFrom);
+      endDate.setDate(startDurationFrom.getDate() + endAt);
+
+      let shareIndex
+      if(i>=0 && i<=9) {
+        shareIndex = `0${i}`
+      } else {
+        shareIndex = i
+      }
+
+      const newPropertyShare = new PropertyShare({
+        availableInDuration: {
+          startDate: startDate,
+          endDate: endDate,
+        },
+        propertyDocID: newProperty._id,
+        shareID: `${newProperty.propertyID}${shareIndex}`
+      });
+
+      await newPropertyShare.save();
+      shareDocIDList.push(newPropertyShare._id);
+    }
+
+    newProperty.shareDocIDList = shareDocIDList;
+
     await newProperty.save().then(() => {
       if (listingStatus === "live") {
         const subject = `Property (${newProperty.propertyID}) status of listing.`;
@@ -478,7 +564,7 @@ const getFeaturedProperty = async (req, res) => {
         $geoNear: {
           near: { type: "Point", coordinates: coordinates.map(Number) },
           distanceField: "distance",
-          maxDistance: 20000, // 3 kilometers in meters
+          maxDistance: 300000, // 10000 kilometers in meters
           spherical: true,
           query: matchQuery,
         },
@@ -596,7 +682,7 @@ const getMostViewedProperties = async (req, res) => {
         $geoNear: {
           near: { type: "Point", coordinates: coordinates.map(Number) },
           distanceField: "distance",
-          maxDistance: 20000, // 3 kilometers in meters
+          maxDistance: 300000, // 3 kilometers in meters
           spherical: true,
         },
       });
@@ -676,7 +762,7 @@ const getRecentlyAddedProperties = async (req, res) => {
 
     // Calculate the date 5 days ago
     const fiveDaysAgo = new Date();
-    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 60);
 
     // Match query to find properties added within the last 5 days
     const matchQuery = {
@@ -716,7 +802,7 @@ const getRecentlyAddedProperties = async (req, res) => {
         $geoNear: {
           near: { type: "Point", coordinates: coordinates.map(Number) },
           distanceField: "distance",
-          maxDistance: 20000, // 3 kilometers in meters
+          maxDistance: 300000, // 300 kilometers in meters
           spherical: true,
         },
       });
@@ -915,4 +1001,5 @@ module.exports = {
   getPropertiesByType,
   getPropertiesByAvailableShares,
   getPropertyByID,
+  testGenerateShareID,
 };

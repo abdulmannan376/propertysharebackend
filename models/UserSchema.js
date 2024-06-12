@@ -7,7 +7,11 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   loggedIn: { type: Boolean, required: true },
-  role: { type: String, required: true, enum: ["admin", "user"] },
+  role: {
+    type: String,
+    required: true,
+    enum: ["admin", "user", "shareholder", "super admin"],
+  },
   emailVerificationCode: { type: Number },
   emailVerified: { type: Boolean, required: true },
   userDefaultSettingID: {

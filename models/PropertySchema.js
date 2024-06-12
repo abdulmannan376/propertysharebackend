@@ -66,6 +66,10 @@ const PropertySchema = new mongoose.Schema(
     imageDirURL: { type: String, default: "" },
     imageCount: { type: Number, default: 0 },
     propertyID: { type: String },
+    shareDocIDList: {
+      type: [],
+      required: true,
+    },
     amenitiesID: {
       type: mongoose.Types.ObjectId,
       ref: "property_amenities",
