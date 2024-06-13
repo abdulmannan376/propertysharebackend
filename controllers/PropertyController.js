@@ -6,7 +6,6 @@ const JWTController = require("../helpers/jwtController");
 const { sendEmail } = require("../helpers/emailController");
 const Properties = require("../models/PropertySchema");
 const { default: slugify } = require("slugify");
-const { promises } = require("nodemailer/lib/xoauth2");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -139,7 +138,7 @@ const updateProperty = async (req, res) => {
       listingStatus = "live";
     } else if (body.userRole === "user" && listingStatus === "completed") {
       listingStatus = "pending approval";
-    } else if (listingStatus !== "draft") {
+    } else if (listingStatus !== "draft" && listingStatus !== "live") {
       listingStatus = "draft";
     }
 
@@ -223,56 +222,6 @@ const updateProperty = async (req, res) => {
   }
 };
 
-const testGenerateShareID = async (req, res) => {
-  const startDurationFrom = new Date("2024-06-12");
-
-  for (let i = 0; i <= 20; i++) {
-    let newPropertyShare;
-    console.log("i: ", i);
-    if (i === 0) {
-      const startDate = new Date(startDurationFrom);
-      const endDate = new Date();
-      endDate.setDate(startDurationFrom.getDate() + 14);
-
-      // newPropertyShare = new PropertyShare({
-      //   availableInDuration: {
-      //     startDate: startDate,
-      //     endDate: endDate,
-      //   },
-      // });
-      console.log(
-        JSON.stringify({
-          startDate: startDate,
-          endDate: endDate,
-        })
-      );
-    } else {
-      const startDate = new Date();
-      const startAt = i * 14;
-      startDate.setDate(startDurationFrom.getDate() + startAt);
-      const endDate = new Date();
-      const endAt = (i + 1) * 14;
-      endDate.setDate(startDurationFrom.getDate() + endAt);
-      console.log(
-        JSON.stringify({
-          startDate: startDate,
-          endDate: endDate,
-        })
-      );
-      // newPropertyShare = new PropertyShare({
-      //   availableInDuration: {
-      //     startDate: startDate,
-      //     endDate: endDate,
-      //   },
-      // });
-    }
-    // await newPropertyShare.save();
-    // newProperty.shareDocIDList.push(newPropertyShare._id);
-  }
-
-  return res.status(200);
-};
-
 const addNewProperty = async (req, res) => {
   try {
     const body = req.body;
@@ -333,7 +282,7 @@ const addNewProperty = async (req, res) => {
     const startDurationFrom = new Date(body.startDate);
     const shareDocIDList = [];
 
-    for (let i = 0; i <= 20; i++) {
+    for (let i = 0; i <= body.numOfShares; i++) {
       const startAt = i * 14;
       const endAt = (i + 1) * 14;
 
@@ -342,20 +291,20 @@ const addNewProperty = async (req, res) => {
       const endDate = new Date(startDurationFrom);
       endDate.setDate(startDurationFrom.getDate() + endAt);
 
-      let shareIndex
-      if(i>=0 && i<=9) {
-        shareIndex = `0${i}`
+      let shareIndex;
+      if (i >= 0 && i <= 9) {
+        shareIndex = `0${i}`;
       } else {
-        shareIndex = i
+        shareIndex = i;
       }
 
       const newPropertyShare = new PropertyShare({
         availableInDuration: {
-          startDate: startDate,
-          endDate: endDate,
+          startDate: startDate.toISOString().split("T")[0],
+          endDate: endDate.toISOString().split("T")[0],
         },
         propertyDocID: newProperty._id,
-        shareID: `${newProperty.propertyID}${shareIndex}`
+        shareID: `${newProperty.propertyID}${shareIndex}`,
       });
 
       await newPropertyShare.save();
@@ -417,7 +366,7 @@ const addPropertyImages = async (req, res) => {
     if (!propertyFound) {
       return res.status(400).json({ message: "Error occured", success: false });
     }
-    console.log("body: ", body);
+    // console.log("body: ", body);
 
     let listingStatus = "";
     if (body.userRole === "admin") {
@@ -601,7 +550,7 @@ const getFeaturedProperty = async (req, res) => {
       });
     }
 
-    const propertiesPerPage = 4;
+    const propertiesPerPage = 8;
     const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
 
     const pipelineForTotalData = [...pipeline];
@@ -673,7 +622,7 @@ const getMostViewedProperties = async (req, res) => {
 
     const pipeline = [];
 
-    const propertiesPerPage = 4;
+    const propertiesPerPage = 8;
     const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
 
     // If coordinates are provided and they are not empty
@@ -791,7 +740,7 @@ const getRecentlyAddedProperties = async (req, res) => {
       }
     }
 
-    const propertiesPerPage = 4;
+    const propertiesPerPage = 8;
     const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
 
     const pipeline = [];
@@ -1001,5 +950,4 @@ module.exports = {
   getPropertiesByType,
   getPropertiesByAvailableShares,
   getPropertyByID,
-  testGenerateShareID,
 };

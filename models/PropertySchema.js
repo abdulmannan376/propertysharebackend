@@ -40,7 +40,7 @@ const PropertySchema = new mongoose.Schema(
       type: {
         houseNumber: String,
         streetNumber: String,
-        zipCode: Number,
+        zipCode: String,
         city: String,
         state: String,
         country: String,

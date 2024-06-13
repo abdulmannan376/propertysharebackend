@@ -7,6 +7,7 @@ const userRoutes = require("./routes/UserRoutes");
 const propertyRoutes = require("./routes/PropertyRoutes");
 const notificationRoutes = require("./routes/notificationRoutes")
 const upload = require("./middleware/multerConfig");
+const shareRoutes = require("./routes/ShareRoutes")
 const path = require("path");
 
 app.use(cors());
@@ -17,6 +18,7 @@ require("./middleware/dbConnect");
 app.use("/user", userRoutes);
 app.use("/property", propertyRoutes);
 app.use("/notification", notificationRoutes)
+app.use("/share", shareRoutes)
 
 
 // Serve images as static files

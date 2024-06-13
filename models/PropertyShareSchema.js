@@ -12,7 +12,7 @@ const PropertyShareSchema = new mongoose.Schema({
   },
   currentOwnerDocID: {
     type: mongoose.Types.ObjectId,
-    ref: "users",
+    ref: "shareholders",
     default: null,
   },
   availableInDuration: {
@@ -20,6 +20,23 @@ const PropertyShareSchema = new mongoose.Schema({
       startDate: String,
       endDate: String,
     },
+  },
+  onSwap: {
+    type: Boolean,
+    default: false,
+  },
+  onSale: {
+    type: Boolean,
+    default: false,
+  },
+  onRent: {
+    type: Boolean,
+    default: false,
+  },
+  utilisedStatus: {
+    type: String,
+    enum: ["Purchased", "In Use", "Completed", "Listed"],
+    default: "Listed",
   },
   currentBoughtAt: {
     type: Number,
