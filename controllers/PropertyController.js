@@ -671,7 +671,7 @@ const getMostViewedProperties = async (req, res) => {
     }
 
     // Add sorting by creation date, newest first
-    pipeline.push({ $sort: { createdAt: -1 } });
+    pipeline.push({ $sort: { viewedCount: -1 } });
 
     const pipelineForTotalData = [...pipeline];
 
