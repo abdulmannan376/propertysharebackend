@@ -4,6 +4,9 @@ const Users = require("../models/UserSchema");
 const Shareholders = require("../models/ShareholderSchema");
 const { sendEmail } = require("../helpers/emailController");
 
+const currentDateMilliseconds = Date.now();
+const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
+
 const buyShare = async (req, res) => {
   try {
     const { username, shareID, price } = req.body;
@@ -16,7 +19,7 @@ const buyShare = async (req, res) => {
     })
       .populate("propertyDocID")
       .exec();
-
+    // console.log("propertyShareFound: ", propertyShareFound);
     const propertyFound = await Properties.findOne({
       _id: propertyShareFound.propertyDocID._id,
     });
@@ -54,6 +57,12 @@ const buyShare = async (req, res) => {
         .status(201)
         .json({ message: "Purchase successfull", success: true });
     }
+
+    propertyShareFound.currentBoughtAt = price;
+    propertyShareFound.utilisedStatus = "Purchased";
+    propertyShareFound.currentOwnerDocID = shareholderFound._id;
+
+    await propertyShareFound.save()
 
     const shareDocIDList = shareholderFound.purchasedShareIDList;
     shareDocIDList.push({ shareID: propertyShareFound._id });
@@ -118,7 +127,37 @@ const getBuySharesDetailByUsername = async (req, res) => {
   }
 };
 
+const getSharesByProperty = async (req, res) => {
+  try {
+    const { key } = req.params;
+
+    const propertySharesFound = await PropertyShares.find({
+      propertyDocID: key,
+    });
+
+    if (!propertySharesFound || propertySharesFound.length === 0) {
+      return res.status(400).json({ message: "Try again.", success: false });
+    }
+
+    res.status(200).json({
+      message: "Fetch successfull",
+      success: true,
+      body: propertySharesFound,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getSharesByProperty",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
 module.exports = {
   buyShare,
   getBuySharesDetailByUsername,
+  getSharesByProperty,
 };

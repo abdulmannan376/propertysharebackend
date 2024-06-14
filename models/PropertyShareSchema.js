@@ -28,8 +28,8 @@ const PropertyShareSchema = new mongoose.Schema({
   },
   availableInDuration: {
     type: {
-      startDate: Number,
-      endDate: Number,
+      startDate: String,
+      endDate: String,
     },
   },
   onSwap: {
