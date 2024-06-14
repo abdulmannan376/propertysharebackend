@@ -63,9 +63,9 @@ const buyShare = async (req, res) => {
     await propertyFound.save();
 
     shareholderFound.save().then(() => {
-      const recipient = userFound.email;
+      const recipient = shareholderFound.userID.email;
       const subject = "Successfull Purchase of Share.";
-      const body = `Dear ${userFound.name}, \nThis email is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
+      const body = `Dear ${shareholderFound.userID.name}, \nThis email is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
 
       sendEmail(recipient, subject, body);
     });

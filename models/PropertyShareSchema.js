@@ -15,10 +15,21 @@ const PropertyShareSchema = new mongoose.Schema({
     ref: "shareholders",
     default: null,
   },
+  reservedByUserDocID: {
+    type: mongoose.Types.ObjectId,
+    ref: "users",
+    default: null,
+  },
+  reservationDuration: {
+    type: {
+      startDateTime: Number,
+      endDateTime: Number,
+    },
+  },
   availableInDuration: {
     type: {
-      startDate: String,
-      endDate: String,
+      startDate: Number,
+      endDate: Number,
     },
   },
   onSwap: {
@@ -35,7 +46,7 @@ const PropertyShareSchema = new mongoose.Schema({
   },
   utilisedStatus: {
     type: String,
-    enum: ["Purchased", "In Use", "Completed", "Listed"],
+    enum: ["Purchased", "Reserved", "In Use", "Completed", "Listed"],
     default: "Listed",
   },
   currentBoughtAt: {

@@ -300,8 +300,8 @@ const addNewProperty = async (req, res) => {
 
       const newPropertyShare = new PropertyShare({
         availableInDuration: {
-          startDate: startDate.toISOString().split("T")[0],
-          endDate: endDate.toISOString().split("T")[0],
+          startDate: startDate.getUTCMilliseconds(),
+          endDate: endDate.getUTCMilliseconds(),
         },
         propertyDocID: newProperty._id,
         shareID: `${newProperty.propertyID}${shareIndex}`,
@@ -553,6 +553,9 @@ const getFeaturedProperty = async (req, res) => {
     const propertiesPerPage = 8;
     const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
 
+    // Add sorting by creation date, newest first
+    pipeline.push({ $sort: { createdAt: -1 } });
+
     const pipelineForTotalData = [...pipeline];
 
     // Add pagination to the pipeline
@@ -666,6 +669,9 @@ const getMostViewedProperties = async (req, res) => {
         },
       });
     }
+
+    // Add sorting by creation date, newest first
+    pipeline.push({ $sort: { createdAt: -1 } });
 
     const pipelineForTotalData = [...pipeline];
 
@@ -786,6 +792,10 @@ const getRecentlyAddedProperties = async (req, res) => {
         },
       });
     }
+
+    // Add sorting by creation date, newest first
+    pipeline.push({ $sort: { createdAt: -1 } });
+
     const pipelineForTotalData = [...pipeline];
     // Add pagination to the pipeline
     pipeline.push({ $skip: skipDocuments }, { $limit: propertiesPerPage });
@@ -840,7 +850,10 @@ const getPropertiesByType = async (req, res) => {
     const coordinates = [];
 
     properties.map((property) => {
-      coordinates.push(property.location.coordinates);
+      coordinates.push({
+        coordinates: property.location.coordinates,
+        propertyID: property.propertyID,
+      });
     });
 
     res.status(200).json({
@@ -888,7 +901,10 @@ const getPropertiesByAvailableShares = async (req, res) => {
     const coordinates = [];
 
     properties.map((property) => {
-      coordinates.push(property.location.coordinates);
+      coordinates.push({
+        coordinates: property.location.coordinates,
+        propertyID: property.propertyID,
+      });
     });
 
     res.status(200).json({
