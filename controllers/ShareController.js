@@ -3,6 +3,7 @@ const Properties = require("../models/PropertySchema");
 const Users = require("../models/UserSchema");
 const Shareholders = require("../models/ShareholderSchema");
 const { sendEmail } = require("../helpers/emailController");
+const { listenerCount } = require("../models/PropertyRequestSchema");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -62,7 +63,7 @@ const buyShare = async (req, res) => {
     propertyShareFound.utilisedStatus = "Purchased";
     propertyShareFound.currentOwnerDocID = shareholderFound._id;
 
-    await propertyShareFound.save()
+    await propertyShareFound.save();
 
     const shareDocIDList = shareholderFound.purchasedShareIDList;
     shareDocIDList.push({ shareID: propertyShareFound._id });
@@ -98,22 +99,52 @@ const getBuySharesDetailByUsername = async (req, res) => {
     const shareholderFound = await Shareholders.findOne({ username: key });
 
     if (!shareholderFound) {
-      return res.status(400).json({ message: "Try again.", success: false });
+      return res
+        .status(400)
+        .json({ message: "No Purchases found.", success: false });
     }
 
     const sharesByUsernamePromises = shareholderFound.purchasedShareIDList.map(
       (share) => {
-        const shareDetail = PropertyShares.findOne(share.shareDocID);
+        const shareDetail = PropertyShares.findOne(share.shareDocID)
+          .populate(
+            "propertyDocID",
+            "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+          )
+          .exec();
         return shareDetail;
       }
     );
 
     const sharesByUsername = await Promise.all(sharesByUsernamePromises);
 
+    // Assuming sharesByUsername is an array of share objects
+    const sharesPerProperty = sharesByUsername.reduce((acc, share) => {
+      const propertyID = share.propertyDocID.propertyID;
+      // Check if the propertyID already has an entry in the accumulator
+      if (acc[propertyID]) {
+        // If yes, increment the count
+        acc[propertyID].count++;
+      } else {
+        // If no, create a new entry
+        acc[propertyID] = {
+          propertyID: propertyID,
+          propertyDetails: share.propertyDocID,
+          count: 1,
+        };
+      }
+      return acc;
+    }, {});
+
+    // To convert the object back into an array if needed:
+    const sharesPerPropertyArray = Object.values(sharesPerProperty);
+
     res.status(200).json({
       message: "Fetched data",
       success: true,
-      body: sharesByUsername,
+      body: {
+        sharesPerProperty: sharesPerPropertyArray,
+      },
     });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
@@ -156,8 +187,55 @@ const getSharesByProperty = async (req, res) => {
   }
 };
 
+const reserveShare = async (req, res) => {
+  try {
+    const { username, shareID } = req.body;
+    const userFound = await Users.findOne({ username: username });
+    if (!userFound) {
+      return res.status(400).json({ message: "Try again.", success: false });
+    }
+
+    const propertyShareFound = await PropertyShares.findOne({
+      shareID: shareID,
+    })
+      .populate("propertyDocID")
+      .exec();
+
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 2);
+
+    console.log("startDate: ", startDate, "\nendDate", endDate)
+    propertyShareFound.reservedByUserDocID = userFound._id;
+    propertyShareFound.reservationDuration = {
+      startDateTime: startDate.toISOString().split("T")[0],
+      endDateTime: endDate.toISOString().split("T")[0],
+    };
+
+    propertyShareFound.utilisedStatus = "Reserved";
+
+    await propertyShareFound.save().then(() => {
+      const recipient = userFound.email;
+      const subject = "Successfull Purchase of Share.";
+      const body = `Dear ${userFound.name}, \nThis email is to confirm your reservation of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. This reservation will be removed from your reservations after 2 days from now please confirm you purchase as soon as possible. \nRegards, \nBeach Bunny House.`;
+
+      sendEmail(recipient, subject, body);
+    });
+    res.status(201).json({ message: "Reservation successfull", success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "reserveShare",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
 module.exports = {
   buyShare,
   getBuySharesDetailByUsername,
   getSharesByProperty,
+  reserveShare,
 };

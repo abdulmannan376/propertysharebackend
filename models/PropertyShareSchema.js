@@ -22,8 +22,8 @@ const PropertyShareSchema = new mongoose.Schema({
   },
   reservationDuration: {
     type: {
-      startDateTime: Number,
-      endDateTime: Number,
+      startDateTime: String,
+      endDateTime: String,
     },
   },
   availableInDuration: {
@@ -46,7 +46,7 @@ const PropertyShareSchema = new mongoose.Schema({
   },
   utilisedStatus: {
     type: String,
-    enum: ["Purchased", "Reserved", "In Use", "Completed", "Listed"],
+    enum: ["Purchased", "Reserved", "On Rent", "On Swap", "In Use", "Completed", "Listed"],
     default: "Listed",
   },
   currentBoughtAt: {
