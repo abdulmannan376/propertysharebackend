@@ -6,6 +6,8 @@ const JWTController = require("../helpers/jwtController");
 const { sendEmail } = require("../helpers/emailController");
 const Properties = require("../models/PropertySchema");
 const { default: slugify } = require("slugify");
+const fs = require("fs/promises"); // Use promises version for async operations
+const path = require("path");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -13,22 +15,40 @@ const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
 const addPropertyRequest = async (req, res) => {
   try {
     const body = req.body;
+    console.log(body);
 
-    const propertyCoordinates = { lat: body.lat, long: body.long };
+    const propertyLocation = {
+      type: "Point",
+      coordinates: [body.long, body.lat],
+    };
+
     const newPropertyRequest = new PropertyRequest({
-      coordinates: propertyCoordinates,
+      location: propertyLocation,
       personDetails: {
         name: body.name,
         email: body.email,
         contact: body.contact,
       },
+      requirementDetails: {
+        propertyType: body.propertyType,
+        areaRange: body.areaRange,
+        priceRange: body.priceRange,
+      },
     });
 
-    await newPropertyRequest.save();
+    await newPropertyRequest.save().then(() => {
+      const recipient = body.email;
+      const subject = "New Property Request at Beach Bunny House";
+      const emailBody = `Dear ${body.name}, \nYour request has been successfully submitted into our system any property according to your requirement will be infromed to you by our email. \nRegards \nBeach Bunny House.`;
 
-    res.status(201).json({ message: "Request submitted", success: true });
+      sendEmail(recipient, subject, emailBody);
+      res.status(201).json({
+        message: "A confirmation email is sent to you.",
+        success: true,
+      });
+    });
   } catch (error) {
-    console.log(`Error: ${error}`, "location: ", {
+    console.log(`Error: ${error}`, "\nlocation: ", {
       function: "addPropertyRequest",
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
@@ -344,7 +364,7 @@ const addNewProperty = async (req, res) => {
       }
     });
   } catch (error) {
-    console.log(`Error: ${error}`, "location: ", {
+    console.log(`Error: ${error}`, "\nlocation: ", {
       function: "addNewProperty",
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
@@ -375,8 +395,11 @@ const addPropertyImages = async (req, res) => {
       listingStatus = "pending approval";
     }
 
-    propertyFound.imageDirURL = `uploads/${body.propertyID}`;
-    propertyFound.imageCount = files.length;
+    propertyFound.imageDirURL = `uploads/${body.propertyID}/`;
+    const updatedImageCount = fs
+      .readdirSync(propertyFound.imageDirURL)
+      .filter((file) => file.startsWith("image-")).length;
+    propertyFound.imageCount = updatedImageCount;
     propertyFound.listingStatus = listingStatus;
 
     await propertyFound.save().then(() => {
@@ -401,6 +424,51 @@ const addPropertyImages = async (req, res) => {
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
       function: "addPropertyImages",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const deleteAllImages = async (req, res) => {
+  try {
+    const body = req.body;
+    const propertyFound = await Properties.findOne({
+      propertyID: body.propertyID,
+    });
+
+    if (!propertyFound) {
+      return res.status(400).json({ message: "Error occured", success: false });
+    }
+
+    const imageDir = `uploads/${body.propertyID}/`;
+
+    // Check if directory exists before attempting to remove it
+    try {
+      await fs.access(imageDir);
+      await fs.rmdir(imageDir, { recursive: true });
+      console.log(
+        `All images have been deleted and directory ${imageDir} removed.`
+      );
+    } catch (dirError) {
+      console.error(`Error accessing or removing directory: ${dirError}`);
+      return res
+        .status(500)
+        .json({ message: "Failed to delete images directory", success: false });
+    }
+
+    // Optionally update the property record if needed
+    propertyFound.imageCount = 0;
+    propertyFound.imageDirURL = "";
+    await propertyFound.save();
+
+    res.json({ message: "All images successfully deleted", success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "deleteAllImages",
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
@@ -561,7 +629,7 @@ const getFeaturedProperty = async (req, res) => {
     // Add pagination to the pipeline
     pipeline.push({ $skip: skipDocuments }, { $limit: propertiesPerPage });
 
-    console.log(pipeline);
+    // console.log(pipeline);
 
     const propertiesTotal = await Properties.aggregate(pipelineForTotalData);
     const properties = await Properties.aggregate(pipeline);
@@ -601,7 +669,7 @@ const getMostViewedProperties = async (req, res) => {
     const { coordinates, propertyType, beds, area, price, page } = body;
     const matchQuery = { viewedCount: { $gte: 5 } }; // Using viewedCount greater than or equal to 20
 
-    console.log("body: ", body);
+    // console.log("body: ", body);
     // Adding dynamic filters based on the request body
     if (propertyType && propertyType.length > 0)
       matchQuery.propertyType = { $in: propertyType };
@@ -724,7 +792,7 @@ const getRecentlyAddedProperties = async (req, res) => {
       createdAt: { $gte: fiveDaysAgo },
     };
 
-    console.log("body: ", body);
+    // console.log("body: ", body);
     // Adding dynamic filters based on the request body
     if (propertyType && propertyType.length > 0)
       matchQuery.propertyType = { $in: propertyType };
@@ -834,7 +902,7 @@ const getRecentlyAddedProperties = async (req, res) => {
 
 const getPropertiesByType = async (req, res) => {
   try {
-    console.log(JSON.parse(req.params.key));
+    // console.log(JSON.parse(req.params.key));
     const { propertyType } = JSON.parse(req.params.key);
 
     const matchQuery = {};
@@ -875,7 +943,7 @@ const getPropertiesByType = async (req, res) => {
 
 const getPropertiesByAvailableShares = async (req, res) => {
   try {
-    console.log(JSON.parse(req.params.key));
+    // console.log(JSON.parse(req.params.key));
     const { availableShares } = JSON.parse(req.params.key);
 
     let matchQuery = {};
@@ -960,6 +1028,7 @@ module.exports = {
   getPropertyByUsername,
   updateProperty,
   addPropertyImages,
+  deleteAllImages,
   getFeaturedProperty,
   getMostViewedProperties,
   getRecentlyAddedProperties,

@@ -20,6 +20,11 @@ router.post(
   PropertyController.addPropertyImages
 );
 
+router.put(
+  "/delete-all-images-by-propertyID",
+  PropertyController.deleteAllImages
+);
+
 router.get(
   "/get-featured-property/:key",
   PropertyController.getFeaturedProperty

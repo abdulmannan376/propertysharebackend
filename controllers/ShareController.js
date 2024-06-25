@@ -44,7 +44,7 @@ const buyShare = async (req, res) => {
       propertyShareFound.utilisedStatus = "Purchased";
       propertyShareFound.currentOwnerDocID = newShareholder._id;
 
-      propertyFound.stakesOccupied++;
+      propertyFound.stakesOccupied += 1;
       await propertyFound.save();
 
       propertyShareFound.save().then(() => {
@@ -69,7 +69,7 @@ const buyShare = async (req, res) => {
     shareDocIDList.push({ shareID: propertyShareFound._id });
     shareholderFound.purchasedShareIDList = shareDocIDList;
 
-    propertyFound.stakesOccupied++;
+    propertyFound.stakesOccupied += 1;
     await propertyFound.save();
 
     shareholderFound.save().then(() => {
@@ -201,11 +201,15 @@ const reserveShare = async (req, res) => {
       .populate("propertyDocID")
       .exec();
 
+    const propertyFound = await Properties.findOne({
+      _id: propertyShareFound.propertyDocID._id,
+    });
+
     const startDate = new Date();
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + 2);
 
-    console.log("startDate: ", startDate, "\nendDate", endDate)
+    console.log("startDate: ", startDate, "\nendDate", endDate);
     propertyShareFound.reservedByUserDocID = userFound._id;
     propertyShareFound.reservationDuration = {
       startDateTime: startDate.toISOString().split("T")[0],
@@ -214,7 +218,13 @@ const reserveShare = async (req, res) => {
 
     propertyShareFound.utilisedStatus = "Reserved";
 
-    await propertyShareFound.save().then(() => {
+    propertyFound.stakesOccupied += 1;
+
+    await propertyFound.save();
+
+    console.log(propertyFound.stakesOccupied);
+
+    propertyShareFound.save().then(() => {
       const recipient = userFound.email;
       const subject = "Successfull Purchase of Share.";
       const body = `Dear ${userFound.name}, \nThis email is to confirm your reservation of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. This reservation will be removed from your reservations after 2 days from now please confirm you purchase as soon as possible. \nRegards, \nBeach Bunny House.`;
@@ -233,9 +243,68 @@ const reserveShare = async (req, res) => {
       .json({ message: "Internal Server Error", error: error, success: false });
   }
 };
+
+const getReservationsByUsername = async (req, res) => {
+  try {
+    const { key } = req.params;
+
+    const userFound = await Users.findOne({ username: key });
+
+    if (!userFound) {
+      return res.status(400).json({ message: "Try again.", success: false });
+    }
+
+    const reservedSharesList = await PropertyShares.find({
+      reservedByUserDocID: userFound._id,
+      utilisedStatus: "Reserved",
+    })
+      .populate(
+        "propertyDocID",
+        "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+      )
+      .exec();
+
+    // Assuming sharesByUsername is an array of share objects
+    const reservationsPerProperty = reservedSharesList.reduce((acc, share) => {
+      const propertyID = share.propertyDocID.propertyID;
+      // Check if the propertyID already has an entry in the accumulator
+      if (acc[propertyID]) {
+        // If yes, increment the count
+        acc[propertyID].count++;
+      } else {
+        // If no, create a new entry
+        acc[propertyID] = {
+          propertyID: propertyID,
+          propertyDetails: share.propertyDocID,
+          count: 1,
+        };
+      }
+      return acc;
+    }, {});
+
+    // To convert the object back into an array if needed:
+    const reservationsPerPropertyArray = Object.values(reservationsPerProperty);
+
+    res.status(200).json({
+      message: " Fetched reservations",
+      success: true,
+      body: reservationsPerPropertyArray,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "reserveShare",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
 module.exports = {
   buyShare,
   getBuySharesDetailByUsername,
   getSharesByProperty,
   reserveShare,
+  getReservationsByUsername,
 };

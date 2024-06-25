@@ -2,12 +2,16 @@ const mongoose = require("mongoose");
 
 const PropertyRequestSchema = new mongoose.Schema({
   requestID: { type: String },
-  coordinates: {
+  location: {
     type: {
-      lat: String,
-      long: String,
+      type: String, // Don't do `{ location: { type: String } }`
+      enum: ["Point"], // 'location.type' must be 'Point'
+      required: true,
     },
-    required: true,
+    coordinates: {
+      type: [Number], // Array of numbers, [longitude, latitude]
+      required: true,
+    },
   },
   personDetails: {
     type: {
@@ -17,8 +21,43 @@ const PropertyRequestSchema = new mongoose.Schema({
     },
     required: true,
   },
+  requirementDetails: {
+    type: {
+      propertyType: {
+        type: String,
+        enum: [
+          "Mansion",
+          "Villa",
+          "Apartment",
+          "Suite",
+          "Condo",
+          "Townhouse",
+          "Bungalow",
+          "Cabin",
+          "Studio",
+          "Single family home",
+        ],
+        required: true,
+      },
+      areaRange: {
+        type: [String],
+        required: true,
+        validate: [arrayLimit, "{PATH} must have exactly 2 values"], // Custom validator for ensuring 2 values
+      },
+      priceRange: {
+        type: [String],
+        required: true,
+        validate: [arrayLimit, "{PATH} must have exactly 2 values"], // Custom validator for ensuring 2 values
+      },
+    },
+    required: true,
+  },
   notifyCount: { type: Number, default: 0 },
 });
+
+function arrayLimit(val) {
+  return val.length === 2;
+}
 
 // Helper function to pad the sequence number
 function padNumber(num, size) {
