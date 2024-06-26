@@ -398,7 +398,7 @@ const addPropertyImages = async (req, res) => {
 
     propertyFound.imageDirURL = `uploads/${body.propertyID}/`;
     const updatedImageCount = fs
-      .readdir(propertyFound.imageDirURL)
+      .readdirSync(propertyFound.imageDirURL)
       .filter((file) => file.startsWith("image-")).length;
     propertyFound.imageCount = updatedImageCount;
     propertyFound.listingStatus = listingStatus;
