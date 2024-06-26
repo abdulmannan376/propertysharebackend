@@ -26,6 +26,7 @@ const PropertyRequestSchema = new mongoose.Schema({
       propertyType: {
         type: String,
         enum: [
+          "All",
           "Mansion",
           "Villa",
           "Apartment",

@@ -5,9 +5,10 @@ const app = express();
 const port = process.env.PORT || 5000;
 const userRoutes = require("./routes/UserRoutes");
 const propertyRoutes = require("./routes/PropertyRoutes");
-const notificationRoutes = require("./routes/notificationRoutes")
+const notificationRoutes = require("./routes/notificationRoutes");
 const upload = require("./middleware/multerConfig");
-const shareRoutes = require("./routes/ShareRoutes")
+const shareRoutes = require("./routes/ShareRoutes");
+const threadRoutes = require("./routes/threadRoutes");
 const path = require("path");
 
 app.use(cors());
@@ -17,9 +18,9 @@ require("./middleware/dbConnect");
 
 app.use("/user", userRoutes);
 app.use("/property", propertyRoutes);
-app.use("/notification", notificationRoutes)
-app.use("/share", shareRoutes)
-
+app.use("/notification", notificationRoutes);
+app.use("/share", shareRoutes);
+app.use("/thread", threadRoutes);
 
 // Serve images as static files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -35,10 +36,7 @@ app.post(
     }
     let fileNames = req.files.map((file) => file.filename);
 
-    
     res.send(`Files uploaded successfully!`);
-
-
   }
 );
 

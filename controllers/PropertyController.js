@@ -6,7 +6,8 @@ const JWTController = require("../helpers/jwtController");
 const { sendEmail } = require("../helpers/emailController");
 const Properties = require("../models/PropertySchema");
 const { default: slugify } = require("slugify");
-const fs = require("fs/promises"); // Use promises version for async operations
+const fs = require("fs")
+const fsPromises = require("fs/promises"); // Use promises version for async operations
 const path = require("path");
 
 const currentDateMilliseconds = Date.now();
@@ -64,7 +65,7 @@ const fetchCoordinatesOfRequestes = async (req, res) => {
     // Query to fetch only the coordinates from all PropertyRequest documents
     const coordinates = await PropertyRequest.find(
       {},
-      "coordinates -_id"
+      "location propertyID -_id"
     ).exec();
 
     // Return the coordinates to the client
@@ -397,7 +398,7 @@ const addPropertyImages = async (req, res) => {
 
     propertyFound.imageDirURL = `uploads/${body.propertyID}/`;
     const updatedImageCount = fs
-      .readdirSync(propertyFound.imageDirURL)
+      .readdir(propertyFound.imageDirURL)
       .filter((file) => file.startsWith("image-")).length;
     propertyFound.imageCount = updatedImageCount;
     propertyFound.listingStatus = listingStatus;
@@ -422,7 +423,7 @@ const addPropertyImages = async (req, res) => {
       }
     });
   } catch (error) {
-    console.log(`Error: ${error}`, "location: ", {
+    console.log(`Error: ${error}`, "\nlocation: ", {
       function: "addPropertyImages",
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
@@ -448,8 +449,8 @@ const deleteAllImages = async (req, res) => {
 
     // Check if directory exists before attempting to remove it
     try {
-      await fs.access(imageDir);
-      await fs.rmdir(imageDir, { recursive: true });
+      await fsPromises.access(imageDir);
+      await fsPromises.rmdir(imageDir, { recursive: true });
       console.log(
         `All images have been deleted and directory ${imageDir} removed.`
       );

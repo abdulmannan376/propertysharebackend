@@ -226,7 +226,7 @@ const reserveShare = async (req, res) => {
 
     propertyShareFound.save().then(() => {
       const recipient = userFound.email;
-      const subject = "Successfull Purchase of Share.";
+      const subject = "Successfull Reservation of Share.";
       const body = `Dear ${userFound.name}, \nThis email is to confirm your reservation of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. This reservation will be removed from your reservations after 2 days from now please confirm you purchase as soon as possible. \nRegards, \nBeach Bunny House.`;
 
       sendEmail(recipient, subject, body);

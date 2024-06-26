@@ -1,32 +1,60 @@
 const mongoose = require("mongoose");
 
-const ThreadSchema = new mongoose.Schema({
-  threadID: {
-    type: String,
+const ThreadSchema = new mongoose.Schema(
+  {
+    threadID: {
+      type: String,
+    },
+    parentThreadDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "threads",
+      default: null,
+    },
+    childThreadDocIDsList: {
+      type: [mongoose.Types.ObjectId],
+      ref: "threads",
+      default: [],
+    },
+    title: {
+      type: String,
+      default: "",
+    },
+    body: {
+      type: String,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["root", "child"],
+      default: "child",
+    },
+    likedCount: {
+      type: Number,
+      default: 0,
+    },
+    author: {
+      type: mongoose.Types.ObjectId,
+      ref: "users",
+      required: true,
+    },
+    shareDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "property_shares",
+      required: true,
+    },
+    propertyDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "properties",
+      required: true,
+    },
+    category: {
+      type: String,
+      enum: ["Rent", "Sell", "Swap"],
+      required: true,
+    },
   },
-  parentThreadDocID: {
-    type: mongoose.Types.ObjectId,
-    ref: "threads",
-    default: null,
-  },
-  childThreadDocIDsList: {
-    type: [mongoose.Types.ObjectId],
-    ref: "threads",
-    default: [],
-  },
-  body: {
-    type: String,
-    required: true
-  },
-  likedCount: {
-    type: Number,
-    default: 0,
-  },
-  author: {
-    type: mongoose.Types.ObjectId,
-    ref: 'User', // Assuming there is a User model
-  }
-}, { timestamps: true });
+  { timestamps: true }
+);
 
 // Helper function to pad the sequence number
 function padNumber(num, size) {
@@ -51,7 +79,8 @@ ThreadSchema.pre("save", async function (next) {
 
     let nextSeqNumber = 1; // Default sequence number
     if (lastEntry) {
-      const lastSeqNumber = parseInt(lastEntry.threadID.slice(prefix.length + 8)) || 0;
+      const lastSeqNumber =
+        parseInt(lastEntry.threadID.slice(prefix.length + 8)) || 0;
       nextSeqNumber = lastSeqNumber + 1;
     }
 
