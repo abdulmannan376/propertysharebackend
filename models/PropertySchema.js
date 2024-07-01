@@ -46,7 +46,6 @@ const PropertySchema = new mongoose.Schema(
         country: String,
         addressInString: String,
       },
-      required: true,
     },
     status: {
       type: String,
@@ -63,7 +62,7 @@ const PropertySchema = new mongoose.Schema(
     viewedCount: { type: Number, default: 0 },
     detail: { type: String, required: true },
     attributesID: { type: mongoose.Types.ObjectId },
-    pinnedImageIndex: { type: Number, default: -1},
+    pinnedImageIndex: { type: Number, default: -1 },
     imageDirURL: { type: String, default: "" },
     imageCount: { type: Number, default: 0 },
     propertyID: { type: String },

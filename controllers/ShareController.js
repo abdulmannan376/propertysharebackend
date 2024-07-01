@@ -31,7 +31,7 @@ const buyShare = async (req, res) => {
         return res.status(400).json({ message: "Try again.", success: false });
       }
       const shareDocIDList = [];
-      shareDocIDList.push({ shareID: propertyShareFound._id });
+      shareDocIDList.push({ shareDocID: propertyShareFound._id });
 
       const newShareholder = new Shareholders({
         userID: userFound._id,
@@ -66,7 +66,7 @@ const buyShare = async (req, res) => {
     await propertyShareFound.save();
 
     const shareDocIDList = shareholderFound.purchasedShareIDList;
-    shareDocIDList.push({ shareID: propertyShareFound._id });
+    shareDocIDList.push({ shareDocID: propertyShareFound._id });
     shareholderFound.purchasedShareIDList = shareDocIDList;
 
     propertyFound.stakesOccupied += 1;
@@ -112,14 +112,18 @@ const getBuySharesDetailByUsername = async (req, res) => {
             "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
           )
           .exec();
+        console.log("shareDetail: ", shareDetail);
         return shareDetail;
       }
     );
 
     const sharesByUsername = await Promise.all(sharesByUsernamePromises);
 
+    console.log("sharesByUsername: ", sharesByUsername);
+
     // Assuming sharesByUsername is an array of share objects
     const sharesPerProperty = sharesByUsername.reduce((acc, share) => {
+      console.log("acc: ", acc);
       const propertyID = share.propertyDocID.propertyID;
       // Check if the propertyID already has an entry in the accumulator
       if (acc[propertyID]) {
@@ -135,6 +139,8 @@ const getBuySharesDetailByUsername = async (req, res) => {
       }
       return acc;
     }, {});
+
+    console.log(sharesPerProperty);
 
     // To convert the object back into an array if needed:
     const sharesPerPropertyArray = Object.values(sharesPerProperty);

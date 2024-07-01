@@ -6,7 +6,7 @@ const JWTController = require("../helpers/jwtController");
 const { sendEmail } = require("../helpers/emailController");
 const Properties = require("../models/PropertySchema");
 const { default: slugify } = require("slugify");
-const fs = require("fs")
+const fs = require("fs");
 const fsPromises = require("fs/promises"); // Use promises version for async operations
 const path = require("path");
 
@@ -255,6 +255,7 @@ const addNewProperty = async (req, res) => {
         .json({ message: "Not authorized.", success: false });
     }
 
+    // console.log(body);
     let listingStatus = body.listingStatus;
     if (body.userRole === "admin" && listingStatus === "completed") {
       listingStatus = "live";
@@ -319,10 +320,11 @@ const addNewProperty = async (req, res) => {
         shareIndex = i;
       }
 
+      // console.log("start Date: ", startDate, "end date: ", endDate);
       const newPropertyShare = new PropertyShare({
         availableInDuration: {
-          startDate: startDate.getUTCMilliseconds(),
-          endDate: endDate.getUTCMilliseconds(),
+          startDate: startDate.toISOString().split("T")[0],
+          endDate: endDate.toISOString().split("T")[0],
         },
         propertyDocID: newProperty._id,
         shareID: `${newProperty.propertyID}${shareIndex}`,
@@ -332,6 +334,7 @@ const addNewProperty = async (req, res) => {
       shareDocIDList.push(newPropertyShare._id);
     }
 
+    console.log(shareDocIDList);
     newProperty.shareDocIDList = shareDocIDList;
 
     await newProperty.save().then(() => {
@@ -376,57 +379,172 @@ const addNewProperty = async (req, res) => {
   }
 };
 
+// Function to reorganize files in the directory
+function reorganizeFiles(directory, deleteIndices = []) {
+  console.log(directory, deleteIndices);
+  const files = fs
+    .readdirSync(directory)
+    .filter((file) => file.startsWith("image-"));
+  // Delete files as per indices provided
+  deleteIndices.sort((a, b) => b - a); // Sort indices in descending order for deletion
+  deleteIndices.forEach((index) => {
+    const filePath = path.join(directory, files[index]);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  });
+  // Rename remaining files to maintain sequence
+  const remainingFiles = fs
+    .readdirSync(directory)
+    .filter((file) => file.startsWith("image-"));
+  remainingFiles.forEach((file, index) => {
+    const newFileName = `image-${index}${path.extname(file)}`;
+    const oldFilePath = path.join(directory, file);
+    const newFilePath = path.join(directory, newFileName);
+    fs.renameSync(oldFilePath, newFilePath);
+  });
+}
+
+// const addPropertyImages = async (req, res) => {
+//   try {
+//     const body = req.body;
+//     const files = req.files;
+//     const propertyFound = await Properties.findOne({
+//       propertyID: body.propertyID,
+//     });
+
+//     if (!propertyFound) {
+//       return res.status(400).json({ message: "Error occured", success: false });
+//     }
+//     // console.log("body: ", body);
+
+//     let listingStatus = "";
+//     if (body.userRole === "admin") {
+//       listingStatus = "live";
+//     } else if (body.userRole === "user") {
+//       listingStatus = "pending approval";
+//     }
+
+//     const uploadPath = `uploads/${req.body.propertyID}/`;
+//     // Ensure the upload directory exists
+//     fs.mkdirSync(uploadPath, { recursive: true });
+//     // Delete specified images before saving new ones
+//     console.log(req.body);
+//     if (req.body.deleteImageList) {
+//       reorganizeFiles(uploadPath, req.body.deleteImageList.map(Number));
+//     }
+
+//     propertyFound.imageDirURL = uploadPath;
+//     const updatedImageCount = fs
+//       .readdirSync(propertyFound.imageDirURL)
+//       .filter((file) => file.startsWith("image-")).length;
+//     propertyFound.imageCount = updatedImageCount;
+//     propertyFound.listingStatus = listingStatus;
+
+//     await propertyFound.save().then(() => {
+//       if (listingStatus === "live") {
+//         const subject = `Property (${body.propertyID}) status of listing.`;
+//         const emailBody = `Hello ${body.userName},\nYour property with title: ${propertyFound.title}, is successfully live on our platform and is ready for operations from the start date: ${propertyFound.startDate}. \nRegards,\nBunny Beach House.`;
+//         sendEmail(body.email, subject, emailBody);
+//         return res.status(200).json({
+//           message: `Successfull.`,
+//           success: true,
+//         });
+//       } else if (listingStatus === "pending approval") {
+//         const subject = `Property (${body.propertyID}) status of listing.`;
+//         const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully sent for approval. Our team will review your request and get back to you for further proceedings. \nRegards,\nBunny Beach House.`;
+//         sendEmail(body.email, subject, emailBody);
+//         return res.status(200).json({
+//           message: `Successfull.`,
+//           success: true,
+//         });
+//       }
+//     });
+//   } catch (error) {
+//     console.log(`Error: ${error}`, "\nlocation: ", {
+//       function: "addPropertyImages",
+//       fileLocation: "controllers/PropertyController.js",
+//       timestamp: currentDateString,
+//     });
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error, success: false });
+//   }
+// };
+
 const addPropertyImages = async (req, res) => {
   try {
     const body = req.body;
     const files = req.files;
+
+    console.log(body);
     const propertyFound = await Properties.findOne({
       propertyID: body.propertyID,
     });
 
     if (!propertyFound) {
-      return res.status(400).json({ message: "Error occured", success: false });
-    }
-    // console.log("body: ", body);
-
-    let listingStatus = "";
-    if (body.userRole === "admin") {
-      listingStatus = "live";
-    } else if (body.userRole === "user") {
-      listingStatus = "pending approval";
+      return res
+        .status(400)
+        .json({ message: "Property not found", success: false });
     }
 
-    propertyFound.imageDirURL = `uploads/${body.propertyID}/`;
-    const updatedImageCount = fs
-      .readdirSync(propertyFound.imageDirURL)
+    const uploadPath = `uploads/${body.propertyID}/`;
+    // Ensure the upload directory exists
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+
+    // Handle deletion of specified images
+    if (body.deleteImageList && body.deleteImageList?.length) {
+      const existingFiles = fs
+        .readdirSync(uploadPath)
+        .filter((file) => file.startsWith("image-"));
+      body.deleteImageList.map(Number).forEach((index) => {
+        if (existingFiles[index]) {
+          fs.unlinkSync(path.join(uploadPath, existingFiles[index]));
+        }
+      });
+    }
+
+    // Save new files (assuming diskStorage is used and files are automatically saved)
+    files.forEach((file, index) => {
+      const newFilename = `image-${index + 1}${path.extname(
+        file.originalname
+      )}`;
+      const oldPath = file.path;
+      const newPath = path.join(uploadPath, newFilename);
+
+      // Rename file to maintain naming convention
+      fs.renameSync(oldPath, newPath);
+    });
+
+    // Update property with new information
+    propertyFound.imageDirURL = uploadPath;
+    propertyFound.imageCount = fs
+      .readdirSync(uploadPath)
       .filter((file) => file.startsWith("image-")).length;
-    propertyFound.imageCount = updatedImageCount;
-    propertyFound.listingStatus = listingStatus;
+    propertyFound.listingStatus =
+      body.userRole === "admin" ? "live" : "pending approval";
 
-    await propertyFound.save().then(() => {
-      if (listingStatus === "live") {
-        const subject = `Property (${body.propertyID}) status of listing.`;
-        const emailBody = `Hello ${body.userName},\nYour property with title: ${propertyFound.title}, is successfully live on our platform and is ready for operations from the start date: ${propertyFound.startDate}. \nRegards,\nBunny Beach House.`;
-        sendEmail(body.email, subject, emailBody);
-        return res.status(200).json({
-          message: `Successfull.`,
-          success: true,
-        });
-      } else if (listingStatus === "pending approval") {
-        const subject = `Property (${body.propertyID}) status of listing.`;
-        const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully sent for approval. Our team will review your request and get back to you for further proceedings. \nRegards,\nBunny Beach House.`;
-        sendEmail(body.email, subject, emailBody);
-        return res.status(200).json({
-          message: `Successfull.`,
-          success: true,
-        });
-      }
+    await propertyFound.save();
+
+    const subject = `Property (${body.propertyID}) status of listing.`;
+    const emailBody =
+      body.userRole === "admin"
+        ? `Hello ${body.userName},\nYour property with title: ${propertyFound.title}, is successfully live on our platform.\nRegards,\nBunny Beach House.`
+        : `Hello ${body.userName},\nYour property with title: ${body.title}, is under review for approval.\nRegards,\nBunny Beach House.`;
+
+    sendEmail(body.email, subject, emailBody);
+
+    res.status(200).json({
+      message: "Property images updated successfully.",
+      success: true,
     });
   } catch (error) {
-    console.log(`Error: ${error}`, "\nlocation: ", {
+    console.error(`Error in addPropertyImages: ${error}\n`, {
       function: "addPropertyImages",
       fileLocation: "controllers/PropertyController.js",
-      timestamp: currentDateString,
+      timestamp: new Date().toISOString(),
     });
     res
       .status(500)

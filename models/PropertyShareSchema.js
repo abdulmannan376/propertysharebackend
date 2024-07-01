@@ -46,7 +46,15 @@ const PropertyShareSchema = new mongoose.Schema({
   },
   utilisedStatus: {
     type: String,
-    enum: ["Purchased", "Reserved", "On Rent", "On Swap", "In Use", "Completed", "Listed"],
+    enum: [
+      "Purchased",
+      "Reserved",
+      "On Rent",
+      "On Swap",
+      "In Use",
+      "Completed",
+      "Listed",
+    ],
     default: "Listed",
   },
   currentBoughtAt: {
