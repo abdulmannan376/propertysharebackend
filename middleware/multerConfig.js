@@ -21,7 +21,7 @@ function reorganizeFiles(directory, deleteIndices = []) {
     .readdirSync(directory)
     .filter((file) => file.startsWith("image-"));
   remainingFiles.forEach((file, index) => {
-    const newFileName = `image-${index}${path.extname(file)}`;
+    const newFileName = `image-${index + 1}${path.extname(file)}`;
     const oldFilePath = path.join(directory, file);
     const newFilePath = path.join(directory, newFileName);
     fs.renameSync(oldFilePath, newFilePath);

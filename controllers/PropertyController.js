@@ -398,7 +398,7 @@ function reorganizeFiles(directory, deleteIndices = []) {
     .readdirSync(directory)
     .filter((file) => file.startsWith("image-"));
   remainingFiles.forEach((file, index) => {
-    const newFileName = `image-${index}${path.extname(file)}`;
+    const newFileName = `image-${index + 1}${path.extname(file)}`;
     const oldFilePath = path.join(directory, file);
     const newFilePath = path.join(directory, newFileName);
     fs.renameSync(oldFilePath, newFilePath);
@@ -494,30 +494,22 @@ const addPropertyImages = async (req, res) => {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
 
+    // Save new files (assuming diskStorage is used and files are automatically saved)
+    const imageCount = propertyFound.imageCount;
+    files.forEach((file, index) => {
+      const newFilename = `image-${imageCount + index + 1}${path.extname(
+        file.originalname
+      )}`;
+      const oldPath = file.path;
+      const newPath = path.join(uploadPath, newFilename);
+
+      // Rename file to maintain naming convention
+      fs.renameSync(oldPath, newPath);
+    });
+
     // Handle deletion of specified images
     if (body.deleteImageList && body.deleteImageList?.length) {
       reorganizeFiles(uploadPath, body.deleteImageList.map(Number));
-    } else {
-      const existingFiles = fs
-        .readdirSync(uploadPath)
-        .filter((file) => file.startsWith("image-"));
-      body.deleteImageList.map(Number).forEach((index) => {
-        if (existingFiles[index]) {
-          fs.unlinkSync(path.join(uploadPath, existingFiles[index]));
-        }
-      });
-
-      // Save new files (assuming diskStorage is used and files are automatically saved)
-      files.forEach((file, index) => {
-        const newFilename = `image-${index + 1}${path.extname(
-          file.originalname
-        )}`;
-        const oldPath = file.path;
-        const newPath = path.join(uploadPath, newFilename);
-
-        // Rename file to maintain naming convention
-        fs.renameSync(oldPath, newPath);
-      });
     }
 
     // Update property with new information
