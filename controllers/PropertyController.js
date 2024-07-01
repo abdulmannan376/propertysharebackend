@@ -512,6 +512,10 @@ const addPropertyImages = async (req, res) => {
       reorganizeFiles(uploadPath, body.deleteImageList.map(Number));
     }
 
+    if (body.pinnedImage) {
+      propertyFound.pinnedImageIndex = body.pinnedImage;
+    }
+
     // Update property with new information
     propertyFound.imageDirURL = uploadPath;
     propertyFound.imageCount = fs
