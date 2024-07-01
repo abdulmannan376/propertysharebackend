@@ -513,7 +513,7 @@ const addPropertyImages = async (req, res) => {
     }
 
     if (body.pinnedImage) {
-      propertyFound.pinnedImageIndex = body.pinnedImage;
+      propertyFound.pinnedImageIndex = parseInt(body.pinnedImage) + 1;
     }
 
     // Update property with new information
