@@ -15,6 +15,10 @@ const ThreadSchema = new mongoose.Schema(
       ref: "threads",
       default: [],
     },
+    childrenCount: {
+      type: Number,
+      default: 0
+    },
     title: {
       type: String,
       default: "",

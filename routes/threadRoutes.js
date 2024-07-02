@@ -6,6 +6,7 @@ const ThreadsController = require("../controllers/ThreadController");
 
 router.post("/create-root-thread", ThreadsController.genNewRootThread);
 router.post("/add-child-thread", ThreadsController.genChildToRoot);
+router.post("/add-child-to-child", ThreadsController.genChildToChild)
 
 //GET routes
 

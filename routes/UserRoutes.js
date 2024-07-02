@@ -12,5 +12,7 @@ router.get("/get-user-detail/:key", UsersController.getUserDetails)
 router.put("/update-account-settings/:key", UsersController.updateUserAccountSetting)
 router.put("/change-login-password/:key", UsersController.changeUserLoginPassword)
 
+router.get("/decrypt-password", UsersController.decryptPassword)
+
 module.exports = router
 

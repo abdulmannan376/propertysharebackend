@@ -665,28 +665,35 @@ const deleteAllImages = async (req, res) => {
 const getFeaturedProperty = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key);
-    const { coordinates, propertyType, beds, area, price, page } = body;
+    const { coordinates, propertyType, beds, area, priceRange, page } = body;
     const matchQuery = { status: "Featured" }; // Default match query
 
-    // console.log("body: ", body);
+    console.log("body: ", body);
     // Adding dynamic filters based on the request body
     if (propertyType && propertyType.length > 0)
       matchQuery.propertyType = { $in: propertyType };
     if (area && area.length === 2) {
       if (area[0] !== "0") {
         matchQuery.area = { $gte: parseFloat(area[0]) };
+      } else {
+        matchQuery.area = { $gte: parseFloat("0") };
       }
       if (area[1] !== "ANY") {
         matchQuery.area = { ...matchQuery.area, $lte: parseFloat(area[1]) };
       }
     }
 
-    if (price && price.length === 2) {
-      if (price[0] !== "0") {
-        matchQuery.price = { $gte: parseFloat(price[0]) };
+    if (priceRange && priceRange.length === 2) {
+      if (priceRange[0] !== "0") {
+        matchQuery.valuePerShare = { $gte: parseFloat(priceRange[0]) };
+      } else {
+        matchQuery.valuePerShare = { $gte: parseFloat("0") };
       }
-      if (price[1] !== "ANY") {
-        matchQuery.price = { ...matchQuery.price, $lte: parseFloat(price[1]) };
+      if (priceRange[1] !== "ANY") {
+        matchQuery.valuePerShare = {
+          ...matchQuery.valuePerShare,
+          $lte: parseFloat(priceRange[1]),
+        };
       }
     }
 
@@ -748,6 +755,8 @@ const getFeaturedProperty = async (req, res) => {
 
     // console.log(pipeline);
 
+    console.log(pipeline);
+
     const propertiesTotal = await Properties.aggregate(pipelineForTotalData);
     const properties = await Properties.aggregate(pipeline);
 
@@ -783,7 +792,7 @@ const getFeaturedProperty = async (req, res) => {
 const getMostViewedProperties = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key); // Parsing the key from params which should be a JSON string
-    const { coordinates, propertyType, beds, area, price, page } = body;
+    const { coordinates, propertyType, beds, area, priceRange, page } = body;
     const matchQuery = { viewedCount: { $gte: 5 } }; // Using viewedCount greater than or equal to 20
 
     // console.log("body: ", body);
@@ -793,18 +802,25 @@ const getMostViewedProperties = async (req, res) => {
     if (area && area.length === 2) {
       if (area[0] !== "0") {
         matchQuery.area = { $gte: parseFloat(area[0]) };
+      } else {
+        matchQuery.area = { $gte: parseFloat("0") };
       }
       if (area[1] !== "ANY") {
         matchQuery.area = { ...matchQuery.area, $lte: parseFloat(area[1]) };
       }
     }
 
-    if (price && price.length === 2) {
-      if (price[0] !== "0") {
-        matchQuery.price = { $gte: parseFloat(price[0]) };
+    if (priceRange && priceRange.length === 2) {
+      if (priceRange[0] !== "0") {
+        matchQuery.valuePerShare = { $gte: parseFloat(priceRange[0]) };
+      } else {
+        matchQuery.valuePerShare = { $gte: parseFloat("0") };
       }
-      if (price[1] !== "ANY") {
-        matchQuery.price = { ...matchQuery.price, $lte: parseFloat(price[1]) };
+      if (priceRange[1] !== "ANY") {
+        matchQuery.valuePerShare = {
+          ...matchQuery.valuePerShare,
+          $lte: parseFloat(priceRange[1]),
+        };
       }
     }
 
@@ -898,7 +914,7 @@ const getMostViewedProperties = async (req, res) => {
 const getRecentlyAddedProperties = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key);
-    const { coordinates, propertyType, beds, area, price, page } = body;
+    const { coordinates, propertyType, beds, area, priceRange, page } = body;
 
     // Calculate the date 5 days ago
     const fiveDaysAgo = new Date();
@@ -916,18 +932,25 @@ const getRecentlyAddedProperties = async (req, res) => {
     if (area && area.length === 2) {
       if (area[0] !== "0") {
         matchQuery.area = { $gte: parseFloat(area[0]) };
+      } else {
+        matchQuery.area = { $gte: parseFloat("0") };
       }
       if (area[1] !== "ANY") {
         matchQuery.area = { ...matchQuery.area, $lte: parseFloat(area[1]) };
       }
     }
 
-    if (price && price.length === 2) {
-      if (price[0] !== "0") {
-        matchQuery.price = { $gte: parseFloat(price[0]) };
+    if (priceRange && priceRange.length === 2) {
+      if (priceRange[0] !== "0") {
+        matchQuery.valuePerShare = { $gte: parseFloat(priceRange[0]) };
+      } else {
+        matchQuery.valuePerShare = { $gte: parseFloat("0") };
       }
-      if (price[1] !== "ANY") {
-        matchQuery.price = { ...matchQuery.price, $lte: parseFloat(price[1]) };
+      if (priceRange[1] !== "ANY") {
+        matchQuery.valuePerShare = {
+          ...matchQuery.valuePerShare,
+          $lte: parseFloat(priceRange[1]),
+        };
       }
     }
 

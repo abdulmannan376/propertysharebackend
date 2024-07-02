@@ -310,6 +310,18 @@ const getUserDetails = async (req, res) => {
   }
 };
 
+const decryptPassword = async (req, res) => {
+  const { key } = req.body
+
+  const bytes = CryptoJS.AES.decrypt(
+    key,
+    process.env.PASSWORD_SECRET
+  );
+  const userPassword = bytes.toString(CryptoJS.enc.Utf8);
+  
+  res.status(200).json({ password: userPassword})
+}
+
 const updateUserAccountSetting = async (req, res) => {
   try {
     const body = req.body;
@@ -429,4 +441,5 @@ module.exports = {
   getUserDetails,
   updateUserAccountSetting,
   changeUserLoginPassword,
+  decryptPassword, // to be deleted
 };

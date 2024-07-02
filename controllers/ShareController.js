@@ -166,11 +166,14 @@ const getBuySharesDetailByUsername = async (req, res) => {
 
 const getSharesByProperty = async (req, res) => {
   try {
-    const { key } = req.params;
+    const { key, status } = req.params;
 
     const propertySharesFound = await PropertyShares.find({
       propertyDocID: key,
-    });
+      utilisedStatus: status,
+    })
+      .populate("currentOwnerDocID", "username")
+      .exec();
 
     if (!propertySharesFound || propertySharesFound.length === 0) {
       return res.status(400).json({ message: "Try again.", success: false });

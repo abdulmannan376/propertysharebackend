@@ -37,6 +37,15 @@ const genNewRootThread = async (req, res) => {
       throw new Error("property share not found.");
     }
 
+    const threadFound = await Threads.findOne({
+      shareDocID: propertyShareFound._id,
+    });
+    if (threadFound && threadFound.category === category) {
+      return res
+        .status(400)
+        .json({ message: "Thread existed for this share.", success: false });
+    }
+
     const newRootThread = new Threads({
       shareDocID: propertyShareFound._id,
       propertyDocID: propertyFound._id,
@@ -78,7 +87,6 @@ const genChildToRoot = async (req, res) => {
     const {
       threadID,
       username,
-      shareID,
       propertyID,
       threadTitle,
       threadBody,
@@ -102,14 +110,6 @@ const genChildToRoot = async (req, res) => {
       throw new Error("property not found.");
     }
 
-    const propertyShareFound = await PropertyShares.findOne({
-      shareID: shareID,
-    });
-    if (!propertyShareFound) {
-      // res.status(400).json({ message: "", success: false });
-      throw new Error("property share not found.");
-    }
-
     const parentThreadFound = await Threads.findOne({ threadID: threadID });
     if (!parentThreadFound) {
       // res.status(400).json({ message: "", success: false });
@@ -117,7 +117,7 @@ const genChildToRoot = async (req, res) => {
     }
 
     const newThread = new Threads({
-      shareDocID: propertyShareFound._id,
+      shareDocID: parentThreadFound.shareDocID,
       propertyDocID: propertyFound._id,
       author: userFound._id,
       body: threadBody,
@@ -130,6 +130,93 @@ const genChildToRoot = async (req, res) => {
     threadChildern.push(newThread._id);
 
     parentThreadFound.childThreadDocIDsList = threadChildern;
+    parentThreadFound.childrenCount = +1;
+
+    await newThread.save();
+    parentThreadFound.save().then(() => {
+      const subject = `Thread Started Successfully`;
+      const body = `Dear ${userFound.name}, \nYour thread, with title: ${threadTitle}, has been added to community chat. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        subject,
+        body,
+        userFound.userDefaultSettingID.notifyUpdates,
+        username
+      );
+      res
+        .status(201)
+        .json({ message: "Thread created successfully.", success: true });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "genChildToRoot",
+      fileLocation: "controllers/ThreadController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const genChildToChild = async (req, res) => {
+  try {
+    const {
+      rootThreadID,
+      threadID,
+      username,
+      propertyID,
+      threadTitle,
+      threadBody,
+      category,
+    } = req.body;
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      // res.status(400).json({ message: "lo", success: false });
+      throw new Error("user not found.");
+    }
+
+    const propertyFound = await Properties.findOne({
+      propertyID: propertyID,
+    });
+    if (!propertyFound) {
+      // res.status(400).json({ message: "", success: false });
+      throw new Error("property not found.");
+    }
+
+    const parentThreadFound = await Threads.findOne({ threadID: threadID });
+    if (!parentThreadFound) {
+      // res.status(400).json({ message: "", success: false });
+      throw new Error("parent thread not found.");
+    }
+
+    const rootThreadFound = await Threads.findOne({ threadID: rootThreadID });
+    if (!rootThreadFound) {
+      // res.status(400).json({ message: "", success: false });
+      throw new Error("root thread not found.");
+    }
+
+    const newThread = new Threads({
+      shareDocID: parentThreadFound.shareDocID,
+      propertyDocID: propertyFound._id,
+      author: userFound._id,
+      body: threadBody,
+      category: category,
+      title: threadTitle,
+      status: "child",
+    });
+
+    const threadChildern = [...parentThreadFound.childThreadDocIDsList];
+    threadChildern.push(newThread._id);
+
+    parentThreadFound.childThreadDocIDsList = threadChildern;
+    parentThreadFound.childrenCount =+ 1;
+
+    rootThreadFound.childrenCount =+ 1;
 
     await newThread.save();
     parentThreadFound.save().then(() => {
@@ -172,6 +259,7 @@ const getAllThreadsByProperty = async (req, res) => {
     const threadList = await Threads.find({
       propertyDocID: propertyFound._id,
       category: category,
+      status: "root"
     })
       .populate("shareDocID", "availableInDuration")
       .populate("author", "name")
@@ -239,4 +327,5 @@ module.exports = {
   getAllThreadsByProperty,
   genChildToRoot,
   getChildrenByParentThread,
+  genChildToChild,
 };
