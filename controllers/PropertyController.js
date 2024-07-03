@@ -294,6 +294,7 @@ const addNewProperty = async (req, res) => {
         addressInString: body.fullAddress,
       },
       listingStatus: listingStatus,
+      valuePerShare: Math.round(body.totalPrice / body.numOfShares),
       publishedBy: body.username,
       publisherRole: body.userRole,
       amenitiesID: newAmenities._id,
@@ -305,7 +306,7 @@ const addNewProperty = async (req, res) => {
     const shareDocIDList = [];
 
     for (let i = 0; i <= body.numOfShares; i++) {
-      const startAt = i * 14;
+      const startAt = i * 15;
       const endAt = (i + 1) * 14;
 
       const startDate = new Date(startDurationFrom);

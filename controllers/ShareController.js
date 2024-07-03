@@ -4,6 +4,8 @@ const Users = require("../models/UserSchema");
 const Shareholders = require("../models/ShareholderSchema");
 const { sendEmail } = require("../helpers/emailController");
 const { listenerCount } = require("../models/PropertyRequestSchema");
+const { sendUpdateNotification } = require("./notificationController");
+const { default: mongoose } = require("mongoose");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -196,6 +198,100 @@ const getSharesByProperty = async (req, res) => {
   }
 };
 
+const openShareForRent = async (req, res) => {
+  try {
+    const { shareID, username } = req.body;
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      return res.status(400).json({ message: "Try again.", success: false });
+    }
+
+    const propertyShareFound = await PropertyShares.findOne({
+      shareID: shareID,
+      utilisedStatus: "Purchased",
+    });
+    if (!propertyShareFound) {
+      throw new Error("property share not available for rent.");
+    }
+
+    const propertyFound = await Properties.findOne({
+      _id: propertyShareFound.propertyDocID,
+    });
+
+    propertyFound.stakesOnRent += 1;
+
+    propertyShareFound.onRent = true;
+
+    await propertyFound.save();
+
+    propertyShareFound.save().then(() => {
+      const subject = "Property Share is now available to rent.";
+      const body = `Dear ${userFound.name}, Your share is now available to rent on our platform. Any requests can be seen in its specific community chat. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        subject,
+        body,
+        userFound.userDefaultSettingID.notifyUpdates,
+        username
+      );
+
+      res
+        .status(200)
+        .json({ message: "Successfully open for rent.", success: true });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "rentShare",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const getRentSharesByProperty = async (req, res) => {
+  try {
+    const { key, category } = req.params;
+
+    console.log(req.params);
+    const matchQuery = { propertyDocID: new mongoose.Types.ObjectId(key) };
+
+    if (category === "Rent") {
+      matchQuery.onRent = true;
+    } else if (category === "Sell") {
+      matchQuery.onSale = true;
+    }
+
+    const pipeline = [];
+
+    pipeline.push({ $match: matchQuery });
+
+    console.log(pipeline)
+    const sharesList = await PropertyShares.aggregate(pipeline);
+
+    res.status(200).json({
+      message: "Fetched",
+      success: true,
+      body: sharesList,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "rentShare",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
 const reserveShare = async (req, res) => {
   try {
     const { username, shareID } = req.body;
@@ -316,4 +412,6 @@ module.exports = {
   getSharesByProperty,
   reserveShare,
   getReservationsByUsername,
+  openShareForRent,
+  getRentSharesByProperty,
 };

@@ -35,7 +35,11 @@ const PropertySchema = new mongoose.Schema(
     area: { type: Number, required: true },
     totalStakes: { type: Number, default: 25 },
     stakesOccupied: { type: Number, required: true, default: 0 },
+    stakesOnRent: { type: Number, required: true, default: 0 },
+    stakesOnSale: { type: Number, required: true, default: 0 },
+    stakesOnSwap: { type: Number, required: true, default: 0 },
     valueOfProperty: { type: Number, required: true },
+    valuePerShare: { type: Number, required: true, default: 0 },
     addressOfProperty: {
       type: {
         houseNumber: String,

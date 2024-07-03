@@ -15,6 +15,11 @@ const PropertyShareSchema = new mongoose.Schema({
     ref: "shareholders",
     default: null,
   },
+  tenantUserDocID: {
+    type: mongoose.Types.ObjectId,
+    ref: "users",
+    default: null,
+  },
   reservedByUserDocID: {
     type: mongoose.Types.ObjectId,
     ref: "users",
