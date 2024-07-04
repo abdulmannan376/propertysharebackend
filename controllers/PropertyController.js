@@ -9,6 +9,7 @@ const { default: slugify } = require("slugify");
 const fs = require("fs");
 const fsPromises = require("fs/promises"); // Use promises version for async operations
 const path = require("path");
+const { match } = require("assert");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -666,10 +667,22 @@ const deleteAllImages = async (req, res) => {
 const getFeaturedProperty = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key);
-    const { coordinates, propertyType, beds, area, priceRange, page } = body;
+    const {
+      coordinates,
+      propertyType,
+      beds,
+      area,
+      priceRange,
+      page,
+      category,
+    } = body;
     const matchQuery = { status: "Featured" }; // Default match query
 
     console.log("body: ", body);
+
+    if (category && category === "rent") {
+      matchQuery.stakesOnRent = { $gt: 0 };
+    }
     // Adding dynamic filters based on the request body
     if (propertyType && propertyType.length > 0)
       matchQuery.propertyType = { $in: propertyType };
@@ -793,8 +806,12 @@ const getFeaturedProperty = async (req, res) => {
 const getMostViewedProperties = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key); // Parsing the key from params which should be a JSON string
-    const { coordinates, propertyType, beds, area, priceRange, page } = body;
+    const { coordinates, propertyType, beds, area, priceRange, page, category } = body;
     const matchQuery = { viewedCount: { $gte: 5 } }; // Using viewedCount greater than or equal to 20
+
+    if (category && category === "rent") {
+      matchQuery.stakesOnRent = { $gt: 0 };
+    }
 
     // console.log("body: ", body);
     // Adding dynamic filters based on the request body
@@ -915,7 +932,7 @@ const getMostViewedProperties = async (req, res) => {
 const getRecentlyAddedProperties = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key);
-    const { coordinates, propertyType, beds, area, priceRange, page } = body;
+    const { coordinates, propertyType, beds, area, priceRange, page, category } = body;
 
     // Calculate the date 5 days ago
     const fiveDaysAgo = new Date();
@@ -925,6 +942,10 @@ const getRecentlyAddedProperties = async (req, res) => {
     const matchQuery = {
       createdAt: { $gte: fiveDaysAgo },
     };
+
+    if (category && category === "rent") {
+      matchQuery.stakesOnRent = { $gt: 0 };
+    }
 
     // console.log("body: ", body);
     // Adding dynamic filters based on the request body
