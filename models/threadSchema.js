@@ -27,6 +27,7 @@ const ThreadSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    
     status: {
       type: String,
       enum: ["root", "child"],
