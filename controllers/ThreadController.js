@@ -110,6 +110,7 @@ const addRootThreadToShare = async (req, res) => {
       body: body,
       category: category,
       status: "root",
+      threadLevel: "0",
     });
 
     newThread.save().then(() => {
@@ -151,6 +152,7 @@ const getRootThreads = async (req, res) => {
 
     const threadsList = await Threads.find({
       shareDocID: propertyShareFound._id,
+      status: "root",
     }).populate("author", "name");
 
     res.status(200).json({
@@ -172,12 +174,9 @@ const getRootThreads = async (req, res) => {
 
 const genChildToRoot = async (req, res) => {
   try {
-    const {
-      username,
-      threadID,
-      threadBody,
-      category,
-    } = req.body;
+    const { username, threadID, threadBody, category, threadLevel } = req.body;
+
+    console.log(req.body);
 
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
@@ -197,14 +196,24 @@ const genChildToRoot = async (req, res) => {
     const newThread = new Threads({
       shareDocID: parentThreadFound.shareDocID,
       propertyDocID: parentThreadFound.propertyDocID,
+      parentThreadDocID: parentThreadFound._id,
       author: userFound._id,
       body: threadBody,
       category: category,
       status: "child",
+      threadLevel: threadLevel,
     });
 
     const threadChildern = [...parentThreadFound.childThreadDocIDsList];
     threadChildern.push(newThread._id);
+
+    if (threadLevel === "2") {
+      const rootThread = await Threads.findOne({
+        _id: parentThreadFound.parentThreadDocID,
+      });
+      rootThread.childrenCount = +1;
+      await rootThread.save();
+    }
 
     parentThreadFound.childThreadDocIDsList = threadChildern;
     parentThreadFound.childrenCount = +1;
@@ -377,7 +386,7 @@ const getChildrenByParentThread = async (req, res) => {
 
     const threadChilrenListPromises =
       parentThreadFound.childThreadDocIDsList.map((child) => {
-        return Threads.findOne({ _id: child });
+        return Threads.findOne({ _id: child }).populate("author", "name");
       });
 
     const threadChilrenList = await Promise.all(threadChilrenListPromises);

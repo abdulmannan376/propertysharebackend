@@ -57,6 +57,11 @@ const ThreadSchema = new mongoose.Schema(
       enum: ["Rent", "Sell", "Swap"],
       required: true,
     },
+    threadLevel: {
+      type: String,
+      enum: ["0", "1", "2"],
+      required: true
+    }
   },
   { timestamps: true }
 );
