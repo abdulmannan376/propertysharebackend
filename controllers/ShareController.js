@@ -173,6 +173,9 @@ const getSharesByProperty = async (req, res) => {
     const propertySharesFound = await PropertyShares.find({
       propertyDocID: key,
       utilisedStatus: status,
+      onRent: false,
+      onSale: false,
+      onSwap: false,
     })
       .populate("currentOwnerDocID", "username")
       .exec();
@@ -198,9 +201,9 @@ const getSharesByProperty = async (req, res) => {
   }
 };
 
-const openShareForRent = async (req, res) => {
+const openShareByCategory = async (req, res) => {
   try {
-    const { shareID, username } = req.body;
+    const { shareID, username, category } = req.body;
 
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
@@ -215,16 +218,22 @@ const openShareForRent = async (req, res) => {
       utilisedStatus: "Purchased",
     });
     if (!propertyShareFound) {
-      throw new Error("property share not available for rent.");
+      throw new Error(`property share not available for ${category}.`);
     }
 
     const propertyFound = await Properties.findOne({
       _id: propertyShareFound.propertyDocID,
     });
 
-    propertyFound.stakesOnRent += 1;
+    if (category === "Rent") {
+      propertyFound.stakesOnRent += 1;
 
-    propertyShareFound.onRent = true;
+      propertyShareFound.onRent = true;
+    } else if (category === "Sell") {
+      propertyFound.stakesOnSale += 1;
+
+      propertyShareFound.onSale = true;
+    }
 
     await propertyFound.save();
 
@@ -255,7 +264,7 @@ const openShareForRent = async (req, res) => {
   }
 };
 
-const getRentSharesByProperty = async (req, res) => {
+const getSharesByCategory = async (req, res) => {
   try {
     const { key, category } = req.params;
 
@@ -272,7 +281,7 @@ const getRentSharesByProperty = async (req, res) => {
 
     pipeline.push({ $match: matchQuery });
 
-    console.log(pipeline)
+    console.log(pipeline);
     const sharesList = await PropertyShares.aggregate(pipeline);
 
     res.status(200).json({
@@ -412,6 +421,6 @@ module.exports = {
   getSharesByProperty,
   reserveShare,
   getReservationsByUsername,
-  openShareForRent,
-  getRentSharesByProperty,
+  openShareByCategory,
+  getSharesByCategory,
 };
