@@ -153,7 +153,7 @@ const getRootThreads = async (req, res) => {
     const threadsList = await Threads.find({
       shareDocID: propertyShareFound._id,
       status: "root",
-    }).populate("author", "name");
+    }).populate("author", "name username");
 
     res.status(200).json({
       message: "Fetched",
@@ -386,7 +386,10 @@ const getChildrenByParentThread = async (req, res) => {
 
     const threadChilrenListPromises =
       parentThreadFound.childThreadDocIDsList.map((child) => {
-        return Threads.findOne({ _id: child }).populate("author", "name");
+        return Threads.findOne({ _id: child }).populate(
+          "author",
+          "name username"
+        );
       });
 
     const threadChilrenList = await Promise.all(threadChilrenListPromises);

@@ -271,18 +271,18 @@ const getSharesByCategory = async (req, res) => {
     console.log(req.params);
     const matchQuery = { propertyDocID: new mongoose.Types.ObjectId(key) };
 
+    let sharesList = [];
     if (category === "Rent") {
-      matchQuery.onRent = true;
+      sharesList = await PropertyShares.find({ onRent: true }).populate(
+        "currentOwnerDocID",
+        "username"
+      );
     } else if (category === "Sell") {
-      matchQuery.onSale = true;
+      sharesList = await PropertyShares.find({ onSale: true }).populate(
+        "currentOwnerDocID",
+        "username"
+      );
     }
-
-    const pipeline = [];
-
-    pipeline.push({ $match: matchQuery });
-
-    console.log(pipeline);
-    const sharesList = await PropertyShares.aggregate(pipeline);
 
     res.status(200).json({
       message: "Fetched",
