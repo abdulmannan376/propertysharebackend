@@ -59,27 +59,74 @@ const getUpdateNotificationByWebsite = async (req, res) => {
       });
     }
 
-    const updateNotificationList = await Notification.find({
-      username: key,
-      sentChannels: { $in: ["website"] },
-    });
+    const pipeline = [
+      {
+        $match: {
+          username: key,
+          sentChannels: { $in: ["website"] },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+    ];
+    const updateNotificationList = await Notification.aggregate(pipeline);
+
+    const unreadNotifications = updateNotificationList.filter(
+      (notification) => notification.inAppStatus === "unread"
+    );
 
     res.status(200).json({
       message: "Fetched",
       success: true,
       body: {
         notificationList: updateNotificationList,
-        notificationsCount: updateNotificationList.length,
+        notificationsCount: unreadNotifications.length,
       },
     });
   } catch (error) {
-    console.log(`Error: ${error}`, "location: ", {
-      function: "sendUpdateNotification",
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getUpdateNotificationByWebsite",
       fileLocation: "controllers/notificationController.js",
       timestamp: currentDate,
     });
-    return false;
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
   }
 };
 
-module.exports = { sendUpdateNotification, getUpdateNotificationByWebsite };
+const markNotificationRead = async (req, res) => {
+  try {
+    const { key } = req.params;
+
+    const notificationFound = await Notification.findOne({
+      notificationID: key,
+    });
+
+    if (!notificationFound) {
+      throw new Error("notification not found in database.");
+    }
+    console.log("notification: ", notificationFound);
+    notificationFound.inAppStatus = "read";
+
+    notificationFound.save().then(() => {
+      res
+        .status(200)
+        .json({ message: "Notification marked read", success: true });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "markNotificationRead",
+      fileLocation: "controllers/notificationController.js",
+      timestamp: currentDate,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+module.exports = {
+  sendUpdateNotification,
+  getUpdateNotificationByWebsite,
+  markNotificationRead,
+};
