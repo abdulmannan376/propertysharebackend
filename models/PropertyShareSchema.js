@@ -75,6 +75,11 @@ const PropertyShareSchema = new mongoose.Schema({
     ],
     default: [],
   },
+  shareOffersList: {
+    type: [mongoose.Types.ObjectId],
+    ref: "property_share_offers",
+    default: []
+  }
 });
 
 const PropertyShare = mongoose.model("property_shares", PropertyShareSchema);

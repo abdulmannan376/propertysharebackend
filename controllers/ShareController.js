@@ -6,6 +6,7 @@ const { sendEmail } = require("../helpers/emailController");
 const { listenerCount } = require("../models/PropertyRequestSchema");
 const { sendUpdateNotification } = require("./notificationController");
 const { default: mongoose } = require("mongoose");
+const ShareOffers = require("../models/PropertyShareOfferSchema");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -269,19 +270,19 @@ const getSharesByCategory = async (req, res) => {
     const { key, category } = req.params;
 
     console.log(req.params);
-    const propertyFound = await Properties.findOne({ propertyID: key})
+    const propertyFound = await Properties.findOne({ propertyID: key });
 
     let sharesList = [];
     if (category === "Rent") {
-      sharesList = await PropertyShares.find({ propertyDocID: propertyFound._id,  onRent: true }).populate(
-        "currentOwnerDocID",
-        "username"
-      );
+      sharesList = await PropertyShares.find({
+        propertyDocID: propertyFound._id,
+        onRent: true,
+      }).populate("currentOwnerDocID", "username");
     } else if (category === "Sell") {
-      sharesList = await PropertyShares.find({ propertyDocID: propertyFound._id, onSale: true }).populate(
-        "currentOwnerDocID",
-        "username"
-      );
+      sharesList = await PropertyShares.find({
+        propertyDocID: propertyFound._id,
+        onSale: true,
+      }).populate("currentOwnerDocID", "username");
     }
 
     res.status(200).json({
@@ -407,6 +408,38 @@ const getReservationsByUsername = async (req, res) => {
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "reserveShare",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const genNewShareOffer = async () => {
+  try {
+    const { shareID, username, price, category } = req.body;
+
+    const shareFound = await PropertyShares.findOne({ shareID: shareID });
+    if (!shareFound) {
+      throw new Error("property share not found");
+    }
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found.");
+    }
+
+    
+
+
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "genNewShareOffer",
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
