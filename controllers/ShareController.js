@@ -269,16 +269,16 @@ const getSharesByCategory = async (req, res) => {
     const { key, category } = req.params;
 
     console.log(req.params);
-    const matchQuery = { propertyDocID: new mongoose.Types.ObjectId(key) };
+    const propertyFound = await Properties.findOne({ propertyID: key})
 
     let sharesList = [];
     if (category === "Rent") {
-      sharesList = await PropertyShares.find({ onRent: true }).populate(
+      sharesList = await PropertyShares.find({ propertyDocID: propertyFound._id,  onRent: true }).populate(
         "currentOwnerDocID",
         "username"
       );
     } else if (category === "Sell") {
-      sharesList = await PropertyShares.find({ onSale: true }).populate(
+      sharesList = await PropertyShares.find({ propertyDocID: propertyFound._id, onSale: true }).populate(
         "currentOwnerDocID",
         "username"
       );
