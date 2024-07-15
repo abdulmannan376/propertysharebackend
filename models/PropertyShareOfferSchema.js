@@ -60,7 +60,7 @@ ShareOfferSchema.pre("save", async function (next) {
     const prefix = "SOID"; // Share Offer ID
 
     // Find the last document created today with a similar prefix
-    const lastEntry = await mongoose.models["properties"]
+    const lastEntry = await mongoose.models["property_share_offers"]
       ?.findOne({ shareOfferID: new RegExp("^" + prefix + dateString) })
       .sort("-shareOfferID");
 

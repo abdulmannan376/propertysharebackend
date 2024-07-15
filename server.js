@@ -3,8 +3,8 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 const port = process.env.PORT || 5000;
-const https = require('https');
-const fs = require('fs');
+const https = require("https");
+const fs = require("fs");
 const userRoutes = require("./routes/UserRoutes");
 const propertyRoutes = require("./routes/PropertyRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
@@ -43,22 +43,28 @@ app.post(
 );
 
 // Read SSL certificate files
-// const privateKey = fs.readFileSync('/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem', 'utf8');
-// const certificate = fs.readFileSync('/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem', 'utf8');
+const privateKey = fs.readFileSync(
+  "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
+  "utf8"
+);
+const certificate = fs.readFileSync(
+  "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
+  "utf8"
+);
 
-// const credentials = {
-//   key: privateKey,
-//   cert: certificate,
-// };
+const credentials = {
+  key: privateKey,
+  cert: certificate,
+};
 
-// // Create HTTPS server
-// const httpsServer = https.createServer(credentials, app);
+// Create HTTPS server
+const httpsServer = https.createServer(credentials, app);
 
-// // Listen on port 443
-// httpsServer.listen(443, () => {
-//   console.log('HTTPS Server running on port 443');
-// });
-
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+// Listen on port 443
+httpsServer.listen(443, () => {
+  console.log("HTTPS Server running on port 443");
 });
+
+// app.listen(port, () => {
+//   console.log(`Server is running on port ${port}`);
+// });

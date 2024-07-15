@@ -30,7 +30,7 @@ NotificationSchema.pre("save", async function (next) {
     const prefix = "NID"; // Notification ID
 
     // Find the last document created today with a similar prefix
-    const lastEntry = await mongoose.models["properties"]
+    const lastEntry = await mongoose.models["notifications"]
       ?.findOne({ notificationID: new RegExp("^" + prefix + dateString) })
       .sort("-notificationID");
 

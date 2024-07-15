@@ -97,7 +97,7 @@ const getUpdateNotificationByWebsite = async (req, res) => {
 const markNotificationRead = async (req, res) => {
   try {
     const { key } = req.params;
-
+    console.log(key);
     const notificationFound = await Notification.findOne({
       notificationID: key,
     });
