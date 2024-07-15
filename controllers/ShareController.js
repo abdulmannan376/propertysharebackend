@@ -417,13 +417,40 @@ const getReservationsByUsername = async (req, res) => {
   }
 };
 
-const genNewShareOffer = async () => {
+const genNewShareOffer = async (req, res) => {
   try {
     const { shareID, username, price, category } = req.body;
 
-    const shareFound = await PropertyShares.findOne({ shareID: shareID });
+    console.log(req.body)
+
+    let shareFound = null;
+    if (category === "Rent") {
+      shareFound = await PropertyShares.findOne({
+        shareID: shareID,
+        onRent: true,
+      })
+        .populate("currentOwnerDocID", "username")
+        .exec();
+
+        console.log("shareFound: ", shareFound)
+    } else if (category === "Sell") {
+      shareFound = await PropertyShares.findOne({
+        shareID: shareID,
+        onSale: true,
+      })
+        .populate("currentOwnerDocID", "username")
+        .exec();
+    }
     if (!shareFound) {
       throw new Error("property share not found");
+    }
+
+    const offerExists = await ShareOffers.findOne({
+      shareDocID: shareFound._id,
+      status: { $in: ["pending", "accepted"] },
+    });
+    if (offerExists) {
+      return res.status(400).json({ message: "Offer already live." });
     }
 
     const userFound = await Users.findOne({ username: username }).populate(
@@ -434,12 +461,89 @@ const genNewShareOffer = async () => {
       throw new Error("user not found.");
     }
 
-    
+    const ownerFound = await Users.findOne({
+      username: shareFound.currentOwnerDocID.username,
+    }).populate("userDefaultSettingID", "notifyUpdates");
 
+    const newShareOffer = new ShareOffers({
+      shareDocID: shareFound._id,
+      price: price,
+      shareholderDocID: shareFound.currentOwnerDocID,
+      userDocID: userFound._id,
+      category: category,
+    });
 
+    shareFound.shareOffersList.push(newShareOffer._id);
+    await shareFound.save();
+
+    newShareOffer.save().then(() => {
+      const userNotificationSubject = `Property share ${category} offer recieved`;
+      const userNotificationBody = `Dear ${userFound.name}, \n${ownerFound.name} has given an offer for this share to ${category}, of price: $${price}.\nRegards, \nBeach Bunny house.`;
+
+      sendUpdateNotification(
+        userNotificationSubject,
+        userNotificationBody,
+        userFound.userDefaultSettingID.notifyUpdates,
+        username
+      );
+
+      const ownerNotificationSubject = `Property share ${category} offer sent`;
+      const ownerNotificationBody = `Dear ${ownerFound.name}, \nYour offer for share ${category} is sent to user: ${username} of price: $${price}. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        ownerNotificationSubject,
+        ownerNotificationBody,
+        ownerFound.userDefaultSettingID.notifyUpdates,
+        ownerFound.username
+      );
+
+      res
+        .status(201)
+        .json({ message: "Offer sent successfully.", success: true });
+    });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "genNewShareOffer",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const fetchShareOffersOfOwnerByCategory = async (req, res) => {
+  try {
+    const { username, category } = req.params;
+
+    const shareholderFound = await Shareholders.findOne({ username: username });
+    if (!shareholderFound) {
+      throw new Error("user not found.");
+    }
+
+    // Find share offers and populate nested documents
+    const shareOffersList = await ShareOffers.find({
+      shareholderDocID: shareholderFound._id,
+      category: category, // Assuming there is a field to filter by category
+    }).populate({
+      path: "shareDocID",
+      select: "availableInDuration",
+      populate: {
+        path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+        model: "properties", // Assuming 'Property' is the model name for propertyDocID
+        select: "propertyID pinnedImageIndex title addressOfProperty",
+      },
+    });
+
+    res.json({
+      message: "Share offers fetched successfully",
+      success: true,
+      body: shareOffersList,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "fetchShareOffersOfOwnerByCategory",
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
@@ -456,4 +560,6 @@ module.exports = {
   getReservationsByUsername,
   openShareByCategory,
   getSharesByCategory,
+  genNewShareOffer,
+  fetchShareOffersOfOwnerByCategory,
 };

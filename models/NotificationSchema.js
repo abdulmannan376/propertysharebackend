@@ -32,7 +32,7 @@ NotificationSchema.pre("save", async function (next) {
     // Find the last document created today with a similar prefix
     const lastEntry = await mongoose.models["properties"]
       ?.findOne({ notificationID: new RegExp("^" + prefix + dateString) })
-      .sort("-propertyID");
+      .sort("-notificationID");
 
     let nextSeqNumber = 1; // Default sequence number
     if (lastEntry) {

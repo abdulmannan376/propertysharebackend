@@ -7,6 +7,7 @@ const ShareController = require("../controllers/ShareController");
 router.post("/buy-share", ShareController.buyShare);
 router.post("/reserve-share", ShareController.reserveShare);
 router.post("/open-share-by-category", ShareController.openShareByCategory);
+router.post("/gen-new-offer", ShareController.genNewShareOffer);
 
 //GET
 router.get(
@@ -21,6 +22,13 @@ router.get(
   "/get-reservations-by-username/:key",
   ShareController.getReservationsByUsername
 );
-router.get("/get-shares-by-category/:key/:category", ShareController.getSharesByCategory)
+router.get(
+  "/get-shares-by-category/:key/:category",
+  ShareController.getSharesByCategory
+);
+router.get(
+  "/get-sent-offers-by-category/:username/:category",
+  ShareController.fetchShareOffersOfOwnerByCategory
+);
 
 module.exports = router;
