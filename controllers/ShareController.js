@@ -421,7 +421,7 @@ const genNewShareOffer = async (req, res) => {
   try {
     const { shareID, username, price, category } = req.body;
 
-    console.log(req.body)
+    console.log(req.body);
 
     let shareFound = null;
     if (category === "Rent") {
@@ -432,7 +432,7 @@ const genNewShareOffer = async (req, res) => {
         .populate("currentOwnerDocID", "username")
         .exec();
 
-        console.log("shareFound: ", shareFound)
+      console.log("shareFound: ", shareFound);
     } else if (category === "Sell") {
       shareFound = await PropertyShares.findOne({
         shareID: shareID,
@@ -526,15 +526,23 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
     const shareOffersList = await ShareOffers.find({
       shareholderDocID: shareholderFound._id,
       category: category, // Assuming there is a field to filter by category
-    }).populate({
-      path: "shareDocID",
-      select: "availableInDuration",
-      populate: {
-        path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
-        model: "properties", // Assuming 'Property' is the model name for propertyDocID
-        select: "propertyID pinnedImageIndex title addressOfProperty",
-      },
-    });
+    })
+      .populate({
+        path: "shareDocID",
+        select: "availableInDuration",
+        populate: {
+          path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+          model: "properties", // Assuming 'Property' is the model name for propertyDocID
+          select:
+            "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+          populate: {
+            path: "amenitiesID",
+            model: "property_amenities",
+            select: "roomDetails",
+          },
+        },
+      })
+      .populate("userDocID", "username");
 
     res.json({
       message: "Share offers fetched successfully",
@@ -544,6 +552,54 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "fetchShareOffersOfOwnerByCategory",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const fetchShareOffersOfUserByCategory = async (req, res) => {
+  try {
+    const { username, category } = req.params;
+
+    const userFound = await Users.findOne({ username: username });
+    if (!userFound) {
+      throw new Error("user not found.");
+    }
+
+    // Find share offers and populate nested documents
+    const shareOffersList = await ShareOffers.find({
+      userDocID: userFound._id,
+      category: category, // Assuming there is a field to filter by category
+    })
+      .populate({
+        path: "shareDocID",
+        select: "availableInDuration",
+        populate: {
+          path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+          model: "properties", // Assuming 'Property' is the model name for propertyDocID
+          select:
+            "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+          populate: {
+            path: "amenitiesID",
+            model: "property_amenities",
+            select: "roomDetails",
+          },
+        },
+      })
+      .populate("shareholderDocID", "username");
+
+    res.json({
+      message: "Share offers fetched successfully",
+      success: true,
+      body: shareOffersList,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "fetchShareOffersOfUserByCategory",
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
@@ -562,4 +618,5 @@ module.exports = {
   getSharesByCategory,
   genNewShareOffer,
   fetchShareOffersOfOwnerByCategory,
+  fetchShareOffersOfUserByCategory,
 };

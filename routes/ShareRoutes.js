@@ -30,5 +30,9 @@ router.get(
   "/get-sent-offers-by-category/:username/:category",
   ShareController.fetchShareOffersOfOwnerByCategory
 );
+router.get(
+  "/get-received-offers-by-category/:username/:category",
+  ShareController.fetchShareOffersOfUserByCategory
+);
 
 module.exports = router;
