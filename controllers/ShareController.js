@@ -608,6 +608,170 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
       .json({ message: "Internal Server Error", error: error, success: false });
   }
 };
+
+function processDate(dateString) {
+  const date = new Date(dateString);
+
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  let commutedDateString = "";
+  const dateOfMonth = date.getDate();
+  if (dateOfMonth % 10 === 1) {
+    commutedDateString += "1st";
+  } else if (dateOfMonth % 10 === 2) {
+    commutedDateString += "2nd";
+  } else if (dateOfMonth % 10 === 3) {
+    commutedDateString += "3rd";
+  } else {
+    commutedDateString += `${dateOfMonth}th`;
+  }
+
+  commutedDateString += ` ${months[date.getMonth()]} ${
+    dateString.split("-")[0]
+  }`;
+
+  return commutedDateString;
+}
+
+const handleShareRentOfferAction = async (req, res) => {
+  try {
+    const { username, offerID, action } = req.body;
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    const shareOfferFound = await ShareOffers.findOne({
+      shareOfferID: offerID,
+    }).populate("shareholderDocID", "username");
+    if (!shareOfferFound) {
+      throw new Error("share offer not found");
+    }
+
+    const shareOwnerFound = await Users.findOne({
+      username: username,
+    }).populate("userDefaultSettingID", "notifyUpdates");
+
+    const propertyShareFound = await PropertyShares.findOne({
+      _id: shareOfferFound.shareDocID,
+    }).populate("propertyDocID", "title");
+
+    if (action === "accepted") {
+      propertyShareFound.tenantUserDocID = userFound._id;
+      propertyShareFound.onRent = false;
+      propertyShareFound.utilisedStatus = "On Rent";
+
+      await propertyShareFound.save();
+
+      shareOfferFound.status = "accepted";
+    } else if (action === "rejected") {
+      shareOfferFound.status = "rejected";
+    } else if (action === "cancelled") {
+      shareOfferFound.status = "cancelled";
+    }
+
+    shareOfferFound.save().then(() => {
+      if (action === "accepted") {
+        const userNotificationsubject = `Rent Offer from ${shareOwnerFound.username} Accepted`;
+        const userNotificationbody = `Dear ${
+          userFound.name
+        }, \nYou have successfully accepted the offer of rent of ${
+          propertyShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(propertyShareFound.availableInDuration.startDate) -
+          processDate(propertyShareFound.availableInDuration.endDate)
+        }\nPrice: $${shareOfferFound.price} \nShare Owner Username: ${
+          shareOwnerFound.username
+        } \nRegards, \nBeach Bunny House`;
+
+        const ownerNotificationSubject = `Property Share Rent Offer Accepted`;
+        const ownerNotificationBody = `Dear ${shareOwnerFound.name}, \nYour share rent offer has been accepted by user: ${userFound.username} at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          userNotificationsubject,
+          userNotificationbody,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
+
+        sendUpdateNotification(
+          ownerNotificationSubject,
+          ownerNotificationBody,
+          shareOwnerFound.userDefaultSettingID.notifyUpdates,
+          shareOwnerFound.username
+        );
+      } else if (action === "rejected") {
+        const userNotificationsubject = `Rent Offer from ${shareOwnerFound.username} Rejected`;
+        const userNotificationbody = `Dear ${
+          userFound.name
+        }, \nYou have successfully rejected the offer of rent of ${
+          propertyShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(propertyShareFound.availableInDuration.startDate) -
+          processDate(propertyShareFound.availableInDuration.endDate)
+        }\nPrice: $${shareOfferFound.price} \nShare Owner Username: ${
+          shareOwnerFound.username
+        } \nRegards, \nBeach Bunny House`;
+
+        const ownerNotificationSubject = `Property Share Rent Offer Rejected`;
+        const ownerNotificationBody = `Dear ${shareOwnerFound.name}, \nYour share rent offer has been rejected by user: ${userFound.username} at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          userNotificationsubject,
+          userNotificationbody,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
+
+        sendUpdateNotification(
+          ownerNotificationSubject,
+          ownerNotificationBody,
+          shareOwnerFound.userDefaultSettingID.notifyUpdates,
+          shareOwnerFound.username
+        );
+      } else if (action === "cancelled") {
+        const ownerNotificationSubject = `Property Share Rent Offer Cancelled`;
+        const ownerNotificationBody = `Dear ${shareOwnerFound.name}, \nYour share rent offer has been cancelled at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
+        sendUpdateNotification(
+          ownerNotificationSubject,
+          ownerNotificationBody,
+          shareOwnerFound.userDefaultSettingID.notifyUpdates,
+          shareOwnerFound.username
+        );
+      }
+
+      res
+        .status(200)
+        .json({ message: "Action completed successfull.", success: true });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleShareRentOfferAction",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
 module.exports = {
   buyShare,
   getBuySharesDetailByUsername,
@@ -619,4 +783,5 @@ module.exports = {
   genNewShareOffer,
   fetchShareOffersOfOwnerByCategory,
   fetchShareOffersOfUserByCategory,
+  handleShareRentOfferAction,
 };

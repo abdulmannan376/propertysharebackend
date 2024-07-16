@@ -9,6 +9,12 @@ router.post("/reserve-share", ShareController.reserveShare);
 router.post("/open-share-by-category", ShareController.openShareByCategory);
 router.post("/gen-new-offer", ShareController.genNewShareOffer);
 
+//PUT
+router.put(
+  "/update-share-rent-offer",
+  ShareController.handleShareRentOfferAction
+);
+
 //GET
 router.get(
   "/get-shares-by-username/:key",
