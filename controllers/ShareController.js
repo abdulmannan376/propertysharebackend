@@ -2,11 +2,8 @@ const PropertyShares = require("../models/PropertyShareSchema");
 const Properties = require("../models/PropertySchema");
 const Users = require("../models/UserSchema");
 const Shareholders = require("../models/ShareholderSchema");
-const { sendEmail } = require("../helpers/emailController");
-const { listenerCount } = require("../models/PropertyRequestSchema");
-const { sendUpdateNotification } = require("./notificationController");
-const { default: mongoose } = require("mongoose");
 const ShareOffers = require("../models/PropertyShareOfferSchema");
+const { sendUpdateNotification } = require("./notificationController");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -29,7 +26,10 @@ const buyShare = async (req, res) => {
     });
 
     if (!shareholderFound) {
-      const userFound = await Users.findOne({ username: username });
+      const userFound = await Users.findOne({ username: username }).populate(
+        "userDefaultSettingID",
+        "notifyUpdates"
+      );
       if (!userFound) {
         return res.status(400).json({ message: "Try again.", success: false });
       }
@@ -41,6 +41,9 @@ const buyShare = async (req, res) => {
         username: username,
         purchasedShareIDList: shareDocIDList,
       });
+
+      userFound.role = "shareholder";
+      await userFound.save();
 
       await newShareholder.save();
       propertyShareFound.currentBoughtAt = price;
@@ -55,7 +58,12 @@ const buyShare = async (req, res) => {
         const subject = "Successful Purchase of Share.";
         const body = `Dear ${userFound.name}, \nThis email is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
 
-        sendEmail(recipient, subject, body);
+        sendUpdateNotification(
+          subject,
+          body,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
       });
       return res
         .status(201)
@@ -75,12 +83,22 @@ const buyShare = async (req, res) => {
     propertyFound.stakesOccupied += 1;
     await propertyFound.save();
 
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+
     shareholderFound.save().then(() => {
       const recipient = shareholderFound.userID.email;
       const subject = "Successfull Purchase of Share.";
       const body = `Dear ${shareholderFound.userID.name}, \nThis email is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
 
-      sendEmail(recipient, subject, body);
+      sendUpdateNotification(
+        subject,
+        body,
+        userFound.userDefaultSettingID.notifyUpdates,
+        username
+      );
     });
     res.status(201).json({ message: "Purchase successfull", success: true });
   } catch (error) {
@@ -305,7 +323,10 @@ const getSharesByCategory = async (req, res) => {
 const reserveShare = async (req, res) => {
   try {
     const { username, shareID } = req.body;
-    const userFound = await Users.findOne({ username: username });
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
     if (!userFound) {
       return res.status(400).json({ message: "Try again.", success: false });
     }
@@ -344,7 +365,12 @@ const reserveShare = async (req, res) => {
       const subject = "Successfull Reservation of Share.";
       const body = `Dear ${userFound.name}, \nThis email is to confirm your reservation of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. This reservation will be removed from your reservations after 2 days from now please confirm you purchase as soon as possible. \nRegards, \nBeach Bunny House.`;
 
-      sendEmail(recipient, subject, body);
+      sendUpdateNotification(
+        subject,
+        body,
+        userFound.userDefaultSettingID.notifyUpdates,
+        username
+      );
     });
     res.status(201).json({ message: "Reservation successfull", success: true });
   } catch (error) {

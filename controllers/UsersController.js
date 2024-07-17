@@ -36,7 +36,10 @@ const genNewVerificationCode = async (req, res) => {
     const { email } = req.body;
     console.log("email: ", req.body);
     const verificationCode = Math.round(Math.random() * 1000000);
-    const userFound = await Users.findOne({ email: email });
+    const userFound = await Users.findOne({ email: email }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
     if (!userFound) {
       return res
         .status(400)
@@ -48,7 +51,12 @@ const genNewVerificationCode = async (req, res) => {
       await userFound.save().then(() => {
         const subject = `Email Verification Code: ${userFound.emailVerificationCode}`;
         const emailBody = `Hello, welcome to our service! Please add this code ${userFound.emailVerificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\nRapids AI Team`;
-        sendEmail(userFound.email, subject, emailBody);
+        sendUpdateNotification(
+          subject,
+          emailBody,
+          userFound.userDefaultSettingID.notifyUpdates,
+          userFound.username
+        );
         res.status(200).json({
           message: `A verification code sent to email.`,
           success: true,
@@ -141,7 +149,10 @@ const userLogout = async (req, res) => {
 const userLogin = async (req, res) => {
   try {
     const { username, password, rememberMe } = req.body;
-    const userFound = await Users.findOne({ username: username });
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
     console.log("body: ", req.body);
     if (!userFound) {
       return res
@@ -175,7 +186,12 @@ const userLogin = async (req, res) => {
     await userFound.save().then(() => {
       const subject = `Login activity.`;
       const emailBody = `Dear ${userFound.name},\nYou have successfully logged in your account`;
-      sendEmail(userFound.email, subject, emailBody);
+      sendUpdateNotification(
+        subject,
+        emailBody,
+        userFound.userDefaultSettingID.notifyUpdates,
+        username
+      );
       res.status(200).json({
         message: "Logged in",
         token: token,
@@ -240,7 +256,12 @@ const userSignUp = async (req, res) => {
     newUser.save().then(() => {
       const subject = `Email Verification Code: ${verificationCode}`;
       const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\nRapids AI Team`;
-      sendEmail(body.email, subject, emailBody);
+      sendUpdateNotification(
+        subject,
+        emailBody,
+        newUserDefaultSetting.notifyUpdates,
+        body.username
+      );
       res.status(201).json({
         message: `A verification code sent to email.`,
         success: true,
@@ -311,16 +332,13 @@ const getUserDetails = async (req, res) => {
 };
 
 const decryptPassword = async (req, res) => {
-  const { key } = req.body
+  const { key } = req.body;
 
-  const bytes = CryptoJS.AES.decrypt(
-    key,
-    process.env.PASSWORD_SECRET
-  );
+  const bytes = CryptoJS.AES.decrypt(key, process.env.PASSWORD_SECRET);
   const userPassword = bytes.toString(CryptoJS.enc.Utf8);
-  
-  res.status(200).json({ password: userPassword})
-}
+
+  res.status(200).json({ password: userPassword });
+};
 
 const updateUserAccountSetting = async (req, res) => {
   try {
@@ -348,7 +366,7 @@ const updateUserAccountSetting = async (req, res) => {
     await userDefaultSetting.save().then(() => {
       const subject = `Account Settings Updated`;
       const emailBody = `Dear ${userFound.name}, \nYour account settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.`;
-      sendUpdateNotification(subject, emailBody, body.notifyUpdates, key)
+      sendUpdateNotification(subject, emailBody, body.notifyUpdates, key);
       res.status(201).json({
         message: `Changes updated.`,
         success: true,
@@ -413,7 +431,12 @@ const changeUserLoginPassword = async (req, res) => {
     userFound.save().then(() => {
       const subject = `Login Password Changed.`;
       const emailBody = `Dear ${userFound.name}, \nYour login password have been changed. If you have done, this is the confirmation email if not then please contact our support for further assistance. \nThankyou.`;
-      sendEmail(userFound.email, subject, emailBody);
+      sendUpdateNotification(
+        subject,
+        emailBody,
+        userDefaultSetting.notifyUpdates,
+        key
+      );
       res.status(201).json({
         message: `Changes updated.`,
         success: true,
