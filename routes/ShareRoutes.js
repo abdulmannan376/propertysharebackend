@@ -40,5 +40,6 @@ router.get(
   "/get-received-offers-by-category/:username/:category",
   ShareController.fetchShareOffersOfUserByCategory
 );
+router.get("/get-share-rentals-by-user/:username", ShareController.fetchUserShareRentals)
 
 module.exports = router;

@@ -798,6 +798,63 @@ const handleShareRentOfferAction = async (req, res) => {
       .json({ message: "Internal Server Error", error: error, success: false });
   }
 };
+
+const fetchUserShareRentals = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    const shareFoundList = await PropertyShares.find({
+      tenantUserDocID: userFound._id,
+    }).populate(
+      "propertyDocID",
+      "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+    );
+
+    // Assuming sharesByUsername is an array of share objects
+    const rentalsPerProperty = shareFoundList.reduce((acc, share) => {
+      const propertyID = share.propertyDocID.propertyID;
+      // Check if the propertyID already has an entry in the accumulator
+      if (acc[propertyID]) {
+        // If yes, increment the count
+        acc[propertyID].count++;
+      } else {
+        // If no, create a new entry
+        acc[propertyID] = {
+          propertyID: propertyID,
+          propertyDetails: share.propertyDocID,
+          count: 1,
+        };
+      }
+      return acc;
+    }, {});
+
+    // To convert the object back into an array if needed:
+    const rentalsPerPropertyArray = Object.values(rentalsPerProperty);
+
+    res.status(200).json({
+      message: " Fetched rentals",
+      success: true,
+      body: rentalsPerPropertyArray,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "fetchMyShareRentals",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
 module.exports = {
   buyShare,
   getBuySharesDetailByUsername,
@@ -810,4 +867,5 @@ module.exports = {
   fetchShareOffersOfOwnerByCategory,
   fetchShareOffersOfUserByCategory,
   handleShareRentOfferAction,
+  fetchUserShareRentals,
 };
