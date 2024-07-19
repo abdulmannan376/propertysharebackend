@@ -14,6 +14,10 @@ router.put(
   "/update-share-rent-offer",
   ShareController.handleShareRentOfferAction
 );
+router.put(
+  "/update-share-sell-offer",
+  ShareController.handleShareSellOfferAction
+);
 
 //GET
 router.get(
@@ -40,6 +44,9 @@ router.get(
   "/get-received-offers-by-category/:username/:category",
   ShareController.fetchShareOffersOfUserByCategory
 );
-router.get("/get-share-rentals-by-user/:username", ShareController.fetchUserShareRentals)
+router.get(
+  "/get-share-rentals-by-user/:username",
+  ShareController.fetchUserShareRentals
+);
 
 module.exports = router;

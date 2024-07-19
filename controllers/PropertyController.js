@@ -278,7 +278,7 @@ const addNewProperty = async (req, res) => {
         coordinates: [body.coordinates.long, body.coordinates.lat],
       },
       detail: body.overview,
-      totalStakes: body.numOfShares,
+      totalStakes: body.numOfShares + 1,
       valueOfProperty: body.totalPrice,
       area: body.areaSize,
       startDurationFrom: body.startDate,

@@ -12,6 +12,7 @@ const upload = require("./middleware/multerConfig");
 const shareRoutes = require("./routes/ShareRoutes");
 const threadRoutes = require("./routes/threadRoutes");
 const path = require("path");
+const { sendEmail } = require("./helpers/emailController");
 
 app.use(cors());
 app.use(express.json());
@@ -26,6 +27,9 @@ app.use("/thread", threadRoutes);
 
 // Serve images as static files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+const currentDateMilliseconds = Date.now();
+const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
 
 app.post(
   "/upload-property-images",
@@ -42,29 +46,55 @@ app.post(
   }
 );
 
-// Read SSL certificate files
-const privateKey = fs.readFileSync(
-  "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
-  "utf8"
-);
-const certificate = fs.readFileSync(
-  "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
-  "utf8"
-);
+app.post("/contact-us", async (req, res) => {
+  try {
+    const { name, email, message } = req.body;
 
-const credentials = {
-  key: privateKey,
-  cert: certificate,
-};
+    const subject = `Query from ${name} `;
+    sendEmail(
+      process.env.CONTACT_EMAIL_ADDRESS,
+      subject,
+      `name: ${name}\nemail:${email}\nmessage: ${message}`
+    );
 
-// Create HTTPS server
-const httpsServer = https.createServer(credentials, app);
-
-// Listen on port 443
-httpsServer.listen(443, () => {
-  console.log("HTTPS Server running on port 443");
+    res
+      .status(200)
+      .json({ message: "Message sent successfully", success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "contactUs",
+      fileLocation: "/server.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
 });
 
-// app.listen(port, () => {
-//   console.log(`Server is running on port ${port}`);
+// Read SSL certificate files
+// const privateKey = fs.readFileSync(
+//   "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
+//   "utf8"
+// );
+// const certificate = fs.readFileSync(
+//   "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
+//   "utf8"
+// );
+
+// const credentials = {
+//   key: privateKey,
+//   cert: certificate,
+// };
+
+// // Create HTTPS server
+// const httpsServer = https.createServer(credentials, app);
+
+// // Listen on port 443
+// httpsServer.listen(443, () => {
+//   console.log("HTTPS Server running on port 443");
 // });
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});

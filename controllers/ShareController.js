@@ -76,7 +76,7 @@ const buyShare = async (req, res) => {
 
     await propertyShareFound.save();
 
-    const shareDocIDList = shareholderFound.purchasedShareIDList;
+    const shareDocIDList = [...shareholderFound.purchasedShareIDList];
     shareDocIDList.push({ shareDocID: propertyShareFound._id });
     shareholderFound.purchasedShareIDList = shareDocIDList;
 
@@ -692,7 +692,7 @@ const handleShareRentOfferAction = async (req, res) => {
     }
 
     const shareOwnerFound = await Users.findOne({
-      username: username,
+      username: shareOfferFound.shareholderDocID.username,
     }).populate("userDefaultSettingID", "notifyUpdates");
 
     const propertyShareFound = await PropertyShares.findOne({
@@ -855,6 +855,188 @@ const fetchUserShareRentals = async (req, res) => {
       .json({ message: "Internal Server Error", error: error, success: false });
   }
 };
+
+const handleShareSellOfferAction = async (req, res) => {
+  try {
+    const { username, offerID, action } = req.body;
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    const shareOfferFound = await ShareOffers.findOne({
+      shareOfferID: offerID,
+    }).populate("shareholderDocID", "username");
+    if (!shareOfferFound) {
+      throw new Error("share offer not found");
+    }
+
+    const sharePrevOwnerFound = await Users.findOne({
+      username: shareOfferFound.shareholderDocID.username,
+    }).populate("userDefaultSettingID", "notifyUpdates");
+
+    const propertyShareFound = await PropertyShares.findOne({
+      _id: shareOfferFound.shareDocID,
+    }).populate("propertyDocID", "title");
+
+    const prevShareholder = await Shareholders.findOne({
+      username: shareOfferFound.shareholderDocID.username,
+    });
+
+    const shareholderFound = await Shareholders.findOne({ username: username });
+
+    if (action === "accepted") {
+      const sharePrevOwnerPurchasedIDList = [
+        ...prevShareholder.purchasedShareIDList,
+      ];
+
+      prevShareholder.purchasedShareIDList =
+        sharePrevOwnerPurchasedIDList.filter(
+          (share) => share.shareDocID !== propertyShareFound._id
+        );
+
+      prevShareholder.soldShareIDList.push({
+        shareDocID: propertyShareFound._id,
+      });
+      if (!shareholderFound) {
+        const shareDocIDList = [];
+        shareDocIDList.push({ shareDocID: propertyShareFound._id });
+
+        const newShareholder = new Shareholders({
+          username: username,
+          userID: userFound._id,
+          purchasedShareIDList: shareDocIDList,
+        });
+
+        userFound.role = "shareholder";
+
+        await newShareholder.save();
+        await userFound.save();
+
+        propertyShareFound.currentOwnerDocID = newShareholder._id;
+        propertyShareFound.lastOwners.push({
+          username: sharePrevOwnerFound.username,
+          boughtAt: propertyShareFound.currentBoughtAt,
+        });
+        propertyShareFound.currentBoughtAt = shareOfferFound.price;
+        propertyShareFound.onSale = false
+        propertyShareFound.utilisedStatus = "Purchased"
+
+        await propertyShareFound.save();
+      } else {
+        shareholderFound.purchasedShareIDList.push({
+          shareDocID: propertyShareFound._id,
+        });
+        propertyShareFound.currentOwnerDocID = shareholderFound._id;
+        propertyShareFound.lastOwners.push({
+          username: sharePrevOwnerFound.username,
+          boughtAt: propertyShareFound.currentBoughtAt,
+        });
+        await shareholderFound.save();
+        propertyShareFound.currentBoughtAt = shareOfferFound.price;
+        propertyShareFound.onSale = false
+        propertyShareFound.utilisedStatus = "Purchased"
+
+        await propertyShareFound.save();
+      }
+
+      await prevShareholder.save();
+      shareOfferFound.status = "accepted";
+    } else if (action === "rejected") {
+      shareOfferFound.status = "rejected";
+    } else if (action === "cancelled") {
+      shareOfferFound.status = "cancelled";
+    }
+
+    shareOfferFound.save().then(() => {
+      if (action === "accepted") {
+        const userNotificationsubject = `Sell Offer from ${sharePrevOwnerFound.username} Accepted`;
+        const userNotificationbody = `Dear ${
+          userFound.name
+        }, \nYou have successfully accepted the offer of rent of ${
+          propertyShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(propertyShareFound.availableInDuration.startDate) -
+          processDate(propertyShareFound.availableInDuration.endDate)
+        }\nPrice: $${shareOfferFound.price} \nShare Previous Owner Username: ${
+          sharePrevOwnerFound.username
+        } \nRegards, \nBeach Bunny House`;
+
+        const ownerNotificationSubject = `Property Share Sell Offer Accepted`;
+        const ownerNotificationBody = `Dear ${sharePrevOwnerFound.name}, \nYour share rent offer has been accepted by user: ${userFound.username} at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          userNotificationsubject,
+          userNotificationbody,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
+
+        sendUpdateNotification(
+          ownerNotificationSubject,
+          ownerNotificationBody,
+          sharePrevOwnerFound.userDefaultSettingID.notifyUpdates,
+          sharePrevOwnerFound.username
+        );
+      } else if (action === "rejected") {
+        const userNotificationsubject = `Rent Offer from ${sharePrevOwnerFound.username} Rejected`;
+        const userNotificationbody = `Dear ${
+          userFound.name
+        }, \nYou have successfully rejected the offer of rent of ${
+          propertyShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(propertyShareFound.availableInDuration.startDate) -
+          processDate(propertyShareFound.availableInDuration.endDate)
+        }\nPrice: $${shareOfferFound.price} \nShare Owner Username: ${
+          sharePrevOwnerFound.username
+        } \nRegards, \nBeach Bunny House`;
+
+        const ownerNotificationSubject = `Property Share Rent Offer Rejected`;
+        const ownerNotificationBody = `Dear ${sharePrevOwnerFound.name}, \nYour share rent offer has been rejected by user: ${userFound.username} at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          userNotificationsubject,
+          userNotificationbody,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
+
+        sendUpdateNotification(
+          ownerNotificationSubject,
+          ownerNotificationBody,
+          sharePrevOwnerFound.userDefaultSettingID.notifyUpdates,
+          sharePrevOwnerFound.username
+        );
+      } else if (action === "cancelled") {
+        const ownerNotificationSubject = `Property Share Rent Offer Cancelled`;
+        const ownerNotificationBody = `Dear ${sharePrevOwnerFound.name}, \nYour share rent offer has been cancelled at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
+        sendUpdateNotification(
+          ownerNotificationSubject,
+          ownerNotificationBody,
+          sharePrevOwnerFound.userDefaultSettingID.notifyUpdates,
+          sharePrevOwnerFound.username
+        );
+      }
+
+      res
+        .status(200)
+        .json({ message: "Action completed successfull.", success: true });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleShareSellOfferAction",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
 module.exports = {
   buyShare,
   getBuySharesDetailByUsername,
@@ -868,4 +1050,5 @@ module.exports = {
   fetchShareOffersOfUserByCategory,
   handleShareRentOfferAction,
   fetchUserShareRentals,
+  handleShareSellOfferAction,
 };
