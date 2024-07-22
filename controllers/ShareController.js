@@ -252,6 +252,9 @@ const openShareByCategory = async (req, res) => {
       propertyFound.stakesOnSale += 1;
 
       propertyShareFound.onSale = true;
+    } else if(category === "Swap") {
+
+      propertyShareFound.onSwap = true
     }
 
     await propertyFound.save();
@@ -890,18 +893,25 @@ const handleShareSellOfferAction = async (req, res) => {
     const shareholderFound = await Shareholders.findOne({ username: username });
 
     if (action === "accepted") {
-      const sharePrevOwnerPurchasedIDList = [
-        ...prevShareholder.purchasedShareIDList,
-      ];
+      const sharePrevOwnerPurchasedIDList =
+        prevShareholder.purchasedShareIDList;
 
       prevShareholder.purchasedShareIDList =
         sharePrevOwnerPurchasedIDList.filter(
           (share) => share.shareDocID !== propertyShareFound._id
         );
 
+      console.log(
+        "sharePrevOwnerPurchasedIDList: ",
+        sharePrevOwnerPurchasedIDList,
+        "prevShareholder: ",
+        prevShareholder
+      );
       prevShareholder.soldShareIDList.push({
         shareDocID: propertyShareFound._id,
       });
+
+      console.log("prevShareholder: ", prevShareholder);
       if (!shareholderFound) {
         const shareDocIDList = [];
         shareDocIDList.push({ shareDocID: propertyShareFound._id });
@@ -923,8 +933,8 @@ const handleShareSellOfferAction = async (req, res) => {
           boughtAt: propertyShareFound.currentBoughtAt,
         });
         propertyShareFound.currentBoughtAt = shareOfferFound.price;
-        propertyShareFound.onSale = false
-        propertyShareFound.utilisedStatus = "Purchased"
+        propertyShareFound.onSale = false;
+        propertyShareFound.utilisedStatus = "Purchased";
 
         await propertyShareFound.save();
       } else {
@@ -938,8 +948,8 @@ const handleShareSellOfferAction = async (req, res) => {
         });
         await shareholderFound.save();
         propertyShareFound.currentBoughtAt = shareOfferFound.price;
-        propertyShareFound.onSale = false
-        propertyShareFound.utilisedStatus = "Purchased"
+        propertyShareFound.onSale = false;
+        propertyShareFound.utilisedStatus = "Purchased";
 
         await propertyShareFound.save();
       }
@@ -1037,6 +1047,7 @@ const handleShareSellOfferAction = async (req, res) => {
       .json({ message: "Internal Server Error", error: error, success: false });
   }
 };
+
 module.exports = {
   buyShare,
   getBuySharesDetailByUsername,

@@ -283,7 +283,7 @@ const getUserDefaultSetting = async (req, res) => {
       .populate("userDefaultSettingID")
       .exec();
     if (!userFound) {
-      res.status(400).json({ message: "Try again.", success: false });
+      return res.status(400).json({ message: "Try again.", success: false });
     }
 
     res.status(200).json({
