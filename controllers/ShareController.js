@@ -220,7 +220,49 @@ const getSharesByProperty = async (req, res) => {
   }
 };
 
-const openShareByCategory = async (req, res) => {
+const getSharesByUsername = async (req, res) => {
+  try {
+    const { username, propertyID } = req.params;
+
+    const shareholderFound = await Shareholders.findOne({ username: username });
+
+    if (!shareholderFound) {
+      return res
+        .status(400)
+        .json({ message: "No Purchases found.", success: false });
+    }
+
+    const propertyFound = await Properties.findOne({ propertyID: propertyID });
+
+    const sharesByUsername = await PropertyShares.find({
+      propertyDocID: propertyFound._id,
+      currentOwnerDocID: shareholderFound._id,
+    })
+      .populate(
+        "propertyDocID",
+        "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+      )
+      .exec();
+
+    console.log(sharesByUsername);
+    res.status(200).json({
+      message: "Fetched",
+      success: true,
+      body: sharesByUsername,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getSharesByUsername",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const handleShareByCategory = async (req, res) => {
   try {
     const { shareID, username, category } = req.body;
 
@@ -245,23 +287,40 @@ const openShareByCategory = async (req, res) => {
     });
 
     if (category === "Rent") {
-      propertyFound.stakesOnRent += 1;
+      if (propertyShareFound.onRent) {
+        propertyFound.stakesOnRent -= 1;
 
-      propertyShareFound.onRent = true;
+        propertyShareFound.onRent = false;
+      } else {
+        propertyFound.stakesOnRent += 1;
+
+        propertyShareFound.onRent = true;
+      }
     } else if (category === "Sell") {
-      propertyFound.stakesOnSale += 1;
+      if (propertyShareFound.onSale) {
+        propertyFound.stakesOnSale -= 1;
 
-      propertyShareFound.onSale = true;
-    } else if(category === "Swap") {
+        propertyShareFound.onSale = false;
+      } else {
+        propertyFound.stakesOnSale += 1;
 
-      propertyShareFound.onSwap = true
+        propertyShareFound.onSale = true;
+      }
+    } else if (category === "Swap") {
+      if (propertyShareFound.onSwap) {
+        propertyShareFound.onSwap = false;
+      } else {
+        propertyShareFound.onSwap = true;
+      }
     }
 
     await propertyFound.save();
 
     propertyShareFound.save().then(() => {
-      const subject = "Property Share is now available to rent.";
-      const body = `Dear ${userFound.name}, Your share is now available to rent on our platform. Any requests can be seen in its specific community chat. \nRegards, \nBeach Bunny House.`;
+      const subject = "Property Share status updated.";
+      const body = `Dear ${
+        userFound.name
+      }, Your share status updated for ${category.toLowerCase()}. \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
@@ -270,9 +329,10 @@ const openShareByCategory = async (req, res) => {
         username
       );
 
-      res
-        .status(200)
-        .json({ message: "Successfully open for rent.", success: true });
+      res.status(200).json({
+        message: `Successfull for ${category.toLowerCase()}.`,
+        success: true,
+      });
     });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
@@ -303,6 +363,11 @@ const getSharesByCategory = async (req, res) => {
       sharesList = await PropertyShares.find({
         propertyDocID: propertyFound._id,
         onSale: true,
+      }).populate("currentOwnerDocID", "username");
+    } else if (category === "Swap") {
+      sharesList = await PropertyShares.find({
+        propertyDocID: propertyFound._id,
+        onSwap: true,
       }).populate("currentOwnerDocID", "username");
     }
 
@@ -1054,7 +1119,7 @@ module.exports = {
   getSharesByProperty,
   reserveShare,
   getReservationsByUsername,
-  openShareByCategory,
+  handleShareByCategory,
   getSharesByCategory,
   genNewShareOffer,
   fetchShareOffersOfOwnerByCategory,
@@ -1062,4 +1127,5 @@ module.exports = {
   handleShareRentOfferAction,
   fetchUserShareRentals,
   handleShareSellOfferAction,
+  getSharesByUsername,
 };

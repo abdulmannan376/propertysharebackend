@@ -17,7 +17,6 @@ const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
 const addPropertyRequest = async (req, res) => {
   try {
     const body = req.body;
-    console.log(body);
 
     const propertyLocation = {
       type: "Point",
@@ -116,8 +115,6 @@ const getPropertyByUsername = async (req, res) => {
       propertiesWithAmenitiesPromises
     );
 
-    console.log("propertiesByUsername: ", propertiesWithAmenities);
-
     res.status(200).json({
       message: "Fetched",
       body: propertiesWithAmenities,
@@ -138,7 +135,6 @@ const getPropertyByUsername = async (req, res) => {
 const updateProperty = async (req, res) => {
   try {
     const body = req.body;
-    console.log("body: ", body);
     const { id } = req.params;
     const isTokenValid = await JWTController.verifyJWT(body.token);
     if (!isTokenValid) {
@@ -166,7 +162,6 @@ const updateProperty = async (req, res) => {
 
     let propertyAmenitiesFound;
 
-    console.log("formPhase: ", body.formPhase, typeof body.formPhase);
     if (body.formPhase === 1) {
       propertyFound.title = body.title;
       (propertyFound.location = {
@@ -278,7 +273,7 @@ const addNewProperty = async (req, res) => {
         coordinates: [body.coordinates.long, body.coordinates.lat],
       },
       detail: body.overview,
-      totalStakes: body.numOfShares + 1,
+      totalStakes: parseInt(body.numOfShares) + 1,
       valueOfProperty: body.totalPrice,
       area: body.areaSize,
       startDurationFrom: body.startDate,
@@ -336,7 +331,6 @@ const addNewProperty = async (req, res) => {
       shareDocIDList.push(newPropertyShare._id);
     }
 
-    console.log(shareDocIDList);
     newProperty.shareDocIDList = shareDocIDList;
 
     await newProperty.save().then(() => {
@@ -383,7 +377,7 @@ const addNewProperty = async (req, res) => {
 
 // Function to reorganize files in the directory
 function reorganizeFiles(directory, deleteIndices = []) {
-  console.log(directory, deleteIndices);
+  // console.log(directory, deleteIndices);
   const files = fs
     .readdirSync(directory)
     .filter((file) => file.startsWith("image-"));
@@ -678,8 +672,6 @@ const getFeaturedProperty = async (req, res) => {
     } = body;
     const matchQuery = { status: "Featured" }; // Default match query
 
-    console.log("body: ", body);
-
     if (category && category === "rent") {
       matchQuery.stakesOnRent = { $gt: 0 };
     }
@@ -769,8 +761,6 @@ const getFeaturedProperty = async (req, res) => {
 
     // console.log(pipeline);
 
-    console.log(pipeline);
-
     const propertiesTotal = await Properties.aggregate(pipelineForTotalData);
     const properties = await Properties.aggregate(pipeline);
 
@@ -806,7 +796,15 @@ const getFeaturedProperty = async (req, res) => {
 const getMostViewedProperties = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key); // Parsing the key from params which should be a JSON string
-    const { coordinates, propertyType, beds, area, priceRange, page, category } = body;
+    const {
+      coordinates,
+      propertyType,
+      beds,
+      area,
+      priceRange,
+      page,
+      category,
+    } = body;
     const matchQuery = { viewedCount: { $gte: 5 } }; // Using viewedCount greater than or equal to 20
 
     if (category && category === "rent") {
@@ -932,7 +930,15 @@ const getMostViewedProperties = async (req, res) => {
 const getRecentlyAddedProperties = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key);
-    const { coordinates, propertyType, beds, area, priceRange, page, category } = body;
+    const {
+      coordinates,
+      propertyType,
+      beds,
+      area,
+      priceRange,
+      page,
+      category,
+    } = body;
 
     // Calculate the date 5 days ago
     const fiveDaysAgo = new Date();

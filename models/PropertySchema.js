@@ -62,7 +62,11 @@ const PropertySchema = new mongoose.Schema(
     },
     startDurationFrom: { type: Date, required: true },
     publishedBy: { type: String, required: true, desc: "username" },
-    publisherRole: { type: String, enum: ["admin", "user"], default: "user" },
+    publisherRole: {
+      type: String,
+      enum: ["admin", "shareholder", "user"],
+      default: "user",
+    },
     viewedCount: { type: Number, default: 0 },
     detail: { type: String, required: true },
     attributesID: { type: mongoose.Types.ObjectId },
