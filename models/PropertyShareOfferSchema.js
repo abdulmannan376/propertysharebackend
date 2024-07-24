@@ -15,6 +15,10 @@ const ShareOfferSchema = new mongoose.Schema(
       required: false,
       validate: [priceValidator, "{VALUE} must be greater than zero."], // Custom validator for ensuring 2 values
     },
+    offeredShareDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "property_shares",
+    },
     shareholderDocID: {
       type: mongoose.Types.ObjectId,
       ref: "shareholders",

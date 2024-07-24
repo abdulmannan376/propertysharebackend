@@ -4,6 +4,7 @@ const Users = require("../models/UserSchema");
 const Shareholders = require("../models/ShareholderSchema");
 const ShareOffers = require("../models/PropertyShareOfferSchema");
 const { sendUpdateNotification } = require("./notificationController");
+const PropertyShare = require("../models/PropertyShareSchema");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -660,7 +661,7 @@ const genNewShareOffer = async (req, res) => {
 
 const genShareSwapOffer = async (req, res) => {
   try {
-    const { shareID, username } = req.body;
+    const { shareID, username, offeredShareID } = req.body;
 
     console.log(req.body);
 
@@ -675,6 +676,14 @@ const genShareSwapOffer = async (req, res) => {
       throw new Error("property share not found");
     }
 
+    const offeredShareFound = await PropertyShare.findOne({
+      shareID: offeredShareID,
+    })
+      .populate("currentOwnerDocID", "username")
+      .exec();
+    if (!offeredShareFound) {
+      throw new Error("offered property share not found");
+    }
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
@@ -690,6 +699,7 @@ const genShareSwapOffer = async (req, res) => {
     const offerFound = await ShareOffers.findOne({
       shareDocID: shareFound._id,
       userDocID: userFound._id,
+      offeredShareDocID: offeredShareFound._id,
       category: "Swap",
       status: { $in: ["pending", "accepted"] },
     });
@@ -704,6 +714,7 @@ const genShareSwapOffer = async (req, res) => {
       shareDocID: shareFound._id,
       shareholderDocID: shareFound.currentOwnerDocID,
       userDocID: userFound._id,
+      offeredShareDocID: offeredShareFound._id,
       category: "Swap",
     });
 
@@ -751,32 +762,63 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
   try {
     const { username, category } = req.params;
 
-    const shareholderFound = await Shareholders.findOne({ username: username });
-    if (!shareholderFound) {
-      throw new Error("user not found.");
-    }
-
     // Find share offers and populate nested documents
-    const shareOffersList = await ShareOffers.find({
-      shareholderDocID: shareholderFound._id,
-      category: category, // Assuming there is a field to filter by category
-    })
-      .populate({
-        path: "shareDocID",
-        select: "availableInDuration",
-        populate: {
-          path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
-          model: "properties", // Assuming 'Property' is the model name for propertyDocID
-          select:
-            "propertyID pinnedImageIndex title addressOfProperty area imageCount",
-          populate: {
-            path: "amenitiesID",
-            model: "property_amenities",
-            select: "roomDetails",
-          },
-        },
+    let shareOffersList;
+    if (category === "Swap") {
+      const userFound = await Users.findOne({
+        username: username,
+      });
+      if (!userFound) {
+        throw new Error("user not found.");
+      }
+      shareOffersList = await ShareOffers.find({
+        userDocID: userFound._id,
+        category: category, // Assuming there is a field to filter by category
       })
-      .populate("userDocID", "username");
+        .populate({
+          path: "shareDocID",
+          select: "availableInDuration",
+          populate: {
+            path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+            model: "properties", // Assuming 'Property' is the model name for propertyDocID
+            select:
+              "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          },
+        })
+        .populate("userDocID", "username");
+    } else {
+      const shareholderFound = await Shareholders.findOne({
+        username: username,
+      });
+      if (!shareholderFound) {
+        throw new Error("user not found.");
+      }
+      shareOffersList = await ShareOffers.find({
+        shareholderDocID: shareholderFound._id,
+        category: category, // Assuming there is a field to filter by category
+      })
+        .populate({
+          path: "shareDocID",
+          select: "availableInDuration",
+          populate: {
+            path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+            model: "properties", // Assuming 'Property' is the model name for propertyDocID
+            select:
+              "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          },
+        })
+        .populate("userDocID", "username");
+    }
 
     res.json({
       message: "Share offers fetched successfully",
@@ -799,33 +841,60 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
   try {
     const { username, category } = req.params;
 
-    const userFound = await Users.findOne({ username: username });
-    if (!userFound) {
-      throw new Error("user not found.");
-    }
-
     // Find share offers and populate nested documents
-    const shareOffersList = await ShareOffers.find({
-      userDocID: userFound._id,
-      category: category, // Assuming there is a field to filter by category
-    })
-      .populate({
-        path: "shareDocID",
-        select: "availableInDuration",
-        populate: {
-          path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
-          model: "properties", // Assuming 'Property' is the model name for propertyDocID
-          select:
-            "propertyID pinnedImageIndex title addressOfProperty area imageCount",
-          populate: {
-            path: "amenitiesID",
-            model: "property_amenities",
-            select: "roomDetails",
-          },
-        },
-      })
-      .populate("shareholderDocID", "username");
+    let shareOffersList;
+    if (category === "Swap") {
+      const shareholderFound = await Shareholders.findOne({ username: username });
+      if (!shareholderFound) {
+        throw new Error("shareholder not found.");
+      }
 
+      shareOffersList = await ShareOffers.find({
+        shareholderDocID: shareholderFound._id,
+        category: category, // Assuming there is a field to filter by category
+      })
+        .populate({
+          path: "shareDocID",
+          select: "availableInDuration",
+          populate: {
+            path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+            model: "properties", // Assuming 'Property' is the model name for propertyDocID
+            select:
+              "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          },
+        })
+        .populate("shareholderDocID", "username");
+    } else {
+      const userFound = await Users.findOne({ username: username });
+      if (!userFound) {
+        throw new Error("user not found.");
+      }
+      shareOffersList = await ShareOffers.find({
+        userDocID: userFound._id,
+        category: category, // Assuming there is a field to filter by category
+      })
+        .populate({
+          path: "shareDocID",
+          select: "availableInDuration",
+          populate: {
+            path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+            model: "properties", // Assuming 'Property' is the model name for propertyDocID
+            select:
+              "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          },
+        })
+        .populate("shareholderDocID", "username");
+    }
     res.json({
       message: "Share offers fetched successfully",
       success: true,
@@ -879,6 +948,49 @@ function processDate(dateString) {
 
   return commutedDateString;
 }
+
+const getSwapShareByUsername = async (req, res) => {
+  try {
+    const { username, propertyID } = req.params;
+
+    const shareholderFound = await Shareholders.findOne({ username: username });
+
+    if (!shareholderFound) {
+      return res
+        .status(400)
+        .json({ message: "No Purchases found.", success: false });
+    }
+
+    const propertyFound = await Properties.findOne({ propertyID: propertyID });
+
+    const sharesByUsername = await PropertyShares.find({
+      propertyDocID: propertyFound._id,
+      currentOwnerDocID: shareholderFound._id,
+      onSwap: true,
+    })
+      .populate(
+        "propertyDocID",
+        "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+      )
+      .exec();
+
+    console.log(sharesByUsername);
+    res.status(200).json({
+      message: "Fetched",
+      success: true,
+      body: sharesByUsername,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getSwapShareByUsername",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
 
 const handleShareRentOfferAction = async (req, res) => {
   try {
@@ -1253,6 +1365,194 @@ const handleShareSellOfferAction = async (req, res) => {
   }
 };
 
+const handleShareSwapOfferAction = async (req, res) => {
+  try {
+    const { username, offerID, action } = req.body;
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    const shareOfferFound = await ShareOffers.findOne({
+      shareOfferID: offerID,
+    }).populate("shareholderDocID", "username");
+    if (!shareOfferFound) {
+      throw new Error("share offer not found");
+    }
+
+    const sharePrevOwnerFound = await Users.findOne({
+      username: shareOfferFound.shareholderDocID.username,
+    }).populate("userDefaultSettingID", "notifyUpdates");
+
+    const propertyShareFound = await PropertyShares.findOne({
+      _id: shareOfferFound.shareDocID,
+    }).populate("propertyDocID", "title");
+
+    const toSwapShareFound = await PropertyShares.findOne({
+      _id: shareOfferFound.offeredShareDocID,
+    }).populate("propertyDocID", "title");
+
+    const prevShareholder = await Shareholders.findOne({
+      username: shareOfferFound.shareholderDocID.username,
+    });
+
+    const shareholderFound = await Shareholders.findOne({ username: username });
+
+    if (action === "accepted") {
+      const sharePrevOwnerPurchasedIDList = [
+        ...prevShareholder.purchasedShareIDList,
+      ];
+
+      prevShareholder.purchasedShareIDList =
+        sharePrevOwnerPurchasedIDList.filter(
+          (share) => share.shareDocID !== propertyShareFound._id
+        );
+
+      prevShareholder.soldShareIDList.push({
+        shareDocID: propertyShareFound._id,
+      });
+
+      const shareNewOwnerPurchasedIDList = [
+        ...shareholderFound.purchasedShareIDList,
+      ];
+
+      shareholderFound.purchasedShareIDList =
+        shareNewOwnerPurchasedIDList.filter(
+          (share) => share.shareDocID !== propertyShareFound._id
+        );
+
+      shareholderFound.soldShareIDList.push({
+        shareDocID: propertyShareFound._id,
+      });
+
+      shareholderFound.purchasedShareIDList.push({
+        shareDocID: propertyShareFound._id,
+      });
+      prevShareholder.purchasedShareIDList.push({
+        shareDocID: toSwapShareFound._id,
+      });
+      propertyShareFound.currentOwnerDocID = shareholderFound._id;
+      propertyShareFound.lastOwners.push({
+        username: sharePrevOwnerFound.username,
+        boughtAt: "",
+      });
+
+      toSwapShareFound.currentOwnerDocID = prevShareholder._id;
+      toSwapShareFound.lastOwners.push({
+        username: shareholderFound.username,
+        boughtAt: "",
+      });
+
+      await shareholderFound.save();
+      propertyShareFound.currentBoughtAt = 0;
+      propertyShareFound.onSwap = false;
+      propertyShareFound.utilisedStatus = "Purchased";
+
+      toSwapShareFound.currentBoughtAt = 0;
+      toSwapShareFound.onSwap = false;
+      toSwapShareFound.utilisedStatus = "Purchased";
+
+      await toSwapShareFound.save();
+      await propertyShareFound.save();
+
+      await prevShareholder.save();
+      shareOfferFound.status = "accepted";
+    } else if (action === "rejected") {
+      shareOfferFound.status = "rejected";
+    } else if (action === "cancelled") {
+      shareOfferFound.status = "cancelled";
+    }
+
+    shareOfferFound.save().then(() => {
+      if (action === "accepted") {
+        const ownerNotificationSubject = `Swap Offer from ${userFound.username} Accepted`;
+        const ownerNotificationBody = `Dear ${
+          userFound.name
+        }, \nYou have successfully accepted the offer of rent of ${
+          propertyShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(propertyShareFound.availableInDuration.startDate) -
+          processDate(propertyShareFound.availableInDuration.endDate)
+        }\nShare Previous Owner Username: ${
+          userFound.username
+        } \nRegards, \nBeach Bunny House`;
+
+        const userNotificationSubject = `Property Share Swap Offer Accepted`;
+        const userNotificationBody = `Dear ${sharePrevOwnerFound.name}, \nYour share swap offer has been accepted by user: ${sharePrevOwnerFound.username} \nRegards, \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          userNotificationSubject,
+          userNotificationBody,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
+
+        sendUpdateNotification(
+          ownerNotificationSubject,
+          ownerNotificationBody,
+          sharePrevOwnerFound.userDefaultSettingID.notifyUpdates,
+          sharePrevOwnerFound.username
+        );
+      } else if (action === "rejected") {
+        const ownerNotificationSubject = `Swap Offer from ${userFound.username} Rejected`;
+        const ownerNotificationBody = `Dear ${
+          shareOfferFound.name
+        }, \nYou have successfully rejected the offer of rent of ${
+          propertyShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(propertyShareFound.availableInDuration.startDate) -
+          processDate(propertyShareFound.availableInDuration.endDate)
+        }\nShare Owner Username: ${
+          userFound.username
+        } \nRegards, \nBeach Bunny House`;
+
+        const userNotificationSubject = `Property Share Swap Offer Rejected`;
+        const userNotificationBody = `Dear ${userFound.name}, \nYour share swap offer has been rejected by user: ${sharePrevOwnerFound.username} \nRegards, \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          userNotificationSubject,
+          userNotificationBody,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
+
+        sendUpdateNotification(
+          ownerNotificationSubject,
+          ownerNotificationBody,
+          sharePrevOwnerFound.userDefaultSettingID.notifyUpdates,
+          sharePrevOwnerFound.username
+        );
+      } else if (action === "cancelled") {
+        const ownerNotificationSubject = `Property Share Swap Offer Cancelled`;
+        const ownerNotificationBody = `Dear ${userFound.name}, \nYour share rent offer has been cancelled. \nRegards, \nBeach Bunny House.`;
+        sendUpdateNotification(
+          ownerNotificationSubject,
+          ownerNotificationBody,
+          sharePrevOwnerFound.userDefaultSettingID.notifyUpdates,
+          sharePrevOwnerFound.username
+        );
+      }
+
+      res
+        .status(200)
+        .json({ message: "Action completed successfull.", success: true });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleShareSellOfferAction",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
 module.exports = {
   buyShare,
   getBuySharesDetailByUsername,
@@ -1269,4 +1569,6 @@ module.exports = {
   handleShareSellOfferAction,
   getSharesByUsername,
   genShareSwapOffer,
+  handleShareSwapOfferAction,
+  getSwapShareByUsername,
 };

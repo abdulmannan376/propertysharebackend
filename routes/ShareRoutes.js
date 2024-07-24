@@ -8,7 +8,7 @@ router.post("/buy-share", ShareController.buyShare);
 router.post("/reserve-share", ShareController.reserveShare);
 router.post("/open-share-by-category", ShareController.handleShareByCategory);
 router.post("/gen-new-offer", ShareController.genNewShareOffer);
-router.post("/gen-share-swap-offer", ShareController.genShareSwapOffer)
+router.post("/gen-share-swap-offer", ShareController.genShareSwapOffer);
 
 //PUT
 router.put(
@@ -18,6 +18,10 @@ router.put(
 router.put(
   "/update-share-sell-offer",
   ShareController.handleShareSellOfferAction
+);
+router.put(
+  "/update-share-swap-offer",
+  ShareController.handleShareSwapOfferAction
 );
 
 //GET
@@ -49,6 +53,13 @@ router.get(
   "/get-share-rentals-by-user/:username",
   ShareController.fetchUserShareRentals
 );
-router.get("/get-all-shares-by-username/:username/:propertyID", ShareController.getSharesByUsername);
+router.get(
+  "/get-all-shares-by-username/:username/:propertyID",
+  ShareController.getSharesByUsername
+);
+router.get(
+  "/get-swap-shares/:username/:propertyID",
+  ShareController.getSwapShareByUsername
+);
 
 module.exports = router;
