@@ -8,6 +8,7 @@ router.post("/buy-share", ShareController.buyShare);
 router.post("/reserve-share", ShareController.reserveShare);
 router.post("/open-share-by-category", ShareController.handleShareByCategory);
 router.post("/gen-new-offer", ShareController.genNewShareOffer);
+router.post("/gen-share-swap-offer", ShareController.genShareSwapOffer)
 
 //PUT
 router.put(

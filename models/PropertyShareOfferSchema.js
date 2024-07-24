@@ -12,7 +12,7 @@ const ShareOfferSchema = new mongoose.Schema(
     },
     price: {
       type: Number,
-      required: true,
+      required: false,
       validate: [priceValidator, "{VALUE} must be greater than zero."], // Custom validator for ensuring 2 values
     },
     shareholderDocID: {

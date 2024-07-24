@@ -291,6 +291,23 @@ const handleShareByCategory = async (req, res) => {
         propertyFound.stakesOnRent -= 1;
 
         propertyShareFound.onRent = false;
+
+        const shareOfferList = await ShareOffers.find({
+          shareDocID: propertyShareFound._id,
+          category: "Rent",
+        });
+
+        const updatedShareOfferListPromises = shareOfferList.map(
+          (shareOffer) => {
+            if (shareOffer.status === "pending") {
+              shareOffer.status = "rejected";
+            }
+
+            return shareOffer.save();
+          }
+        );
+
+        await Promise.all(updatedShareOfferListPromises);
       } else {
         propertyFound.stakesOnRent += 1;
 
@@ -301,6 +318,23 @@ const handleShareByCategory = async (req, res) => {
         propertyFound.stakesOnSale -= 1;
 
         propertyShareFound.onSale = false;
+
+        const shareOfferList = await ShareOffers.find({
+          shareDocID: propertyShareFound._id,
+          category: "Sell",
+        });
+
+        const updatedShareOfferListPromises = shareOfferList.map(
+          (shareOffer) => {
+            if (shareOffer.status === "pending") {
+              shareOffer.status = "rejected";
+            }
+
+            return shareOffer.save();
+          }
+        );
+
+        await Promise.all(updatedShareOfferListPromises);
       } else {
         propertyFound.stakesOnSale += 1;
 
@@ -308,6 +342,23 @@ const handleShareByCategory = async (req, res) => {
       }
     } else if (category === "Swap") {
       if (propertyShareFound.onSwap) {
+        const shareOfferList = await ShareOffers.find({
+          shareDocID: propertyShareFound._id,
+          category: "Swap",
+        });
+
+        const updatedShareOfferListPromises = shareOfferList.map(
+          (shareOffer) => {
+            if (shareOffer.status === "pending") {
+              shareOffer.status = "rejected";
+            }
+
+            return shareOffer.save();
+          }
+        );
+
+        await Promise.all(updatedShareOfferListPromises);
+
         propertyShareFound.onSwap = false;
       } else {
         propertyShareFound.onSwap = true;
@@ -583,6 +634,95 @@ const genNewShareOffer = async (req, res) => {
 
       const ownerNotificationSubject = `Property share ${category} offer sent`;
       const ownerNotificationBody = `Dear ${ownerFound.name}, \nYour offer for share ${category} is sent to user: ${username} of price: $${price}. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        ownerNotificationSubject,
+        ownerNotificationBody,
+        ownerFound.userDefaultSettingID.notifyUpdates,
+        ownerFound.username
+      );
+
+      res
+        .status(201)
+        .json({ message: "Offer sent successfully.", success: true });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "genNewShareOffer",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const genShareSwapOffer = async (req, res) => {
+  try {
+    const { shareID, username } = req.body;
+
+    console.log(req.body);
+
+    const shareFound = await PropertyShares.findOne({
+      shareID: shareID,
+      onSwap: true,
+    })
+      .populate("currentOwnerDocID", "username")
+      .exec();
+
+    if (!shareFound) {
+      throw new Error("property share not found");
+    }
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found.");
+    }
+
+    const ownerFound = await Users.findOne({
+      username: shareFound.currentOwnerDocID.username,
+    }).populate("userDefaultSettingID", "notifyUpdates");
+
+    const offerFound = await ShareOffers.findOne({
+      shareDocID: shareFound._id,
+      userDocID: userFound._id,
+      category: "Swap",
+      status: { $in: ["pending", "accepted"] },
+    });
+    if (offerFound) {
+      return res.status(403).json({
+        message: "Offer already sent.",
+        success: false,
+      });
+    }
+
+    const newShareOffer = new ShareOffers({
+      shareDocID: shareFound._id,
+      shareholderDocID: shareFound.currentOwnerDocID,
+      userDocID: userFound._id,
+      category: "Swap",
+    });
+
+    shareFound.shareOffersList.push(newShareOffer._id);
+    await shareFound.save();
+
+    newShareOffer.save().then(() => {
+      const userNotificationSubject = `Property share swap offer sent`;
+      const userNotificationBody = `Dear ${userFound.name}, \nYour offer for share swap is sent to user: ${ownerFound.username}. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        userNotificationSubject,
+        userNotificationBody,
+        userFound.userDefaultSettingID.notifyUpdates,
+        username
+      );
+
+      const ownerNotificationSubject = `Property share swap offer recieved`;
+      const ownerNotificationBody = `Dear ${ownerFound.name}, \n${userFound.name} has given an offer for this share to swap \nRegards, \nBeach Bunny house.`;
 
       sendUpdateNotification(
         ownerNotificationSubject,
@@ -1128,4 +1268,5 @@ module.exports = {
   fetchUserShareRentals,
   handleShareSellOfferAction,
   getSharesByUsername,
+  genShareSwapOffer,
 };
