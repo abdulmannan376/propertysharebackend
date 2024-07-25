@@ -790,7 +790,8 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
           },
         })
         .populate("userDocID", "username")
-        .populate("shareholderDocID", "username");
+        .populate("shareholderDocID", "username")
+        .populate("offeredShareDocID", "availableInDuration");
     } else {
       const shareholderFound = await Shareholders.findOne({
         username: username,
@@ -871,7 +872,8 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
           },
         })
         .populate("shareholderDocID", "username")
-        .populate("userDocID", "username");
+        .populate("userDocID", "username")
+        .populate("offeredShareDocID", "availableInDuration");
     } else {
       const userFound = await Users.findOne({ username: username });
       if (!userFound) {
