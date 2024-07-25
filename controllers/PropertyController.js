@@ -186,7 +186,7 @@ async function findNearbyMarkers(propertyID) {
     }, \nIt is to update you, a property is added in your interested location:\nState/Province: ${
       propertyFound.addressOfProperty.state
     }\nCountry: ${
-      compCities.getCountryByShort(card.addressOfProperty.country).name
+      compCities.getCountryByShort(propertyFound.addressOfProperty.country).name
     } \n title: ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
 
     sendEmail(marker.personDetails.email, subject, body);
