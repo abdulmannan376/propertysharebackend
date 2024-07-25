@@ -4,7 +4,6 @@ const Users = require("../models/UserSchema");
 const Shareholders = require("../models/ShareholderSchema");
 const ShareOffers = require("../models/PropertyShareOfferSchema");
 const { sendUpdateNotification } = require("./notificationController");
-const PropertyShare = require("../models/PropertyShareSchema");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -676,7 +675,7 @@ const genShareSwapOffer = async (req, res) => {
       throw new Error("property share not found");
     }
 
-    const offeredShareFound = await PropertyShare.findOne({
+    const offeredShareFound = await PropertyShares.findOne({
       shareID: offeredShareID,
     })
       .populate("currentOwnerDocID", "username")
@@ -790,7 +789,8 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
             },
           },
         })
-        .populate("userDocID", "username");
+        .populate("userDocID", "username")
+        .populate("shareholderDocID", "username");
     } else {
       const shareholderFound = await Shareholders.findOne({
         username: username,
@@ -844,7 +844,9 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
     // Find share offers and populate nested documents
     let shareOffersList;
     if (category === "Swap") {
-      const shareholderFound = await Shareholders.findOne({ username: username });
+      const shareholderFound = await Shareholders.findOne({
+        username: username,
+      });
       if (!shareholderFound) {
         throw new Error("shareholder not found.");
       }
@@ -868,7 +870,8 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
             },
           },
         })
-        .populate("shareholderDocID", "username");
+        .populate("shareholderDocID", "username")
+        .populate("userDocID", "username");
     } else {
       const userFound = await Users.findOne({ username: username });
       if (!userFound) {
@@ -1214,9 +1217,14 @@ const handleShareSellOfferAction = async (req, res) => {
         prevShareholder.purchasedShareIDList;
 
       prevShareholder.purchasedShareIDList =
-        sharePrevOwnerPurchasedIDList.filter(
-          (share) => share.shareDocID !== propertyShareFound._id
-        );
+        sharePrevOwnerPurchasedIDList.filter((share) => {
+          // Convert Mongoose ObjectIDs to string for comparison
+          const shareDocIDString = share.shareDocID.toString();
+          const propertyShareDocIDString = propertyShareFound._id.toString();
+
+          // Return true if they are NOT equal, hence the filter will exclude matching IDs
+          return shareDocIDString !== propertyShareDocIDString;
+        });
 
       console.log(
         "sharePrevOwnerPurchasedIDList: ",
@@ -1367,99 +1375,120 @@ const handleShareSellOfferAction = async (req, res) => {
 
 const handleShareSwapOfferAction = async (req, res) => {
   try {
-    const { username, offerID, action } = req.body;
-
-    const userFound = await Users.findOne({ username: username }).populate(
-      "userDefaultSettingID",
-      "notifyUpdates"
-    );
-    if (!userFound) {
-      throw new Error("user not found");
-    }
+    const { offerID, action } = req.body;
 
     const shareOfferFound = await ShareOffers.findOne({
       shareOfferID: offerID,
-    }).populate("shareholderDocID", "username");
+    })
+      .populate("shareholderDocID", "username")
+      .populate("userDocID", "username");
     if (!shareOfferFound) {
       throw new Error("share offer not found");
     }
 
-    const sharePrevOwnerFound = await Users.findOne({
+    const firstShareholder = await Shareholders.findOne({
       username: shareOfferFound.shareholderDocID.username,
-    }).populate("userDefaultSettingID", "notifyUpdates");
+    }).populate({
+      path: "userID",
+      select: "name",
+      populate: {
+        path: "userDefaultSettingID",
+        model: "user_default_settings",
+        select: "notifyUpdates",
+      },
+    });
 
-    const propertyShareFound = await PropertyShares.findOne({
+    const secondShareholder = await Shareholders.findOne({
+      username: shareOfferFound.userDocID.username,
+    }).populate({
+      path: "userID",
+      select: "name",
+      populate: {
+        path: "userDefaultSettingID",
+        model: "user_default_settings",
+        select: "notifyUpdates",
+      },
+    });
+
+    console.log(shareOfferFound);
+
+    const firstShareFound = await PropertyShares.findOne({
       _id: shareOfferFound.shareDocID,
     }).populate("propertyDocID", "title");
 
-    const toSwapShareFound = await PropertyShares.findOne({
+    const secondShareFound = await PropertyShares.findOne({
       _id: shareOfferFound.offeredShareDocID,
     }).populate("propertyDocID", "title");
 
-    const prevShareholder = await Shareholders.findOne({
-      username: shareOfferFound.shareholderDocID.username,
-    });
-
-    const shareholderFound = await Shareholders.findOne({ username: username });
-
     if (action === "accepted") {
-      const sharePrevOwnerPurchasedIDList = [
-        ...prevShareholder.purchasedShareIDList,
-      ];
+      const firstShareholderPurchaseList =
+        firstShareholder.purchasedShareIDList;
 
-      prevShareholder.purchasedShareIDList =
-        sharePrevOwnerPurchasedIDList.filter(
-          (share) => share.shareDocID !== propertyShareFound._id
-        );
+      firstShareholder.purchasedShareIDList =
+        firstShareholderPurchaseList.filter((share) => {
+          // Convert Mongoose ObjectIDs to string for comparison
+          const shareDocIDString = share.shareDocID.toString();
+          const offerShareDocIDString = shareOfferFound.shareDocID.toString();
 
-      prevShareholder.soldShareIDList.push({
-        shareDocID: propertyShareFound._id,
+          // Return true if they are NOT equal, hence the filter will exclude matching IDs
+          return shareDocIDString !== offerShareDocIDString;
+        });
+
+      firstShareholder.soldShareIDList.push({
+        shareDocID: shareOfferFound.shareDocID,
       });
 
-      const shareNewOwnerPurchasedIDList = [
-        ...shareholderFound.purchasedShareIDList,
-      ];
-
-      shareholderFound.purchasedShareIDList =
-        shareNewOwnerPurchasedIDList.filter(
-          (share) => share.shareDocID !== propertyShareFound._id
-        );
-
-      shareholderFound.soldShareIDList.push({
-        shareDocID: propertyShareFound._id,
+      firstShareholder.purchasedShareIDList.push({
+        shareDocID: shareOfferFound.offeredShareDocID,
       });
 
-      shareholderFound.purchasedShareIDList.push({
-        shareDocID: propertyShareFound._id,
-      });
-      prevShareholder.purchasedShareIDList.push({
-        shareDocID: toSwapShareFound._id,
-      });
-      propertyShareFound.currentOwnerDocID = shareholderFound._id;
-      propertyShareFound.lastOwners.push({
-        username: sharePrevOwnerFound.username,
-        boughtAt: "",
+      secondShareFound.currentOwnerDocID = firstShareholder._id;
+      const secondShareBoughtAt = secondShareFound.currentBoughtAt;
+      secondShareFound.currentBoughtAt = firstShareFound.currentBoughtAt;
+      secondShareFound.lastOwners.push({
+        username: secondShareholder.username,
+        boughtAt: firstShareFound.currentBoughtAt,
       });
 
-      toSwapShareFound.currentOwnerDocID = prevShareholder._id;
-      toSwapShareFound.lastOwners.push({
-        username: shareholderFound.username,
-        boughtAt: "",
+      const secondShareholderPurchaseList =
+        secondShareholder.purchasedShareIDList;
+
+      secondShareholder.purchasedShareIDList =
+        secondShareholderPurchaseList.filter((share) => {
+          // Convert Mongoose ObjectIDs to string for comparison
+          const shareDocIDString = share.shareDocID.toString();
+          const offerShareDocIDString =
+            shareOfferFound.offeredShareDocID.toString();
+
+          // Return true if they are NOT equal, hence the filter will exclude matching IDs
+          return shareDocIDString !== offerShareDocIDString;
+        });
+
+      secondShareholder.soldShareIDList.push({
+        shareDocID: shareOfferFound.offeredShareDocID,
       });
 
-      await shareholderFound.save();
-      propertyShareFound.currentBoughtAt = 0;
-      propertyShareFound.onSwap = false;
-      propertyShareFound.utilisedStatus = "Purchased";
+      secondShareholder.purchasedShareIDList.push({
+        shareDocID: shareOfferFound.shareDocID,
+      });
 
-      toSwapShareFound.currentBoughtAt = 0;
-      toSwapShareFound.onSwap = false;
-      toSwapShareFound.utilisedStatus = "Purchased";
+      firstShareFound.currentOwnerDocID = secondShareholder._id;
+      firstShareFound.currentBoughtAt = secondShareBoughtAt;
+      firstShareFound.lastOwners.push({
+        username: firstShareholder.username,
+        boughtAt: secondShareBoughtAt,
+      });
 
-      await toSwapShareFound.save();
-      await propertyShareFound.save();
+      firstShareFound.onSwap = false;
 
-      await prevShareholder.save();
+      secondShareFound.onSwap = false;
+
+      await firstShareholder.save();
+      await firstShareFound.save();
+
+      await secondShareholder.save();
+      await secondShareFound.save();
+
       shareOfferFound.status = "accepted";
     } else if (action === "rejected") {
       shareOfferFound.status = "rejected";
@@ -1467,73 +1496,118 @@ const handleShareSwapOfferAction = async (req, res) => {
       shareOfferFound.status = "cancelled";
     }
 
+    // console.log(firstShareFound, "\n", secondShareFound);
+
     shareOfferFound.save().then(() => {
       if (action === "accepted") {
-        const ownerNotificationSubject = `Swap Offer from ${userFound.username} Accepted`;
+        const ownerNotificationSubject = `Swap Offer from ${secondShareholder.username} Accepted`;
         const ownerNotificationBody = `Dear ${
-          userFound.name
-        }, \nYou have successfully accepted the offer of rent of ${
-          propertyShareFound.propertyDocID.title
+          firstShareholder.userID.name
+        }, \nYou have successfully accepted the offer to swap your share of ${
+          firstShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(propertyShareFound.availableInDuration.startDate) -
-          processDate(propertyShareFound.availableInDuration.endDate)
-        }\nShare Previous Owner Username: ${
-          userFound.username
+          processDate(firstShareFound.availableInDuration.startDate) -
+          processDate(firstShareFound.availableInDuration.endDate)
+        }\nWith Share of ${
+          secondShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(secondShareFound.availableInDuration.startDate) -
+          processDate(secondShareFound.availableInDuration.endDate)
         } \nRegards, \nBeach Bunny House`;
 
         const userNotificationSubject = `Property Share Swap Offer Accepted`;
-        const userNotificationBody = `Dear ${sharePrevOwnerFound.name}, \nYour share swap offer has been accepted by user: ${sharePrevOwnerFound.username} \nRegards, \nBeach Bunny House.`;
+        const userNotificationBody = `Dear ${
+          secondShareholder.userID.name
+        }, \nYou have successfully accepted the offer to swap your share of ${
+          secondShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(secondShareFound.availableInDuration.startDate) -
+          processDate(secondShareFound.availableInDuration.endDate)
+        }\nWith Share of ${
+          firstShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(firstShareFound.availableInDuration.startDate) -
+          processDate(firstShareFound.availableInDuration.endDate)
+        } \nRegards, \nBeach Bunny House`;
 
         sendUpdateNotification(
           userNotificationSubject,
           userNotificationBody,
-          userFound.userDefaultSettingID.notifyUpdates,
-          username
+          secondShareholder.userID.userDefaultSettingID.notifyUpdates,
+          secondShareholder.username
         );
 
         sendUpdateNotification(
           ownerNotificationSubject,
           ownerNotificationBody,
-          sharePrevOwnerFound.userDefaultSettingID.notifyUpdates,
-          sharePrevOwnerFound.username
+          firstShareholder.userID.userDefaultSettingID.notifyUpdates,
+          firstShareholder.username
         );
       } else if (action === "rejected") {
-        const ownerNotificationSubject = `Swap Offer from ${userFound.username} Rejected`;
+        const ownerNotificationSubject = `Swap Offer from ${secondShareholder.username} Rejected`;
         const ownerNotificationBody = `Dear ${
-          shareOfferFound.name
-        }, \nYou have successfully rejected the offer of rent of ${
-          propertyShareFound.propertyDocID.title
+          firstShareholder.userID.name
+        }, \nYou have successfully rejected the offer to swap your share of ${
+          firstShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(propertyShareFound.availableInDuration.startDate) -
-          processDate(propertyShareFound.availableInDuration.endDate)
-        }\nShare Owner Username: ${
-          userFound.username
+          processDate(firstShareFound.availableInDuration.startDate) -
+          processDate(firstShareFound.availableInDuration.endDate)
+        }\nWith Share of ${
+          secondShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(secondShareFound.availableInDuration.startDate) -
+          processDate(secondShareFound.availableInDuration.endDate)
         } \nRegards, \nBeach Bunny House`;
 
         const userNotificationSubject = `Property Share Swap Offer Rejected`;
-        const userNotificationBody = `Dear ${userFound.name}, \nYour share swap offer has been rejected by user: ${sharePrevOwnerFound.username} \nRegards, \nBeach Bunny House.`;
+        const userNotificationBody = `Dear ${
+          secondShareholder.userID.name
+        }, \nYou have successfully rejected the offer to swap your share of ${
+          secondShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(secondShareFound.availableInDuration.startDate) -
+          processDate(secondShareFound.availableInDuration.endDate)
+        }\nWith Share of ${
+          firstShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(firstShareFound.availableInDuration.startDate) -
+          processDate(firstShareFound.availableInDuration.endDate)
+        } \nRegards, \nBeach Bunny House`;
 
         sendUpdateNotification(
           userNotificationSubject,
           userNotificationBody,
-          userFound.userDefaultSettingID.notifyUpdates,
-          username
+          secondShareholder.userID.userDefaultSettingID.notifyUpdates,
+          secondShareholder.username
         );
 
         sendUpdateNotification(
           ownerNotificationSubject,
           ownerNotificationBody,
-          sharePrevOwnerFound.userDefaultSettingID.notifyUpdates,
-          sharePrevOwnerFound.username
+          firstShareholder.userID.userDefaultSettingID.notifyUpdates,
+          firstShareholder.username
         );
       } else if (action === "cancelled") {
         const ownerNotificationSubject = `Property Share Swap Offer Cancelled`;
-        const ownerNotificationBody = `Dear ${userFound.name}, \nYour share rent offer has been cancelled. \nRegards, \nBeach Bunny House.`;
+        const ownerNotificationBody = `Dear ${
+          firstShareholder.userID.name
+        }, \nYou have successfully rejected the offer to swap your share of ${
+          firstShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(firstShareFound.availableInDuration.startDate) -
+          processDate(firstShareFound.availableInDuration.endDate)
+        }\nWith Share of ${
+          secondShareFound.propertyDocID.title
+        } property's share. \nDuration: ${
+          processDate(secondShareFound.availableInDuration.startDate) -
+          processDate(secondShareFound.availableInDuration.endDate)
+        } \nRegards, \nBeach Bunny House`;
+
         sendUpdateNotification(
           ownerNotificationSubject,
           ownerNotificationBody,
-          sharePrevOwnerFound.userDefaultSettingID.notifyUpdates,
-          sharePrevOwnerFound.username
+          firstShareholder.userID.userDefaultSettingID.notifyUpdates,
+          firstShareholder.username
         );
       }
 
