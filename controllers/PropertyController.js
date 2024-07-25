@@ -179,24 +179,26 @@ async function findNearbyMarkers(propertyID) {
 
   const nearbyMarkersList = await Promise.all(nearbyMarkersListPromises);
 
-  const notifiedMorkers = nearbyMarkersList.map((marker) => {
-    const subject = `Property Request update`;
-    const body = `Dear ${
-      marker.personDetails.name
-    }, \nIt is to update you, a property is added in your interested location:\nState/Province: ${
-      propertyFound.addressOfProperty.state
-    }\nCountry: ${
-      compCities.getCountryByShort(propertyFound.addressOfProperty.country).name
-    } \n title: ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
+  if (nearbyMarkers.length > 0) {
+    const notifiedMorkers = nearbyMarkersList.map((marker) => {
+      const subject = `Property Request update`;
+      const body = `Dear ${
+        marker.personDetails.name
+      }, \nIt is to update you, a property is added in your interested location:\nState/Province: ${
+        propertyFound.addressOfProperty.state
+      }\nCountry: ${
+        compCities.getCountryByShort(propertyFound.addressOfProperty.country)
+          .name
+      } \n title: ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
 
-    sendEmail(marker.personDetails.email, subject, body);
+      sendEmail(marker.personDetails.email, subject, body);
 
-    marker.notifyCount += 1;
+      marker.notifyCount += 1;
 
-    return marker.save();
-  });
-
-  await Promise.all(notifiedMorkers);
+      return marker.save();
+    });
+    await Promise.all(notifiedMorkers);
+  }
 }
 
 const updateProperty = async (req, res) => {
