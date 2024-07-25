@@ -10,6 +10,7 @@ const fs = require("fs");
 const fsPromises = require("fs/promises"); // Use promises version for async operations
 const path = require("path");
 const { match } = require("assert");
+const compCities = require("countrycitystatejson");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -43,6 +44,14 @@ const addPropertyRequest = async (req, res) => {
       const emailBody = `Dear ${body.name}, \nYour request has been successfully submitted into our system any property according to your requirement will be infromed to you by our email. \nRegards \nBeach Bunny House.`;
 
       sendEmail(recipient, subject, emailBody);
+
+      const adminEmailBody = `Dear Admin, \nNew Property request marker has been added. \nName: ${
+        body.name
+      }\nEmail: ${body.email}\nContact: ${
+        body.contact ? body.contact : "no contact added"
+      }. \nRegards \nBeach Bunny House.`;
+
+      sendEmail(process.env.ADMIN_EMAIL, subject, adminEmailBody);
       res.status(201).json({
         message: "A confirmation email is sent to you.",
         success: true,
@@ -64,7 +73,7 @@ const fetchCoordinatesOfRequestes = async (req, res) => {
   try {
     // Query to fetch only the coordinates from all PropertyRequest documents
     const coordinates = await PropertyRequest.find(
-      {},
+      { notifyCount: { $lt: 1 } },
       "location propertyID -_id"
     ).exec();
 
@@ -131,6 +140,64 @@ const getPropertyByUsername = async (req, res) => {
       .json({ message: "Internal Server Error", error: error, success: false });
   }
 };
+
+const testRun = async (req, res) => {
+  const { propertyID } = req.body;
+  findNearbyMarkers(propertyID);
+
+  res.status(200).json({ message: true });
+};
+
+async function findNearbyMarkers(propertyID) {
+  const propertyFound = await Properties.findOne({ propertyID: propertyID });
+
+  const pipeline = [];
+
+  pipeline.push({
+    $geoNear: {
+      near: {
+        type: "Point",
+        coordinates: propertyFound.location.coordinates.map(Number),
+      },
+      distanceField: "distance",
+      maxDistance: 200000, // 10000 kilometers in meters
+      spherical: true,
+    },
+  });
+
+  const nearbyMarkers = await PropertyRequest.aggregate(pipeline);
+
+  const nearbyMarkersListPromises = nearbyMarkers.map((marker) => {
+    if (marker.notifyCount < 2) {
+      const notifyMarker = PropertyRequest.findOne({
+        requestID: marker.requestID,
+      });
+
+      return notifyMarker;
+    }
+  });
+
+  const nearbyMarkersList = await Promise.all(nearbyMarkersListPromises);
+
+  const notifiedMorkers = nearbyMarkersList.map((marker) => {
+    const subject = `Property Request update`;
+    const body = `Dear ${
+      marker.personDetails.name
+    }, \nIt is to update you, a property is added in your interested location:\nState/Province: ${
+      propertyFound.addressOfProperty.state
+    }\nCountry: ${
+      compCities.getCountryByShort(card.addressOfProperty.country).name
+    } \n title: ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
+
+    sendEmail(marker.personDetails.email, subject, body);
+
+    marker.notifyCount += 1;
+
+    return marker.save();
+  });
+
+  await Promise.all(notifiedMorkers);
+}
 
 const updateProperty = async (req, res) => {
   try {
@@ -201,6 +268,7 @@ const updateProperty = async (req, res) => {
     }
 
     await propertyFound.save().then(() => {
+      findNearbyMarkers(propertyFound.propertyID);
       if (listingStatus === "live") {
         const subject = `Property (${propertyFound.propertyID}) status of listing.`;
         const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully live on our platform and is ready for operations from the start date: ${body.startDate}. \nRegards,\nBunny Beach House.`;
@@ -332,6 +400,8 @@ const addNewProperty = async (req, res) => {
     }
 
     newProperty.shareDocIDList = shareDocIDList;
+
+    findNearbyMarkers(newProperty.propertyID);
 
     await newProperty.save().then(() => {
       if (listingStatus === "live") {
@@ -1190,6 +1260,7 @@ const getPropertyByID = async (req, res) => {
 };
 
 module.exports = {
+  testRun,
   addPropertyRequest,
   fetchCoordinatesOfRequestes,
   addNewProperty,

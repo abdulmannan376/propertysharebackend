@@ -52,4 +52,6 @@ router.get("/get-property-by-id/:key", PropertyController.getPropertyByID);
 
 // router.get("/test-share-ID", PropertyController.testGenerateShareID)
 
+router.get("/test-run", PropertyController.testRun)
+
 module.exports = router;
