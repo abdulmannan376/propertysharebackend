@@ -167,7 +167,7 @@ async function findNearbyMarkers(propertyID) {
 
   const nearbyMarkers = await PropertyRequest.aggregate(pipeline);
 
-  const nearbyMarkersListPromises = nearbyMarkers.map((marker) => {
+  const nearbyMarkersListPromises = nearbyMarkers.filter((marker) => {
     if (marker.notifyCount < 2) {
       const notifyMarker = PropertyRequest.findOne({
         requestID: marker.requestID,
@@ -179,8 +179,9 @@ async function findNearbyMarkers(propertyID) {
 
   const nearbyMarkersList = await Promise.all(nearbyMarkersListPromises);
 
-  if (nearbyMarkers.length > 0) {
-    const notifiedMorkers = nearbyMarkersList.map((marker) => {
+  console.log(nearbyMarkersList);
+  if (nearbyMarkersList.length > 0) {
+    const notifiedMarkers = nearbyMarkersList.map(async (marker) => {
       const subject = `Property Request update`;
       const body = `Dear ${
         marker.personDetails.name
@@ -193,11 +194,14 @@ async function findNearbyMarkers(propertyID) {
 
       sendEmail(marker.personDetails.email, subject, body);
 
-      marker.notifyCount += 1;
+      const notifiedMarker = await PropertyRequest.findOne({
+        requestID: marker.requestID,
+      });
 
-      return marker.save();
+      notifiedMarker.notifyCount += 1;
+      return notifiedMarker.save();
     });
-    await Promise.all(notifiedMorkers);
+    await Promise.all(notifiedMarkers);
   }
 }
 
