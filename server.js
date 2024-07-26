@@ -72,7 +72,7 @@ app.post("/contact-us", async (req, res) => {
   }
 });
 
-// Read SSL certificate files
+//Read SSL certificate files
 const privateKey = fs.readFileSync(
   "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
   "utf8"

@@ -5,6 +5,8 @@ const jwt = require("jsonwebtoken");
 const CryptoJS = require("crypto-js");
 const { sendEmail } = require("../helpers/emailController");
 const { sendUpdateNotification } = require("./notificationController");
+const { verifyJWT } = require("../helpers/jwtController");
+const Properties = require("../models/PropertySchema");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -454,6 +456,239 @@ const changeUserLoginPassword = async (req, res) => {
   }
 };
 
+const getUserData = async (req, res) => {
+  try {
+    // Authorization header should be checked if it exists
+    if (!req.headers.authorization) {
+      return res.status(401).json({
+        message: "No authorization token provided.",
+        success: false,
+      });
+    }
+
+    const token = req.headers.authorization.split(" ")[1];
+
+    const isTokenValid = await verifyJWT(token);
+    if (!isTokenValid) {
+      return res.status(404).json({
+        message: "Session expired.",
+        success: false,
+        action: "login",
+      });
+    }
+
+    const data = jwt.decode(token);
+
+    const userFound = await Users.findOne(
+      { username: data.username },
+      "-notificationByIDList -password -emailVerificationCode"
+    )
+      .populate("userDefaultSettingID")
+      .populate("userProfile");
+
+    if (!userFound) {
+      return res.status(404).json({
+        message: "User error. Login again",
+        success: false,
+        action: "login",
+      });
+    }
+
+    res
+      .status(200)
+      .json({ message: "User data found.", success: true, body: userFound });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getUserData",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const handleUserFavouriteList = async (req, res) => {
+  try {
+    const { propertyID, username, action } = req.body;
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found.");
+    }
+
+    const propertyFound = await Properties.findOne({ propertyID: propertyID });
+    if (!propertyFound) {
+      throw new Error("property not found.");
+    }
+
+    const userProfileFound = await UserProfile.findOne({
+      _id: userFound.userProfile,
+    });
+
+    if (action === "add") {
+      userProfileFound.favouriteList.push(propertyID);
+      userProfileFound.save().then(() => {
+        const subject = `Property added to favourites`;
+        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} added to your favourites. \nRegards \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          subject,
+          body,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
+      });
+      return res.status(201).json({
+        message: "Added to favourites",
+        success: true,
+        body: userProfileFound.favouriteList,
+      });
+    } else if (action === "remove") {
+      const prevDetails = [...userProfileFound.favouriteList];
+      userProfileFound.favouriteList = prevDetails.filter((data) => {
+        return data !== propertyID;
+      });
+      userProfileFound.save().then(() => {
+        const subject = `Property removed to favourites`;
+        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} removed to your favourites. \nRegards \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          subject,
+          body,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
+      });
+
+      return res.status(200).json({
+        message: "Removed from favourites",
+        success: true,
+        body: userProfileFound.favouriteList,
+      });
+    } else {
+      return res
+        .status(403)
+        .json({ message: "Forbidden or no action provided", success: false });
+    }
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleUserFavouriteList",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const handleUserWishList = async (req, res) => {
+  try {
+    const { propertyID, username, action } = req.body;
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found.");
+    }
+
+    const propertyFound = await Properties.findOne({ propertyID: propertyID });
+    if (!propertyFound) {
+      throw new Error("property not found.");
+    }
+
+    const userProfileFound = await UserProfile.findOne({
+      _id: userFound.userProfile,
+    });
+
+    if (action === "add") {
+      userProfileFound.wishList.push(propertyID);
+      userProfileFound.save().then(() => {
+        const subject = `Property added to wishlist`;
+        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} added to your wishlist. \nRegards \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          subject,
+          body,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
+      });
+      return res.status(201).json({
+        message: "Added to favourites",
+        success: true,
+        body: userProfileFound.wishList,
+      });
+    } else if (action === "remove") {
+      const prevDetails = [...userProfileFound.wishList];
+      userProfileFound.wishList = prevDetails.filter((data) => {
+        return data !== propertyID;
+      });
+      userProfileFound.save().then(() => {
+        const subject = `Property removed to wishlist`;
+        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} removed to your wishlist. \nRegards \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          subject,
+          body,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
+      });
+
+      return res.status(200).json({
+        message: "Removed from favourites",
+        success: true,
+        body: userProfileFound.wishList,
+      });
+    } else {
+      return res
+        .status(403)
+        .json({ message: "Forbidden or no action provided", success: false });
+    }
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleUserWishList",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+// const fetchUserFavouriteList = async (req, res) => {
+//   try {
+//     const { username } = req.params;
+
+//     const userFound = await Users.findOne({ username: username }).populate(
+//       "userProfile",
+//       "favouriteList"
+//     );
+//     if (!userFound) {
+//       throw new Error("user not found");
+//     }
+
+//   } catch (error) {
+//     console.log(`Error: ${error}`, "\nlocation: ", {
+//       function: "fetchUserFavouriteList",
+//       fileLocation: "controllers/UserController.js",
+//       timestamp: currentDateString,
+//     });
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error, success: false });
+//   }
+// };
+
 module.exports = {
   userSignUp,
   verifyEmailVerficationCode,
@@ -465,4 +700,7 @@ module.exports = {
   updateUserAccountSetting,
   changeUserLoginPassword,
   decryptPassword, // to be deleted
+  getUserData,
+  handleUserFavouriteList,
+  handleUserWishList,
 };

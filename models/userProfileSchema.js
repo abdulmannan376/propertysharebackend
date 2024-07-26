@@ -4,7 +4,7 @@ const UserProfileSchema = new mongoose.Schema({
   nationality: { type: String, default: "" },
   gender: { type: String, enum: ["Male", "Female", "Other"] },
   favouriteList: { type: [String], default: [] },
-  wishList: { type: [Object], default: [] },
+  wishList: { type: [String], default: [] },
   nicNumber: { type: String, default: "" },
   dob: { type: String, default: "" },
   profilePicURL: { type: String, default: "" },
