@@ -28,6 +28,8 @@ router.put("/update-user-wishlist", UsersController.handleUserWishList)
 router.get("/get-user-detail/:key", UsersController.getUserDetails);
 router.get("/get-default-settings/:key", UsersController.getUserDefaultSetting);
 router.get("/get-user-data", UsersController.getUserData);
+router.get("/get-user-favourites/:username", UsersController.fetchUserFavouriteList)
+router.get("/get-user-wishlist/:username", UsersController.fetchUserWishList)
 
 router.get("/decrypt-password", UsersController.decryptPassword);
 

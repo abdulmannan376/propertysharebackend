@@ -142,16 +142,32 @@ const getPropertyByUsername = async (req, res) => {
 };
 
 const testRun = async (req, res) => {
-  const { propertyID } = req.body;
-  findNearbyMarkers(propertyID);
+  const { propertyID, propertyType, area, price } = req.body;
+  findNearbyMarkers(propertyID, propertyType, area, price);
 
   res.status(200).json({ message: true });
 };
 
-async function findNearbyMarkers(propertyID) {
+async function findNearbyMarkers(propertyID, propertyType, area, price) {
   const propertyFound = await Properties.findOne({ propertyID: propertyID });
 
   const pipeline = [];
+
+  const matchQuery = {
+    "requirementDetails.propertyType": { $in: ["All", propertyType] },
+  };
+
+  if (area) {
+    matchQuery["requirementDetails.areaRange"] = {
+      $elemMatch: { $gte: parseFloat(area), $lte: parseFloat(area) },
+    };
+  }
+
+  if (price) {
+    matchQuery["requirementDetails.priceRange"] = {
+      $elemMatch: { $gte: parseFloat(price), $lte: parseFloat(price) },
+    };
+  }
 
   pipeline.push({
     $geoNear: {
@@ -162,11 +178,17 @@ async function findNearbyMarkers(propertyID) {
       distanceField: "distance",
       maxDistance: 200000, // 10000 kilometers in meters
       spherical: true,
+      query: matchQuery,
     },
   });
 
+  pipeline.push({ $match: matchQuery });
+
+  console.log("pipeline: ", pipeline);
+
   const nearbyMarkers = await PropertyRequest.aggregate(pipeline);
 
+  console.log("nearbyMarkers: ", nearbyMarkers);
   const nearbyMarkersListPromises = nearbyMarkers.filter((marker) => {
     if (marker.notifyCount < 2) {
       const notifyMarker = PropertyRequest.findOne({
@@ -179,7 +201,7 @@ async function findNearbyMarkers(propertyID) {
 
   const nearbyMarkersList = await Promise.all(nearbyMarkersListPromises);
 
-  console.log(nearbyMarkersList);
+  console.log("nearbyMarkersList: ", nearbyMarkersList);
   if (nearbyMarkersList.length > 0) {
     const notifiedMarkers = nearbyMarkersList.map(async (marker) => {
       const subject = `Property Request update`;
@@ -274,7 +296,12 @@ const updateProperty = async (req, res) => {
     }
 
     await propertyFound.save().then(() => {
-      findNearbyMarkers(propertyFound.propertyID);
+      findNearbyMarkers(
+        propertyFound.propertyID,
+        propertyFound.propertyType,
+        propertyFound.area,
+        propertyFound.valuePerShare
+      );
       if (listingStatus === "live") {
         const subject = `Property (${propertyFound.propertyID}) status of listing.`;
         const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully live on our platform and is ready for operations from the start date: ${body.startDate}. \nRegards,\nBunny Beach House.`;
@@ -407,7 +434,12 @@ const addNewProperty = async (req, res) => {
 
     newProperty.shareDocIDList = shareDocIDList;
 
-    findNearbyMarkers(newProperty.propertyID);
+    findNearbyMarkers(
+      newProperty.propertyID,
+      newProperty.propertyType,
+      newProperty.area,
+      newProperty.valuePerShare
+    );
 
     await newProperty.save().then(() => {
       if (listingStatus === "live") {

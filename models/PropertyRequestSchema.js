@@ -43,12 +43,12 @@ const PropertyRequestSchema = new mongoose.Schema({
       areaRange: {
         type: [String],
         required: true,
-        validate: [arrayLimit, "{PATH} must have exactly 2 values"], // Custom validator for ensuring 2 values
+        validate: [arrayLimit, "{PATH} must have max 2 values"], // Custom validator for ensuring 2 values
       },
       priceRange: {
         type: [String],
         required: true,
-        validate: [arrayLimit, "{PATH} must have exactly 2 values"], // Custom validator for ensuring 2 values
+        validate: [arrayLimit, "{PATH} must have max 2 values"], // Custom validator for ensuring 2 values
       },
     },
     required: true,
@@ -57,7 +57,7 @@ const PropertyRequestSchema = new mongoose.Schema({
 });
 
 function arrayLimit(val) {
-  return val.length === 2;
+  return val.length <= 2;
 }
 
 // Helper function to pad the sequence number

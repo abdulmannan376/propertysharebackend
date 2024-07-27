@@ -665,29 +665,75 @@ const handleUserWishList = async (req, res) => {
   }
 };
 
-// const fetchUserFavouriteList = async (req, res) => {
-//   try {
-//     const { username } = req.params;
+const fetchUserFavouriteList = async (req, res) => {
+  try {
+    const { username } = req.params;
 
-//     const userFound = await Users.findOne({ username: username }).populate(
-//       "userProfile",
-//       "favouriteList"
-//     );
-//     if (!userFound) {
-//       throw new Error("user not found");
-//     }
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userProfile",
+      "favouriteList"
+    );
+    if (!userFound) {
+      throw new Error("user not found");
+    }
 
-//   } catch (error) {
-//     console.log(`Error: ${error}`, "\nlocation: ", {
-//       function: "fetchUserFavouriteList",
-//       fileLocation: "controllers/UserController.js",
-//       timestamp: currentDateString,
-//     });
-//     res
-//       .status(500)
-//       .json({ message: "Internal Server Error", error: error, success: false });
-//   }
-// };
+    const propertyListPromises = userFound.userProfile.favouriteList.map(
+      (data) => {
+        return Properties.findOne({ propertyID: data }, "-shareDocIDList");
+      }
+    );
+
+    const propertyList = await Promise.all(propertyListPromises);
+
+    res
+      .status(200)
+      .json({ message: "Fetched", success: true, body: propertyList });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "fetchUserFavouriteList",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const fetchUserWishList = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userProfile",
+      "wishList"
+    );
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    const propertyListPromises = userFound.userProfile.wishList.map(
+      (data) => {
+        return Properties.findOne({ propertyID: data }, "-shareDocIDList");
+      }
+    );
+
+    const propertyList = await Promise.all(propertyListPromises);
+
+    res
+      .status(200)
+      .json({ message: "Fetched", success: true, body: propertyList });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "fetchUserFavouriteList",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
 
 module.exports = {
   userSignUp,
@@ -703,4 +749,6 @@ module.exports = {
   getUserData,
   handleUserFavouriteList,
   handleUserWishList,
+  fetchUserFavouriteList,
+  fetchUserWishList
 };
