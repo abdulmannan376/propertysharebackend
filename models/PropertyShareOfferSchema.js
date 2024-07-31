@@ -38,6 +38,10 @@ const ShareOfferSchema = new mongoose.Schema(
       type: String,
       enum: ["Rent", "Sell", "Swap"],
     },
+    offerToPropertyOwner: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

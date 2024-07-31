@@ -2,6 +2,7 @@ const PropertyRequest = require("../models/PropertyRequestSchema");
 const PropertyListing = require("../models/PropertySchema");
 const PropertyAmenities = require("../models/AmenitiesSchema");
 const PropertyShare = require("../models/PropertyShareSchema");
+const PropertyInspection = require("../models/PropertyInspectionSchema");
 const JWTController = require("../helpers/jwtController");
 const { sendEmail } = require("../helpers/emailController");
 const Properties = require("../models/PropertySchema");
@@ -11,6 +12,9 @@ const fsPromises = require("fs/promises"); // Use promises version for async ope
 const path = require("path");
 const { match } = require("assert");
 const compCities = require("countrycitystatejson");
+const Shareholders = require("../models/ShareholderSchema");
+const Users = require("../models/UserSchema");
+const { sendUpdateNotification } = require("./notificationController");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -24,6 +28,22 @@ const addPropertyRequest = async (req, res) => {
       coordinates: [body.long, body.lat],
     };
 
+    let areaRange = [];
+
+    if (body.areaRange[1] === "ANY") {
+      areaRange = [body.areaRange[0], "1000000"];
+    } else {
+      areaRange = body.areaRange;
+    }
+
+    let priceRange = [];
+
+    if (body.priceRange[1] === "ANY") {
+      priceRange = [body.priceRange[0], "10000000"];
+    } else {
+      priceRange = body.priceRange;
+    }
+
     const newPropertyRequest = new PropertyRequest({
       location: propertyLocation,
       personDetails: {
@@ -33,8 +53,8 @@ const addPropertyRequest = async (req, res) => {
       },
       requirementDetails: {
         propertyType: body.propertyType,
-        areaRange: body.areaRange,
-        priceRange: body.priceRange,
+        areaRange: areaRange,
+        priceRange: priceRange,
       },
     });
 
@@ -142,10 +162,10 @@ const getPropertyByUsername = async (req, res) => {
 };
 
 const testRun = async (req, res) => {
-  const { propertyID, propertyType, area, price } = req.body;
-  findNearbyMarkers(propertyID, propertyType, area, price);
-
-  res.status(200).json({ message: true });
+  // const { propertyID, propertyType, area, price } = req.body;
+  // findNearbyMarkers(propertyID, propertyType, area, price);
+  const result = await openInspections();
+  res.status(200).json({ message: true, body: result });
 };
 
 async function findNearbyMarkers(propertyID, propertyType, area, price) {
@@ -183,8 +203,6 @@ async function findNearbyMarkers(propertyID, propertyType, area, price) {
   });
 
   pipeline.push({ $match: matchQuery });
-
-  console.log("pipeline: ", pipeline);
 
   const nearbyMarkers = await PropertyRequest.aggregate(pipeline);
 
@@ -267,7 +285,6 @@ const updateProperty = async (req, res) => {
       propertyFound.totalStakes = body.numOfShares;
       propertyFound.valueOfProperty = body.totalPrice;
       propertyFound.area = body.areaSize;
-      propertyFound.startDurationFrom = body.startDate;
       propertyFound.propertyType = body.propertyType;
       propertyFound.addressOfProperty = {
         houseNumber: body.houseNumber,
@@ -366,6 +383,15 @@ const addNewProperty = async (req, res) => {
 
     const slug = slugify(body.title, { lower: true, strict: true });
 
+    const startDate = new Date(body.startDate);
+    if (startDate.getDay() !== 6) {
+      const dateDiff = 6 - startDate.getDay();
+      const newDate = startDate.getDate() + dateDiff;
+      startDate.setDate(newDate);
+    }
+
+    console.log(startDate);
+
     const newProperty = new PropertyListing({
       title: body.title,
       slug: slug,
@@ -377,7 +403,7 @@ const addNewProperty = async (req, res) => {
       totalStakes: parseInt(body.numOfShares) + 1,
       valueOfProperty: body.totalPrice,
       area: body.areaSize,
-      startDurationFrom: body.startDate,
+      startDurationFrom: startDate,
       propertyType: body.propertyType,
       beds: body.numOfBeds,
       baths: body.numOfBaths,
@@ -399,17 +425,25 @@ const addNewProperty = async (req, res) => {
 
     await newAmenities.save();
     await newProperty.save();
-    const startDurationFrom = new Date(body.startDate);
+    const startDurationFrom = startDate;
     const shareDocIDList = [];
 
     for (let i = 0; i <= body.numOfShares; i++) {
-      const startAt = i * 15;
-      const endAt = (i + 1) * 14;
+      const startAt = i * 14;
+      const endAt = startAt + 13;
 
-      const startDate = new Date(startDurationFrom);
-      startDate.setDate(startDurationFrom.getDate() + startAt);
+      const startDateOfShare = new Date(startDurationFrom);
+      startDateOfShare.setDate(startDurationFrom.getDate() + startAt);
       const endDate = new Date(startDurationFrom);
       endDate.setDate(startDurationFrom.getDate() + endAt);
+
+      console.log(
+        "startDateOfShare: ",
+        startDateOfShare,
+        "\n",
+        "endDate",
+        endDate
+      );
 
       let shareIndex;
       if (i >= 0 && i <= 9) {
@@ -418,11 +452,13 @@ const addNewProperty = async (req, res) => {
         shareIndex = i;
       }
 
-      // console.log("start Date: ", startDate, "end date: ", endDate);
+      // console.log("start Date: ", startDateOfShare, "end date: ", endDate);
       const newPropertyShare = new PropertyShare({
         availableInDuration: {
-          startDate: startDate.toISOString().split("T")[0],
-          endDate: endDate.toISOString().split("T")[0],
+          startDate: startDateOfShare,
+          startDateString: startDateOfShare.toISOString().split("T")[0],
+          endDate: endDate,
+          endDateString: endDate.toISOString().split("T")[0],
         },
         propertyDocID: newProperty._id,
         shareID: `${newProperty.propertyID}${shareIndex}`,
@@ -430,6 +466,60 @@ const addNewProperty = async (req, res) => {
 
       await newPropertyShare.save();
       shareDocIDList.push(newPropertyShare._id);
+    }
+
+    if (body.userRole === "user") {
+      const userFound = await Users.findOne({ username: body.username });
+
+      const propertyShareFound = await PropertyShare.findOne({
+        shareID: `${newProperty.propertyID}00`,
+      });
+
+      const shareDocIDList = [];
+      shareDocIDList.push({ shareDocID: propertyShareFound._id });
+
+      const newShareholder = new Shareholders({
+        userID: userFound._id,
+        username: username,
+        purchasedShareIDList: shareDocIDList,
+      });
+
+      userFound.role = "shareholder";
+      await userFound.save();
+
+      userFound.role = "shareholder";
+      await userFound.save();
+
+      await newShareholder.save();
+      propertyShareFound.currentBoughtAt = newProperty.valuePerShare;
+      propertyShareFound.utilisedStatus = "Purchased";
+      propertyShareFound.currentOwnerDocID = newShareholder._id;
+
+      newProperty.stakesOccupied += 1;
+    } else {
+      const shareholderFound = await Shareholders.findOne({
+        username: body.username,
+      });
+
+      const propertyShareFound = await PropertyShare.findOne({
+        shareID: `${newProperty.propertyID}00`,
+      })
+        .populate("propertyDocID")
+        .exec();
+
+      propertyShareFound.currentBoughtAt = newProperty.valuePerShare;
+      propertyShareFound.utilisedStatus = "Purchased";
+      propertyShareFound.currentOwnerDocID = shareholderFound._id;
+
+      await propertyShareFound.save();
+
+      const shareDocIDList = [...shareholderFound.purchasedShareIDList];
+      shareDocIDList.push({ shareDocID: propertyShareFound._id });
+      shareholderFound.purchasedShareIDList = shareDocIDList;
+
+      await shareholderFound.save();
+
+      newProperty.stakesOccupied += 1;
     }
 
     newProperty.shareDocIDList = shareDocIDList;
@@ -471,6 +561,34 @@ const addNewProperty = async (req, res) => {
         });
       }
     });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "addNewProperty",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const deletePropertyData = async () => {
+  try {
+    const { propertyID } = req.body;
+
+    const propertyFound = await Properties.findOne({ propertyID: propertyID });
+    if (!propertyFound) {
+      throw new Error("property not found");
+    }
+
+    const propertySharesPromises = propertyFound.shareDocIDList.map(
+      (shareDocID) => {
+        const shareFound = PropertyShare.findOne({ _id: shareDocID });
+      }
+    );
+
+    const propertyShares = await Promise.all(propertySharesPromises);
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "addNewProperty",
@@ -575,6 +693,166 @@ function reorganizeFiles(directory, deleteIndices = []) {
 //       .json({ message: "Internal Server Error", error: error, success: false });
 //   }
 // };
+
+async function openInspections() {
+  try {
+    const today = new Date(); // Get the current date and time
+    const twoDaysLater = new Date(today); // Copy today's date to a new variable
+    twoDaysLater.setDate(twoDaysLater.getDate() + 30); // Add two days
+
+    // Format dates to ignore the time component, if necessary
+    today.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
+    twoDaysLater.setHours(23, 59, 59, 999); // Set time to the end of the day
+
+    const pipeline = [
+      {
+        $match: {
+          "availableInDuration.endDate": {
+            $gte: today, // Greater than or equal to the start of today
+            $lte: twoDaysLater, // Less than or equal to the end of the day two days later
+          },
+          utilisedStatus: "Purchased",
+        },
+      },
+    ];
+
+    const propertyShares = await PropertyShare.aggregate(pipeline);
+
+    const newInspections = [];
+
+    for (const share of propertyShares) {
+      if (!share.currentInspectionDocID) {
+        try {
+          const propertyShare = await PropertyShare.findOne({
+            shareID: share.shareID,
+          }).populate("currentOwnerDocID", "username");
+
+          if (propertyShare) {
+            // Create a new inspection
+            const newInspection = new PropertyInspection({
+              propertyDocID: propertyShare.propertyDocID,
+              shareholderDocID: propertyShare.currentOwnerDocID,
+            });
+            await newInspection.save(); // Save the inspection first
+
+            // Update the property share with new inspection details
+            propertyShare.currentInspectionDocID = newInspection._id;
+            propertyShare.inspectionIDList.push(newInspection._id);
+
+            await propertyShare.save(); // Save the property share
+            newInspections.push(propertyShare); // Collect the saved shares for any further processing
+          }
+        } catch (error) {
+          console.error("Error processing property share:", error);
+        }
+      }
+    }
+
+    for (const share of newInspections) {
+      const user = await Users.findOne({
+        username: share.currentOwnerDocID.username,
+      }).populate("userDefaultSettingID", "notifyUpdates");
+
+      const subject = `Share Inspection Status`;
+      const body = `Dear ${user.name}, \nYour Share duration inspection is started, and is pending for submission. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        subject,
+        body,
+        user.userDefaultSettingID.notifyUpdates,
+        user.username
+      );
+    }
+    return propertyShares;
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "openInspections",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+  }
+}
+
+const fetchShareInspectionByUsername = async (req, res) => {
+  try {
+    const { username, action } = req.params;
+
+    const shareholderFound = await Shareholders.findOne({ username: username });
+    if (!shareholderFound) {
+      throw new Error("shareholder not found.");
+    }
+
+    if (action === "my") {
+      const myInspections = await PropertyInspection.find({
+        shareholderDocID: shareholderFound._id,
+      }).populate("propertyDocID", "title addressOfProperty");
+
+      return res
+        .status(200)
+        .json({ message: "Fetched", success: true, body: myInspections });
+    } else if (action === "all") {
+      const sharesByUsernamePromises =
+        shareholderFound.purchasedShareIDList.map((share) => {
+          const shareDetail = PropertyShare.findOne(share.shareDocID)
+            .populate(
+              "propertyDocID",
+              "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+            )
+            .exec();
+          console.log("shareDetail: ", shareDetail);
+          return shareDetail;
+        });
+
+      const sharesByUsername = await Promise.all(sharesByUsernamePromises);
+
+      // Assuming sharesByUsername is an array of share objects
+      const sharesPerProperty = sharesByUsername.reduce((acc, share) => {
+        // console.log("acc: ", acc);
+        const propertyID = share.propertyDocID.propertyID;
+
+        acc[propertyID] = {
+          propertyID: propertyID,
+          propertyDetails: share.propertyDocID,
+        };
+        return acc;
+      }, {});
+
+      // To convert the object back into an array if needed:
+      const shareholderPropertyList = Object.values(sharesPerProperty);
+
+      console.log(shareholderPropertyList);
+
+      const inspectionsList = [];
+
+      for (const property of shareholderPropertyList) {
+        const inspection = await PropertyInspection.findOne({
+          propertyDocID: property.propertyDetails._id,
+        });
+
+        if (inspection) {
+          inspectionsList.push(inspection);
+        }
+      }
+
+      return res
+        .status(200)
+        .json({ message: "Fetched", success: true, body: inspectionsList });
+    } else {
+      return res
+        .status(404)
+        .json({ message: "Forbidden or invalid action", success: true });
+    }
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "fetchShareInspectionByUsername",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
 
 const addPropertyImages = async (req, res) => {
   try {
@@ -1312,4 +1590,5 @@ module.exports = {
   getPropertiesByType,
   getPropertiesByAvailableShares,
   getPropertyByID,
+  fetchShareInspectionByUsername,
 };

@@ -27,14 +27,18 @@ const PropertyShareSchema = new mongoose.Schema({
   },
   reservationDuration: {
     type: {
-      startDateTime: String,
-      endDateTime: String,
+      startDateTime: Date,
+      startDateString: String,
+      endDateTime: Date,
+      endDateString: String,
     },
   },
   availableInDuration: {
     type: {
-      startDate: String,
-      endDate: String,
+      startDate: Date,
+      startDateString: String,
+      endDate: Date,
+      endDateString: String,
     },
   },
   onSwap: {
@@ -48,6 +52,10 @@ const PropertyShareSchema = new mongoose.Schema({
   onRent: {
     type: Boolean,
     default: false,
+  },
+  priceByCategory: {
+    type: Number,
+    default: 0,
   },
   utilisedStatus: {
     type: String,
@@ -78,8 +86,40 @@ const PropertyShareSchema = new mongoose.Schema({
   shareOffersList: {
     type: [mongoose.Types.ObjectId],
     ref: "property_share_offers",
-    default: []
-  }
+    default: [],
+  },
+  currentInspectionDocID: {
+    type: mongoose.Types.ObjectId,
+    ref: "property_inspections",
+    default: null,
+  },
+  inspectionIDList: {
+    type: [mongoose.Types.ObjectId],
+    required: false,
+    ref: "property_inspections",
+  },
+  currentMaintainenceDocID: {
+    type: mongoose.Types.ObjectId,
+    ref: "property_raised_requests",
+    default: null,
+  },
+  maintenanceIDList: {
+    type: [mongoose.Types.ObjectId],
+    required: false,
+    ref: "property_raised_requests",
+    default: [],
+  },
+  currentModificationDocID: {
+    type: mongoose.Types.ObjectId,
+    ref: "property_raised_requests",
+    default: null,
+  },
+  modificationIDList: {
+    type: [mongoose.Types.ObjectId],
+    required: false,
+    ref: "property_raised_requests",
+    default: [],
+  },
 });
 
 const PropertyShare = mongoose.model("property_shares", PropertyShareSchema);

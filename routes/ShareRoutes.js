@@ -62,4 +62,7 @@ router.get(
   ShareController.getSwapShareByUsername
 );
 
+
+router.get("/test-run", ShareController.testRun)
+
 module.exports = router;

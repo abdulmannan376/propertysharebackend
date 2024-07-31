@@ -262,9 +262,106 @@ const getSharesByUsername = async (req, res) => {
   }
 };
 
+const testRun = async (req, res) => {
+  // const { propertyID, propertyType, area, price } = req.body;
+  // findNearbyMarkers(propertyID, propertyType, area, price);
+  const result = await sendSellOfferToPropertyOwner("PLID20240730000100");
+  res.status(200).json({ message: true, body: result });
+};
+
+async function sendSellOfferToPropertyOwner(shareID, category, price) {
+  try {
+    const shareFound = await PropertyShares.findOne({
+      shareID: shareID,
+      onSale: true,
+    })
+      .populate({
+        path: "currentOwnerDocID",
+        model: "shareholders",
+        select: "username userID",
+        populate: {
+          path: "userID",
+          model: "users",
+          select: "userDefaulySettingID name",
+          populate: {
+            path: "userDefaultSettingID",
+            model: "user_default_settings",
+            select: "notifyUpdates",
+          },
+        },
+      })
+      .populate("propertyDocID", "propertyID")
+      .exec();
+
+    const propertyOwnerShareFound = await PropertyShares.findOne({
+      shareID: `${shareFound.propertyDocID.propertyID}00`,
+    }).populate({
+      path: "currentOwnerDocID",
+      model: "shareholders",
+      select: "username userID",
+      populate: {
+        path: "userID",
+        model: "users",
+        select: "userDefaulySettingID name",
+        populate: {
+          path: "userDefaultSettingID",
+          model: "user_default_settings",
+          select: "notifyUpdates",
+        },
+      },
+    });
+
+    const newShareOffer = new ShareOffers({
+      shareDocID: shareFound._id,
+      price: price,
+      shareholderDocID: shareFound.currentOwnerDocID,
+      userDocID: propertyOwnerShareFound.currentOwnerDocID.userID._id,
+      category: category,
+      offerToPropertyOwner: true,
+    });
+
+    shareFound.shareOffersList.push(newShareOffer._id);
+    await shareFound.save();
+
+    newShareOffer.save().then(() => {
+      const userNotificationSubject = `Property share ${category} offer recieved`;
+      const userNotificationBody = `Dear ${propertyOwnerShareFound.currentOwnerDocID.userID.name}, \n${shareFound.currentOwnerDocID.userID.name} has given an offer for this share to ${category}, of price: $${price}.\nRegards, \nBeach Bunny house.`;
+
+      sendUpdateNotification(
+        userNotificationSubject,
+        userNotificationBody,
+        propertyOwnerShareFound.currentOwnerDocID.userID.userDefaultSettingID
+          .notifyUpdates,
+        propertyOwnerShareFound.currentOwnerDocID.username
+      );
+
+      const ownerNotificationSubject = `Property share ${category} offer sent`;
+      const ownerNotificationBody = `Dear ${shareFound.currentOwnerDocID.userID.name}, \nYour offer for share ${category} is sent to property owner: ${propertyOwnerShareFound.currentOwnerDocID.username} of price: $${price}. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        ownerNotificationSubject,
+        ownerNotificationBody,
+        shareFound.currentOwnerDocID.userID.userDefaultSettingID.notifyUpdates,
+        shareFound.currentOwnerDocID.username
+      );
+
+      res
+        .status(201)
+        .json({ message: "Offer sent successfully.", success: true });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "sendSellOfferToPropertyOwner",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    return new Error();
+  }
+}
+
 const handleShareByCategory = async (req, res) => {
   try {
-    const { shareID, username, category } = req.body;
+    const { shareID, username, category, price } = req.body;
 
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
@@ -274,8 +371,17 @@ const handleShareByCategory = async (req, res) => {
       return res.status(400).json({ message: "Try again.", success: false });
     }
 
+    const shareholderFound = await Shareholders.findOne({ username: username });
+    if (shareholderFound) {
+      return res.status(403).json({
+        message: "No purchase found with this share.",
+        success: false,
+      });
+    }
+
     const propertyShareFound = await PropertyShares.findOne({
       shareID: shareID,
+      currentOwnerDocID: shareholderFound._id,
       utilisedStatus: "Purchased",
     });
     if (!propertyShareFound) {
@@ -312,6 +418,7 @@ const handleShareByCategory = async (req, res) => {
         propertyFound.stakesOnRent += 1;
 
         propertyShareFound.onRent = true;
+        propertyShareFound.priceByCategory = price;
       }
     } else if (category === "Sell") {
       if (propertyShareFound.onSale) {
@@ -339,6 +446,7 @@ const handleShareByCategory = async (req, res) => {
         propertyFound.stakesOnSale += 1;
 
         propertyShareFound.onSale = true;
+        propertyShareFound.priceByCategory = price;
       }
     } else if (category === "Swap") {
       if (propertyShareFound.onSwap) {
@@ -467,8 +575,10 @@ const reserveShare = async (req, res) => {
     console.log("startDate: ", startDate, "\nendDate", endDate);
     propertyShareFound.reservedByUserDocID = userFound._id;
     propertyShareFound.reservationDuration = {
-      startDateTime: startDate.toISOString().split("T")[0],
-      endDateTime: endDate.toISOString().split("T")[0],
+      startDateTime: startDate,
+      startDateString: startDate.toISOString().split("T")[0],
+      endDateTime: endDate,
+      endDateString: startDate.toISOString().split("T")[0],
     };
 
     propertyShareFound.utilisedStatus = "Reserved";
@@ -588,14 +698,6 @@ const genNewShareOffer = async (req, res) => {
     }
     if (!shareFound) {
       throw new Error("property share not found");
-    }
-
-    const offerExists = await ShareOffers.findOne({
-      shareDocID: shareFound._id,
-      status: { $in: ["pending", "accepted"] },
-    });
-    if (offerExists) {
-      return res.status(400).json({ message: "Offer already live." });
     }
 
     const userFound = await Users.findOne({ username: username }).populate(
@@ -1052,8 +1154,16 @@ const handleShareRentOfferAction = async (req, res) => {
         }, \nYou have successfully accepted the offer of rent of ${
           propertyShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(propertyShareFound.availableInDuration.startDate) -
-          processDate(propertyShareFound.availableInDuration.endDate)
+          processDate(
+            propertyShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            propertyShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         }\nPrice: $${shareOfferFound.price} \nShare Owner Username: ${
           shareOwnerFound.username
         } \nRegards, \nBeach Bunny House`;
@@ -1081,8 +1191,16 @@ const handleShareRentOfferAction = async (req, res) => {
         }, \nYou have successfully rejected the offer of rent of ${
           propertyShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(propertyShareFound.availableInDuration.startDate) -
-          processDate(propertyShareFound.availableInDuration.endDate)
+          processDate(
+            propertyShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            propertyShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         }\nPrice: $${shareOfferFound.price} \nShare Owner Username: ${
           shareOwnerFound.username
         } \nRegards, \nBeach Bunny House`;
@@ -1303,8 +1421,16 @@ const handleShareSellOfferAction = async (req, res) => {
         }, \nYou have successfully accepted the offer of rent of ${
           propertyShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(propertyShareFound.availableInDuration.startDate) -
-          processDate(propertyShareFound.availableInDuration.endDate)
+          processDate(
+            propertyShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            propertyShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         }\nPrice: $${shareOfferFound.price} \nShare Previous Owner Username: ${
           sharePrevOwnerFound.username
         } \nRegards, \nBeach Bunny House`;
@@ -1332,8 +1458,16 @@ const handleShareSellOfferAction = async (req, res) => {
         }, \nYou have successfully rejected the offer of rent of ${
           propertyShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(propertyShareFound.availableInDuration.startDate) -
-          processDate(propertyShareFound.availableInDuration.endDate)
+          processDate(
+            propertyShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            propertyShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         }\nPrice: $${shareOfferFound.price} \nShare Owner Username: ${
           sharePrevOwnerFound.username
         } \nRegards, \nBeach Bunny House`;
@@ -1514,13 +1648,29 @@ const handleShareSwapOfferAction = async (req, res) => {
         }, \nYou have successfully accepted the offer to swap your share of ${
           firstShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(firstShareFound.availableInDuration.startDate) -
-          processDate(firstShareFound.availableInDuration.endDate)
+          processDate(
+            firstShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            firstShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         }\nWith Share of ${
           secondShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(secondShareFound.availableInDuration.startDate) -
-          processDate(secondShareFound.availableInDuration.endDate)
+          processDate(
+            secondShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            secondShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         } \nRegards, \nBeach Bunny House`;
 
         const userNotificationSubject = `Property Share Swap Offer Accepted`;
@@ -1529,13 +1679,29 @@ const handleShareSwapOfferAction = async (req, res) => {
         }, \nYou have successfully accepted the offer to swap your share of ${
           secondShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(secondShareFound.availableInDuration.startDate) -
-          processDate(secondShareFound.availableInDuration.endDate)
+          processDate(
+            secondShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            secondShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         }\nWith Share of ${
           firstShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(firstShareFound.availableInDuration.startDate) -
-          processDate(firstShareFound.availableInDuration.endDate)
+          processDate(
+            firstShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            firstShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         } \nRegards, \nBeach Bunny House`;
 
         sendUpdateNotification(
@@ -1558,13 +1724,29 @@ const handleShareSwapOfferAction = async (req, res) => {
         }, \nYou have successfully rejected the offer to swap your share of ${
           firstShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(firstShareFound.availableInDuration.startDate) -
-          processDate(firstShareFound.availableInDuration.endDate)
+          processDate(
+            firstShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            firstShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         }\nWith Share of ${
           secondShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(secondShareFound.availableInDuration.startDate) -
-          processDate(secondShareFound.availableInDuration.endDate)
+          processDate(
+            secondShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            secondShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         } \nRegards, \nBeach Bunny House`;
 
         const userNotificationSubject = `Property Share Swap Offer Rejected`;
@@ -1573,13 +1755,29 @@ const handleShareSwapOfferAction = async (req, res) => {
         }, \nYou have successfully rejected the offer to swap your share of ${
           secondShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(secondShareFound.availableInDuration.startDate) -
-          processDate(secondShareFound.availableInDuration.endDate)
+          processDate(
+            secondShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            secondShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         }\nWith Share of ${
           firstShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(firstShareFound.availableInDuration.startDate) -
-          processDate(firstShareFound.availableInDuration.endDate)
+          processDate(
+            firstShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            firstShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         } \nRegards, \nBeach Bunny House`;
 
         sendUpdateNotification(
@@ -1602,13 +1800,29 @@ const handleShareSwapOfferAction = async (req, res) => {
         }, \nYou have successfully rejected the offer to swap your share of ${
           firstShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(firstShareFound.availableInDuration.startDate) -
-          processDate(firstShareFound.availableInDuration.endDate)
+          processDate(
+            firstShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            firstShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         }\nWith Share of ${
           secondShareFound.propertyDocID.title
         } property's share. \nDuration: ${
-          processDate(secondShareFound.availableInDuration.startDate) -
-          processDate(secondShareFound.availableInDuration.endDate)
+          processDate(
+            secondShareFound.availableInDuration.startDate
+              .toISOString()
+              .split("T")[0]
+          ) -
+          processDate(
+            secondShareFound.availableInDuration.endDate
+              .toISOString()
+              .split("T")[0]
+          )
         } \nRegards, \nBeach Bunny House`;
 
         sendUpdateNotification(
@@ -1653,4 +1867,6 @@ module.exports = {
   genShareSwapOffer,
   handleShareSwapOfferAction,
   getSwapShareByUsername,
+
+  testRun,
 };
