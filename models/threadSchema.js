@@ -17,7 +17,7 @@ const ThreadSchema = new mongoose.Schema(
     },
     childrenCount: {
       type: Number,
-      default: 0
+      default: 0,
     },
     title: {
       type: String,
@@ -27,7 +27,7 @@ const ThreadSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    
+
     status: {
       type: String,
       enum: ["root", "child"],
@@ -54,14 +54,21 @@ const ThreadSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ["Rent", "Sell", "Swap"],
+      enum: [
+        "Rent",
+        "Sell",
+        "Swap",
+        "Inspection",
+        "Modification",
+        "Maintenance",
+      ],
       required: true,
     },
     threadLevel: {
       type: String,
       enum: ["0", "1", "2"],
-      required: true
-    }
+      required: true,
+    },
   },
   { timestamps: true }
 );

@@ -36,10 +36,23 @@ const InspectionSchema = new mongoose.Schema(
       ref: "properties",
       required: true,
     },
+    shareDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "property_shares",
+      required: true,
+    },
     shareholderDocID: {
       type: mongoose.Types.ObjectId,
       ref: "shareholders",
       required: true,
+    },
+    commentsByShareholder: {
+      type: String,
+      default: "",
+    },
+    threadsList: {
+      type: [mongoose.Types.ObjectId],
+      default: [],
     },
   },
   { timestamps: true }

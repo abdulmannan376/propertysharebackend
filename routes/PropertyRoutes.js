@@ -2,28 +2,39 @@ const express = require("express");
 const router = express.Router();
 const PropertyController = require("../controllers/PropertyController");
 const upload = require("../middleware/multerConfig");
+const updatedUpload = require("../middleware/multerConfigUpdated");
 
+//POST
 router.post("/add-property-request", PropertyController.addPropertyRequest);
-router.get(
-  "/fetch-coordinates-of-property",
-  PropertyController.fetchCoordinatesOfRequestes
-);
 router.post("/add-new-property", PropertyController.addNewProperty);
-router.get(
-  "/get-properties-by-username/:key",
-  PropertyController.getPropertyByUsername
-);
-router.put("/update-property/:id", PropertyController.updateProperty);
 router.post(
   "/upload-property-images",
   upload.array("imageFiles", 10),
   PropertyController.addPropertyImages
 );
 
+//PUT
+router.put("/update-property/:id", PropertyController.updateProperty);
 router.put(
   "/delete-all-images-by-propertyID",
   PropertyController.deleteAllImages
 );
+router.put(
+  "/update-inspection",
+  updatedUpload.array("imageFiles", 10),
+  PropertyController.handleInspectionSubmission
+);
+
+//GET
+router.get(
+  "/fetch-coordinates-of-property",
+  PropertyController.fetchCoordinatesOfRequestes
+);
+router.get(
+  "/get-properties-by-username/:key",
+  PropertyController.getPropertyByUsername
+);
+
 router.get(
   "/get-featured-property/:key",
   PropertyController.getFeaturedProperty

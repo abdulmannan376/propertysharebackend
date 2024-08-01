@@ -731,6 +731,7 @@ async function openInspections() {
             // Create a new inspection
             const newInspection = new PropertyInspection({
               propertyDocID: propertyShare.propertyDocID,
+              shareDocID: propertyShare._id,
               shareholderDocID: propertyShare.currentOwnerDocID,
             });
             await newInspection.save(); // Save the inspection first
@@ -785,7 +786,19 @@ const fetchShareInspectionByUsername = async (req, res) => {
     if (action === "my") {
       const myInspections = await PropertyInspection.find({
         shareholderDocID: shareholderFound._id,
-      }).populate("propertyDocID", "title addressOfProperty");
+      })
+        .populate({
+          path: "propertyDocID",
+          model: "properties",
+          select:
+            "propertyID imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
+          populate: {
+            path: "amenitiesID",
+            model: "property_amenities",
+            select: "roomDetails",
+          },
+        })
+        .populate("shareDocID", "availableInDuration");
 
       return res
         .status(200)
@@ -794,10 +807,7 @@ const fetchShareInspectionByUsername = async (req, res) => {
       const sharesByUsernamePromises =
         shareholderFound.purchasedShareIDList.map((share) => {
           const shareDetail = PropertyShare.findOne(share.shareDocID)
-            .populate(
-              "propertyDocID",
-              "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
-            )
+            .populate("propertyDocID", "propertyID")
             .exec();
           console.log("shareDetail: ", shareDetail);
           return shareDetail;
@@ -827,7 +837,19 @@ const fetchShareInspectionByUsername = async (req, res) => {
       for (const property of shareholderPropertyList) {
         const inspection = await PropertyInspection.findOne({
           propertyDocID: property.propertyDetails._id,
-        });
+        })
+          .populate({
+            path: "propertyDocID",
+            model: "properties",
+            select:
+              "propertyID imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          })
+          .populate("shareDocID", "availableInDuration");
 
         if (inspection) {
           inspectionsList.push(inspection);
@@ -845,6 +867,63 @@ const fetchShareInspectionByUsername = async (req, res) => {
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "fetchShareInspectionByUsername",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const handleInspectionSubmission = async (req, res) => {
+  try {
+    const body = req.body;
+    const files = req.files;
+
+    console.log(body);
+
+    const userFound = await Users.findOne({ username: body.username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+
+    const inspectionFound = await PropertyInspection.findOne({
+      inspectionID: body.inspectionID,
+    });
+    if (!inspectionFound) {
+      throw new Error("inspection not found.");
+    }
+
+    const uploadPath = `uploads/Inspections/${body.propertyID}/${body.shareID}/${inspectionFound.inspectionID}`;
+
+    // Update property with new information
+    inspectionFound.imageDirURL = uploadPath;
+    inspectionFound.imageCount = fs
+      .readdirSync(uploadPath)
+      .filter((file) => file.startsWith("image-")).length;
+
+    inspectionFound.commentsByShareholder = body.comment;
+    inspectionFound.status = "In Progress";
+    await inspectionFound.save();
+
+    const subject = `Inspection for property (${body.propertyTitle})`;
+    const emailBody = `Hello ${body.userName},\nYour inspection is submitted and will be reviewed by other shareholders. Once it passes 80% successfull vote your inspection closes successfully.\nRegards,\nBunny Beach House.`;
+
+    sendUpdateNotification(
+      subject,
+      emailBody,
+      userFound.userDefaultSettingID.notifyUpdates,
+      body.username
+    );
+
+    res.status(200).json({
+      message: "Inspection images updated successfully.",
+      success: true,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleInspectionSubmission",
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
@@ -1591,4 +1670,5 @@ module.exports = {
   getPropertiesByAvailableShares,
   getPropertyByID,
   fetchShareInspectionByUsername,
+  handleInspectionSubmission,
 };
