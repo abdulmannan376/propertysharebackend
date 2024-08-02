@@ -93,7 +93,7 @@ const fetchCoordinatesOfRequestes = async (req, res) => {
   try {
     // Query to fetch only the coordinates from all PropertyRequest documents
     const coordinates = await PropertyRequest.find(
-      { notifyCount: { $lt: 1 } },
+      { notifyCount: { $lt: 2 } },
       "location propertyID -_id"
     ).exec();
 

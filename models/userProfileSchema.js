@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
 const UserProfileSchema = new mongoose.Schema({
+  userDocID: { type: mongoose.Types.ObjectId, ref: "users"},
   nationality: { type: String, default: "" },
   gender: { type: String, enum: ["Male", "Female", "Other"] },
   favouriteList: { type: [String], default: [] },

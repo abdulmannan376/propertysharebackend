@@ -43,11 +43,11 @@ router.get(
 );
 router.get(
   "/get-sent-offers-by-category/:username/:category",
-  ShareController.fetchShareOffersOfOwnerByCategory
+  ShareController.fetchShareOffersOfUserByCategory
 );
 router.get(
   "/get-received-offers-by-category/:username/:category",
-  ShareController.fetchShareOffersOfUserByCategory
+  ShareController.fetchShareOffersOfOwnerByCategory
 );
 router.get(
   "/get-share-rentals-by-user/:username",
