@@ -278,6 +278,8 @@ const testRun = async (req, res) => {
 
 async function sendSellOfferToPropertyOwner(shareID, category, price) {
   try {
+
+    console.log(shareID, category, price)
     const shareFound = await PropertyShares.findOne({
       shareID: shareID,
       onSale: true,
@@ -299,7 +301,8 @@ async function sendSellOfferToPropertyOwner(shareID, category, price) {
       })
       .populate("propertyDocID", "propertyID")
       .exec();
-
+    
+    console.log(shareFound)
     const propertyOwnerShareFound = await PropertyShares.findOne({
       shareID: `${shareFound.propertyDocID.propertyID}00`,
     }).populate({
@@ -501,13 +504,6 @@ const handleShareByCategory = async (req, res) => {
 
         await Promise.all(updatedShareOfferListPromises);
       } else {
-        if (action === "Buy Back")
-          sendSellOfferToPropertyOwner(
-            propertyShareFound.shareID,
-            category,
-            price
-          );
-
         notifyWishlistUsers(
           propertyFound.propertyID,
           propertyFound.title,
@@ -547,6 +543,14 @@ const handleShareByCategory = async (req, res) => {
     await propertyFound.save();
 
     propertyShareFound.save().then(() => {
+      if(category === "Sell") {
+        if (action === "Buy Back")
+          sendSellOfferToPropertyOwner(
+            propertyShareFound.shareID,
+            category,
+            price
+          );
+      }
       const subject = "Property Share status updated.";
       const body = `Dear ${
         userFound.name

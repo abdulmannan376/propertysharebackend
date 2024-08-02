@@ -798,7 +798,7 @@ const fetchShareInspectionByUsername = async (req, res) => {
             select: "roomDetails",
           },
         })
-        .populate("shareDocID", "availableInDuration");
+        .populate("shareDocID", "availableInDuration shareID");
 
       return res
         .status(200)
@@ -849,7 +849,7 @@ const fetchShareInspectionByUsername = async (req, res) => {
               select: "roomDetails",
             },
           })
-          .populate("shareDocID", "availableInDuration");
+          .populate("shareDocID", "availableInDuration shareID");
 
         if (inspection) {
           inspectionsList.push(inspection);
