@@ -367,7 +367,7 @@ const updateUserAccountSetting = async (req, res) => {
 
     await userDefaultSetting.save().then(() => {
       const subject = `Account Settings Updated`;
-      const emailBody = `Dear ${userFound.name}, \nYour account settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.`;
+      const emailBody = `Dear ${userFound.name}, \nYour account settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou. \nRegards, \nBeach Bunny House.`;
       sendUpdateNotification(subject, emailBody, body.notifyUpdates, key);
       res.status(201).json({
         message: `Changes updated.`,
@@ -712,11 +712,9 @@ const fetchUserWishList = async (req, res) => {
       throw new Error("user not found");
     }
 
-    const propertyListPromises = userFound.userProfile.wishList.map(
-      (data) => {
-        return Properties.findOne({ propertyID: data }, "-shareDocIDList");
-      }
-    );
+    const propertyListPromises = userFound.userProfile.wishList.map((data) => {
+      return Properties.findOne({ propertyID: data }, "-shareDocIDList");
+    });
 
     const propertyList = await Promise.all(propertyListPromises);
 
@@ -735,6 +733,128 @@ const fetchUserWishList = async (req, res) => {
   }
 };
 
+const getUserProfileDetails = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const userFound = await Users.findOne(
+      { username: username },
+      "-password -emailVerificationCode -userDefaultSettingID"
+    )
+      .populate("userProfile")
+      .exec();
+    if (!userFound) {
+      throw new Error(`user not found. entry: ${username}`);
+    }
+
+    res
+      .status(200)
+      .json({ message: "Fetched", success: true, body: userFound });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getUserProfileDetails",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const uploadProfilePic = async (req, res) => {
+  try {
+    const body = req.body;
+
+    const userFound = await Users.findOne({ username: body.username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    const userProfileFound = await UserProfile.findOne({
+      userDocID: userFound._id,
+    });
+
+    const uploadPath = `uploads/ProfilePics/${body.username}/`;
+    userProfileFound.profilePicURL = uploadPath;
+
+    await userProfileFound.save();
+
+    res
+      .status(201)
+      .json({
+        message: "Profile pic updated.",
+        success: true,
+        body: uploadPath,
+      });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getUserProfileDetails",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const updateUserProfileDetails = async (req, res) => {
+  try {
+    const { action, body, username } = req.body;
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found.");
+    }
+
+    const userProfileFound = await UserProfile.findOne({
+      userDocID: userFound._id,
+    });
+
+    if (action === "Primary Details") {
+      userFound.name = body.name;
+      userProfileFound.gender = body.gender;
+      const date = new Date(body.dobString);
+      userProfileFound.dobString = body.dobString ?? "";
+      userProfileFound.dob = date ?? null;
+      userProfileFound.nicNumber = body.nicNumber;
+      userProfileFound.nationality = body.nationality;
+      userProfileFound.religion = body.religion;
+      userProfileFound.bloodGroup = body.bloodGroup;
+    }
+
+    await userFound.save();
+    userProfileFound.save().then(() => {
+      const subject = `Profile Settings Updated`;
+      const notificationBody = `Dear ${userFound.name}, \nYour profile settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.\nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        subject,
+        notificationBody,
+        userFound.userDefaultSettingID.notifyUpdates,
+        username
+      );
+    });
+
+    res.status(200).json({ message: "Changes updated.", success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "updateUserProfileDetails",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
 module.exports = {
   userSignUp,
   verifyEmailVerficationCode,
@@ -750,5 +870,8 @@ module.exports = {
   handleUserFavouriteList,
   handleUserWishList,
   fetchUserFavouriteList,
-  fetchUserWishList
+  fetchUserWishList,
+  getUserProfileDetails,
+  uploadProfilePic,
+  updateUserProfileDetails,
 };
