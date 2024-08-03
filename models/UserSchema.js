@@ -12,6 +12,7 @@ const UserSchema = new mongoose.Schema({
     required: true,
     enum: ["admin", "user", "shareholder", "super admin"],
   },
+  contact: { type: Number, default: "" },
   emailVerificationCode: { type: Number },
   emailVerified: { type: Boolean, required: true },
   userDefaultSettingID: {

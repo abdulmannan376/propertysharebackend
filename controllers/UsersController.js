@@ -828,6 +828,9 @@ const updateUserProfileDetails = async (req, res) => {
       userProfileFound.nationality = body.nationality;
       userProfileFound.religion = body.religion;
       userProfileFound.bloodGroup = body.bloodGroup;
+    } else if(action === "Contact Details") {
+      userFound.contact = body.contact 
+      userProfileFound.permanentAddress = body.permanentAddress
     }
 
     await userFound.save();

@@ -16,6 +16,7 @@ const UserProfileSchema = new mongoose.Schema({
     enum: ["", "O+", "O-", "A+", "A-", "AB+", "AB-", "B+", "B-"],
     default: "",
   },
+  permanentAddress: { type: String, default: "" },
   nextOfKinDetails: {
     type: {
       fullName: String,
@@ -24,9 +25,9 @@ const UserProfileSchema = new mongoose.Schema({
       contact: String,
       nicNumber: String,
       dob: Date,
-      dobString: String
+      dobString: String,
     },
-    default: null
+    default: null,
   },
   paymentDetails: {
     type: {
@@ -36,7 +37,7 @@ const UserProfileSchema = new mongoose.Schema({
       cardExpiryYear: Number,
       cardCVV: String,
     },
-    default: null
+    default: null,
   },
   withdrawalDetails: {
     type: {
@@ -47,7 +48,6 @@ const UserProfileSchema = new mongoose.Schema({
     },
     default: null,
   },
-  
 });
 
 const UserProfile = mongoose.model("user_profiles", UserProfileSchema);
