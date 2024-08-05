@@ -1483,7 +1483,7 @@ const fetchUserShareRentals = async (req, res) => {
 
 const handleShareSellOfferAction = async (req, res) => {
   try {
-    const { username, offerID, action } = req.body;
+    const { username, offerID, action, isBuybackOffer } = req.body;
 
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
@@ -1522,7 +1522,7 @@ const handleShareSellOfferAction = async (req, res) => {
       username: shareOfferFound.userDocID.username,
     });
 
-    console.log("shareholderFound: ", shareholderFound);
+    console.log("shareholderFound: ", shareholderFound.username);
 
     if (action === "accepted") {
       // const sharePrevOwnerPurchasedIDList =
@@ -1563,92 +1563,15 @@ const handleShareSellOfferAction = async (req, res) => {
           },
         }
       );
-      if (!shareholderFound) {
-        // const shareDocIDList = [];
-        // shareDocIDList.push({ shareDocID: propertyShareFound._id });
-
-        const newShareholder = new Shareholders({
-          username: username,
-          userID: userFound._id,
-          // purchasedShareIDList: shareDocIDList,
-        });
-
-        userFound.role = "shareholder";
-
-        await newShareholder.save();
-        await userFound.save();
-
-        await Shareholders.updateOne(
-          { _id: newShareholder._id },
-          {
-            $push: {
-              purchasedShareIDList: {
-                shareDocID: propertyShareFound._id,
-              },
-            },
-          }
-        );
-
-        // propertyShareFound.currentOwnerDocID = newShareholder._id;
-        // propertyShareFound.lastOwners.push({
-        //   username: sharePrevOwnerFound.username,
-        //   boughtAt: propertyShareFound.currentBoughtAt,
-        // });
-        // propertyShareFound.currentBoughtAt = shareOfferFound.price;
-        // propertyShareFound.onSale = false;
-        // propertyShareFound.utilisedStatus = "Purchased";
-
+      if (isBuybackOffer) {
         await PropertyShares.updateOne(
           { _id: propertyShareFound._id },
           {
             $set: {
-              currentOwnerDocID: newShareholder._id,
-              currentBoughtAt: shareOfferFound.price,
+              currentOwnerDocID: null,
+              currentBoughtAt: 0,
               onSale: false,
-              utilisedStatus: "Purchased",
-            },
-            $push: {
-              lastOwners: {
-                username: sharePrevOwnerFound.username,
-                boughtAt: propertyShareFound.currentBoughtAt,
-              },
-            },
-          }
-        );
-      } else {
-        // shareholderFound.purchasedShareIDList.push({
-        //   shareDocID: propertyShareFound._id,
-        // });
-
-        await Shareholders.updateOne(
-          { _id: shareholderFound._id },
-          {
-            $addToSet: {
-              purchasedShareIDList: {
-                shareDocID: propertyShareFound._id,
-              },
-            },
-          }
-        );
-
-        // propertyShareFound.currentOwnerDocID = shareholderFound._id;
-        // propertyShareFound.lastOwners.push({
-        //   username: sharePrevOwnerFound.username,
-        //   boughtAt: propertyShareFound.currentBoughtAt,
-        // });
-        // await shareholderFound.save();
-        // propertyShareFound.currentBoughtAt = shareOfferFound.price;
-        // propertyShareFound.onSale = false;
-        // propertyShareFound.utilisedStatus = "Purchased";
-
-        await PropertyShares.updateOne(
-          { _id: propertyShareFound._id },
-          {
-            $set: {
-              currentOwnerDocID: shareholderFound._id,
-              currentBoughtAt: shareOfferFound.price,
-              onSale: false,
-              utilisedStatus: "Purchased",
+              utilisedStatus: "Listed",
             },
             $push: {
               lastOwners: {
@@ -1658,10 +1581,106 @@ const handleShareSellOfferAction = async (req, res) => {
             },
           }
         );
+      } else {
+        if (!shareholderFound) {
+          // const shareDocIDList = [];
+          // shareDocIDList.push({ shareDocID: propertyShareFound._id });
 
-        // await propertyShareFound.save();
+          const newShareholder = new Shareholders({
+            username: username,
+            userID: userFound._id,
+            // purchasedShareIDList: shareDocIDList,
+          });
+
+          userFound.role = "shareholder";
+
+          await newShareholder.save();
+          await userFound.save();
+
+          await Shareholders.updateOne(
+            { _id: newShareholder._id },
+            {
+              $push: {
+                purchasedShareIDList: {
+                  shareDocID: propertyShareFound._id,
+                },
+              },
+            }
+          );
+
+          // propertyShareFound.currentOwnerDocID = newShareholder._id;
+          // propertyShareFound.lastOwners.push({
+          //   username: sharePrevOwnerFound.username,
+          //   boughtAt: propertyShareFound.currentBoughtAt,
+          // });
+          // propertyShareFound.currentBoughtAt = shareOfferFound.price;
+          // propertyShareFound.onSale = false;
+          // propertyShareFound.utilisedStatus = "Purchased";
+
+          await PropertyShares.updateOne(
+            { _id: propertyShareFound._id },
+            {
+              $set: {
+                currentOwnerDocID: newShareholder._id,
+                currentBoughtAt: shareOfferFound.price,
+                onSale: false,
+                utilisedStatus: "Purchased",
+              },
+              $push: {
+                lastOwners: {
+                  username: sharePrevOwnerFound.username,
+                  boughtAt: propertyShareFound.currentBoughtAt,
+                },
+              },
+            }
+          );
+        } else {
+          // shareholderFound.purchasedShareIDList.push({
+          //   shareDocID: propertyShareFound._id,
+          // });
+
+          await Shareholders.updateOne(
+            { _id: shareholderFound._id },
+            {
+              $addToSet: {
+                purchasedShareIDList: {
+                  shareDocID: propertyShareFound._id,
+                },
+              },
+            }
+          );
+
+          // propertyShareFound.currentOwnerDocID = shareholderFound._id;
+          // propertyShareFound.lastOwners.push({
+          //   username: sharePrevOwnerFound.username,
+          //   boughtAt: propertyShareFound.currentBoughtAt,
+          // });
+          // await shareholderFound.save();
+          // propertyShareFound.currentBoughtAt = shareOfferFound.price;
+          // propertyShareFound.onSale = false;
+          // propertyShareFound.utilisedStatus = "Purchased";
+
+          await PropertyShares.updateOne(
+            { _id: propertyShareFound._id },
+            {
+              $set: {
+                currentOwnerDocID: shareholderFound._id,
+                currentBoughtAt: shareOfferFound.price,
+                onSale: false,
+                utilisedStatus: "Purchased",
+              },
+              $push: {
+                lastOwners: {
+                  username: prevShareholder.username,
+                  boughtAt: propertyShareFound.currentBoughtAt,
+                },
+              },
+            }
+          );
+
+          // await propertyShareFound.save();
+        }
       }
-
       // await prevShareholder.save();
       shareOfferFound.status = "accepted";
     } else if (action === "rejected") {

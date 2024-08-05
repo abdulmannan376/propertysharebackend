@@ -495,6 +495,8 @@ const addNewProperty = async (req, res) => {
       propertyShareFound.currentOwnerDocID = newShareholder._id;
 
       newProperty.stakesOccupied += 1;
+
+      propertyShareFound.save();
     } else {
       const shareholderFound = await Shareholders.findOne({
         username: body.username,
