@@ -41,12 +41,12 @@ const PropertyRequestSchema = new mongoose.Schema({
         required: true,
       },
       areaRange: {
-        type: [String],
+        type: [Number],
         required: true,
         validate: [arrayLimit, "{PATH} must have max 2 values"], // Custom validator for ensuring 2 values
       },
       priceRange: {
-        type: [String],
+        type: [Number],
         required: true,
         validate: [arrayLimit, "{PATH} must have max 2 values"], // Custom validator for ensuring 2 values
       },

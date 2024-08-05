@@ -278,8 +278,7 @@ const testRun = async (req, res) => {
 
 async function sendSellOfferToPropertyOwner(shareID, category, price) {
   try {
-
-    console.log(shareID, category, price)
+    console.log(shareID, category, price);
     const shareFound = await PropertyShares.findOne({
       shareID: shareID,
       onSale: true,
@@ -301,8 +300,8 @@ async function sendSellOfferToPropertyOwner(shareID, category, price) {
       })
       .populate("propertyDocID", "propertyID")
       .exec();
-    
-    console.log(shareFound)
+
+    console.log(shareFound);
     const propertyOwnerShareFound = await PropertyShares.findOne({
       shareID: `${shareFound.propertyDocID.propertyID}00`,
     }).populate({
@@ -543,7 +542,7 @@ const handleShareByCategory = async (req, res) => {
     await propertyFound.save();
 
     propertyShareFound.save().then(() => {
-      if(category === "Sell") {
+      if (category === "Sell") {
         if (action === "Buy Back")
           sendSellOfferToPropertyOwner(
             propertyShareFound.shareID,
@@ -802,7 +801,7 @@ const genNewShareOffer = async (req, res) => {
       shareDocID: shareFound._id,
       userDocID: userFound._id,
       category: category,
-      status: { $in: ["pending", "accepted"] },
+      status: { $in: ["pending"] },
     });
     if (offerFound) {
       return res
@@ -968,35 +967,99 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
     const { username, category } = req.params;
 
     // Find share offers and populate nested documents
-    const userFound = await Users.findOne({
-      username: username,
-    });
-    if (!userFound) {
-      throw new Error("user not found.");
-    }
-    const shareOffersList = await ShareOffers.find({
-      userDocID: userFound._id,
-      category: category, // Assuming there is a field to filter by category
-    })
-      .populate({
-        path: "shareDocID",
-        select: "availableInDuration",
-        populate: {
-          path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
-          model: "properties", // Assuming 'Property' is the model name for propertyDocID
-          select:
-            "propertyID pinnedImageIndex title addressOfProperty area imageCount",
-          populate: {
-            path: "amenitiesID",
-            model: "property_amenities",
-            select: "roomDetails",
-          },
-        },
+    let shareOffersList = [];
+    if (category !== "Sell") {
+      const userFound = await Users.findOne({
+        username: username,
+      });
+      if (!userFound) {
+        throw new Error("user not found.");
+      }
+      shareOffersList = await ShareOffers.find({
+        userDocID: userFound._id,
+        category: category, // Assuming there is a field to filter by category
       })
-      .populate("userDocID", "username")
-      .populate("shareholderDocID", "username")
-      .populate("offeredShareDocID", "availableInDuration");
+        .populate({
+          path: "shareDocID",
+          select: "availableInDuration",
+          populate: {
+            path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+            model: "properties", // Assuming 'Property' is the model name for propertyDocID
+            select:
+              "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          },
+        })
+        .populate("userDocID", "username")
+        .populate("shareholderDocID", "username")
+        .populate("offeredShareDocID", "availableInDuration");
+    } else {
+      const userFound = await Users.findOne({
+        username: username,
+      });
+      if (!userFound) {
+        throw new Error("user not found.");
+      }
+      shareOffersList = await ShareOffers.find({
+        userDocID: userFound._id,
+        category: category, // Assuming there is a field to filter by category
+        offerToPropertyOwner: false,
+      })
+        .populate({
+          path: "shareDocID",
+          select: "availableInDuration",
+          populate: {
+            path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+            model: "properties", // Assuming 'Property' is the model name for propertyDocID
+            select:
+              "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          },
+        })
+        .populate("userDocID", "username")
+        .populate("shareholderDocID", "username")
+        .populate("offeredShareDocID", "availableInDuration");
 
+      const shareholderFound = await Shareholders.findOne({
+        username: username,
+      });
+      if (!shareholderFound) {
+        throw new Error("shareholder not found.");
+      }
+      const buybackRequests = await ShareOffers.find({
+        shareholderDocID: shareholderFound._id,
+        category: category, // Assuming there is a field to filter by category
+        offerToPropertyOwner: true,
+      })
+        .populate({
+          path: "shareDocID",
+          select: "availableInDuration",
+          populate: {
+            path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+            model: "properties", // Assuming 'Property' is the model name for propertyDocID
+            select:
+              "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          },
+        })
+        .populate("userDocID", "username")
+        .populate("shareholderDocID", "username")
+        .populate("offeredShareDocID", "availableInDuration");
+
+      shareOffersList = shareOffersList.concat(buybackRequests);
+    }
     res.json({
       message: "Share offers fetched successfully",
       success: true,
@@ -1018,36 +1081,103 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
   try {
     const { username, category } = req.params;
 
-    // Find share offers and populate nested documents
-    const shareholderFound = await Shareholders.findOne({
-      username: username,
-    });
-    if (!shareholderFound) {
-      throw new Error("shareholder not found.");
+    let shareOffersList = [];
+
+    if (category !== "Sell") {
+      // Find share offers and populate nested documents
+      const shareholderFound = await Shareholders.findOne({
+        username: username,
+      });
+      if (!shareholderFound) {
+        throw new Error("shareholder not found.");
+      }
+
+      shareOffersList = await ShareOffers.find({
+        shareholderDocID: shareholderFound._id,
+        category: category, // Assuming there is a field to filter by category
+      })
+        .populate({
+          path: "shareDocID",
+          select: "availableInDuration",
+          populate: {
+            path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+            model: "properties", // Assuming 'Property' is the model name for propertyDocID
+            select:
+              "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          },
+        })
+        .populate("shareholderDocID", "username")
+        .populate("userDocID", "username")
+        .populate("offeredShareDocID", "availableInDuration");
+    } else {
+      // Find share offers and populate nested documents
+      const shareholderFound = await Shareholders.findOne({
+        username: username,
+      });
+      if (!shareholderFound) {
+        throw new Error("shareholder not found.");
+      }
+
+      shareOffersList = await ShareOffers.find({
+        shareholderDocID: shareholderFound._id,
+        category: category, // Assuming there is a field to filter by category
+      })
+        .populate({
+          path: "shareDocID",
+          select: "availableInDuration",
+          populate: {
+            path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+            model: "properties", // Assuming 'Property' is the model name for propertyDocID
+            select:
+              "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          },
+        })
+        .populate("shareholderDocID", "username")
+        .populate("userDocID", "username")
+        .populate("offeredShareDocID", "availableInDuration");
+
+      const userFound = await Users.findOne({ username: username });
+      if (!userFound) {
+        throw new Error("user not found.");
+      }
+
+      const buybackOffers = await ShareOffers.find({
+        userDocID: userFound._id,
+        category: category, // Assuming there is a field to filter by category
+        offerToPropertyOwner: true,
+      })
+        .populate({
+          path: "shareDocID",
+          select: "availableInDuration",
+          populate: {
+            path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+            model: "properties", // Assuming 'Property' is the model name for propertyDocID
+            select:
+              "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          },
+        })
+        .populate("userDocID", "username")
+        .populate("shareholderDocID", "username")
+        .populate("offeredShareDocID", "availableInDuration");
+
+      shareOffersList = shareOffersList.concat(buybackOffers);
     }
 
-    const shareOffersList = await ShareOffers.find({
-      shareholderDocID: shareholderFound._id,
-      category: category, // Assuming there is a field to filter by category
-    })
-      .populate({
-        path: "shareDocID",
-        select: "availableInDuration",
-        populate: {
-          path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
-          model: "properties", // Assuming 'Property' is the model name for propertyDocID
-          select:
-            "propertyID pinnedImageIndex title addressOfProperty area imageCount",
-          populate: {
-            path: "amenitiesID",
-            model: "property_amenities",
-            select: "roomDetails",
-          },
-        },
-      })
-      .populate("shareholderDocID", "username")
-      .populate("userDocID", "username")
-      .populate("offeredShareDocID", "availableInDuration");
     res.json({
       message: "Share offers fetched successfully",
       success: true,
@@ -1363,9 +1493,13 @@ const handleShareSellOfferAction = async (req, res) => {
       throw new Error("user not found");
     }
 
+    console.log(req.body);
+
     const shareOfferFound = await ShareOffers.findOne({
       shareOfferID: offerID,
-    }).populate("shareholderDocID", "username");
+    })
+      .populate("shareholderDocID", "username")
+      .populate("userDocID", "username");
     if (!shareOfferFound) {
       throw new Error("share offer not found");
     }
@@ -1382,41 +1516,61 @@ const handleShareSellOfferAction = async (req, res) => {
       username: shareOfferFound.shareholderDocID.username,
     });
 
-    const shareholderFound = await Shareholders.findOne({ username: username });
+    console.log("prevShareHolder:", prevShareholder.username);
+
+    const shareholderFound = await Shareholders.findOne({
+      username: shareOfferFound.userDocID.username,
+    });
+
+    console.log("shareholderFound: ", shareholderFound);
 
     if (action === "accepted") {
-      const sharePrevOwnerPurchasedIDList =
-        prevShareholder.purchasedShareIDList;
+      // const sharePrevOwnerPurchasedIDList =
+      //   prevShareholder.purchasedShareIDList;
 
-      prevShareholder.purchasedShareIDList =
-        sharePrevOwnerPurchasedIDList.filter((share) => {
-          // Convert Mongoose ObjectIDs to string for comparison
-          const shareDocIDString = share.shareDocID.toString();
-          const propertyShareDocIDString = propertyShareFound._id.toString();
+      // prevShareholder.purchasedShareIDList =
+      //   sharePrevOwnerPurchasedIDList.filter((share) => {
+      //     // Convert Mongoose ObjectIDs to string for comparison
+      //     const shareDocIDString = share.shareDocID.toString();
+      //     const propertyShareDocIDString = propertyShareFound._id.toString();
 
-          // Return true if they are NOT equal, hence the filter will exclude matching IDs
-          return shareDocIDString !== propertyShareDocIDString;
-        });
+      //     // Return true if they are NOT equal, hence the filter will exclude matching IDs
+      //     return shareDocIDString !== propertyShareDocIDString;
+      //   });
 
-      console.log(
-        "sharePrevOwnerPurchasedIDList: ",
-        sharePrevOwnerPurchasedIDList,
-        "prevShareholder: ",
-        prevShareholder
+      // console.log(
+      //   "sharePrevOwnerPurchasedIDList: ",
+      //   sharePrevOwnerPurchasedIDList,
+      //   "prevShareholder: ",
+      //   prevShareholder
+      // );
+      // prevShareholder.soldShareIDList.push({
+      //   shareDocID: propertyShareFound._id,
+      // });
+
+      // console.log("prevShareholder: ", prevShareholder);
+
+      await Shareholders.updateOne(
+        { _id: prevShareholder._id },
+        {
+          $pull: {
+            purchasedShareIDList: propertyShareFound._id,
+          },
+          $addToSet: {
+            soldShareIDList: {
+              shareDocID: propertyShareFound._id,
+            },
+          },
+        }
       );
-      prevShareholder.soldShareIDList.push({
-        shareDocID: propertyShareFound._id,
-      });
-
-      console.log("prevShareholder: ", prevShareholder);
       if (!shareholderFound) {
-        const shareDocIDList = [];
-        shareDocIDList.push({ shareDocID: propertyShareFound._id });
+        // const shareDocIDList = [];
+        // shareDocIDList.push({ shareDocID: propertyShareFound._id });
 
         const newShareholder = new Shareholders({
           username: username,
           userID: userFound._id,
-          purchasedShareIDList: shareDocIDList,
+          // purchasedShareIDList: shareDocIDList,
         });
 
         userFound.role = "shareholder";
@@ -1424,34 +1578,91 @@ const handleShareSellOfferAction = async (req, res) => {
         await newShareholder.save();
         await userFound.save();
 
-        propertyShareFound.currentOwnerDocID = newShareholder._id;
-        propertyShareFound.lastOwners.push({
-          username: sharePrevOwnerFound.username,
-          boughtAt: propertyShareFound.currentBoughtAt,
-        });
-        propertyShareFound.currentBoughtAt = shareOfferFound.price;
-        propertyShareFound.onSale = false;
-        propertyShareFound.utilisedStatus = "Purchased";
+        await Shareholders.updateOne(
+          { _id: newShareholder._id },
+          {
+            $push: {
+              purchasedShareIDList: {
+                shareDocID: propertyShareFound._id,
+              },
+            },
+          }
+        );
 
-        await propertyShareFound.save();
+        // propertyShareFound.currentOwnerDocID = newShareholder._id;
+        // propertyShareFound.lastOwners.push({
+        //   username: sharePrevOwnerFound.username,
+        //   boughtAt: propertyShareFound.currentBoughtAt,
+        // });
+        // propertyShareFound.currentBoughtAt = shareOfferFound.price;
+        // propertyShareFound.onSale = false;
+        // propertyShareFound.utilisedStatus = "Purchased";
+
+        await PropertyShares.updateOne(
+          { _id: propertyShareFound._id },
+          {
+            $set: {
+              currentOwnerDocID: newShareholder._id,
+              currentBoughtAt: shareOfferFound.price,
+              onSale: false,
+              utilisedStatus: "Purchased",
+            },
+            $push: {
+              lastOwners: {
+                username: sharePrevOwnerFound.username,
+                boughtAt: propertyShareFound.currentBoughtAt,
+              },
+            },
+          }
+        );
       } else {
-        shareholderFound.purchasedShareIDList.push({
-          shareDocID: propertyShareFound._id,
-        });
-        propertyShareFound.currentOwnerDocID = shareholderFound._id;
-        propertyShareFound.lastOwners.push({
-          username: sharePrevOwnerFound.username,
-          boughtAt: propertyShareFound.currentBoughtAt,
-        });
-        await shareholderFound.save();
-        propertyShareFound.currentBoughtAt = shareOfferFound.price;
-        propertyShareFound.onSale = false;
-        propertyShareFound.utilisedStatus = "Purchased";
+        // shareholderFound.purchasedShareIDList.push({
+        //   shareDocID: propertyShareFound._id,
+        // });
 
-        await propertyShareFound.save();
+        await Shareholders.updateOne(
+          { _id: shareholderFound._id },
+          {
+            $addToSet: {
+              purchasedShareIDList: {
+                shareDocID: propertyShareFound._id,
+              },
+            },
+          }
+        );
+
+        // propertyShareFound.currentOwnerDocID = shareholderFound._id;
+        // propertyShareFound.lastOwners.push({
+        //   username: sharePrevOwnerFound.username,
+        //   boughtAt: propertyShareFound.currentBoughtAt,
+        // });
+        // await shareholderFound.save();
+        // propertyShareFound.currentBoughtAt = shareOfferFound.price;
+        // propertyShareFound.onSale = false;
+        // propertyShareFound.utilisedStatus = "Purchased";
+
+        await PropertyShares.updateOne(
+          { _id: propertyShareFound._id },
+          {
+            $set: {
+              currentOwnerDocID: shareholderFound._id,
+              currentBoughtAt: shareOfferFound.price,
+              onSale: false,
+              utilisedStatus: "Purchased",
+            },
+            $push: {
+              lastOwners: {
+                username: prevShareholder.username,
+                boughtAt: propertyShareFound.currentBoughtAt,
+              },
+            },
+          }
+        );
+
+        // await propertyShareFound.save();
       }
 
-      await prevShareholder.save();
+      // await prevShareholder.save();
       shareOfferFound.status = "accepted";
     } else if (action === "rejected") {
       shareOfferFound.status = "rejected";

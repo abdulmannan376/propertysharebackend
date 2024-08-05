@@ -162,10 +162,10 @@ const getPropertyByUsername = async (req, res) => {
 };
 
 const testRun = async (req, res) => {
-  // const { propertyID, propertyType, area, price } = req.body;
-  // findNearbyMarkers(propertyID, propertyType, area, price);
-  const result = await openInspections();
-  res.status(200).json({ message: true, body: result });
+  const { propertyID, propertyType, area, price } = req.body;
+  findNearbyMarkers(propertyID, propertyType, area, price);
+  // const result = await openInspections();
+  res.status(200).json({ message: true });
 };
 
 async function findNearbyMarkers(propertyID, propertyType, area, price) {
@@ -178,15 +178,13 @@ async function findNearbyMarkers(propertyID, propertyType, area, price) {
   };
 
   if (area) {
-    matchQuery["requirementDetails.areaRange"] = {
-      $elemMatch: { $gte: parseFloat(area), $lte: parseFloat(area) },
-    };
+    matchQuery["requirementDetails.areaRange.0"] = { $lte: parseInt(area) };
+    matchQuery["requirementDetails.areaRange.1"] = { $gte: parseInt(area) };
   }
 
   if (price) {
-    matchQuery["requirementDetails.priceRange"] = {
-      $elemMatch: { $gte: parseFloat(price), $lte: parseFloat(price) },
-    };
+    matchQuery["requirementDetails.priceRange.0"] = { $lte: parseInt(price) };
+    matchQuery["requirementDetails.priceRange.1"] = { $gte: parseInt(price) };
   }
 
   pipeline.push({
@@ -463,10 +461,12 @@ const addNewProperty = async (req, res) => {
         propertyDocID: newProperty._id,
         shareID: `${newProperty.propertyID}${shareIndex}`,
       });
-
+      // console.log("1");
       await newPropertyShare.save();
       shareDocIDList.push(newPropertyShare._id);
     }
+
+    // console.log("2");-
 
     if (body.userRole === "user") {
       const userFound = await Users.findOne({ username: body.username });
@@ -475,17 +475,16 @@ const addNewProperty = async (req, res) => {
         shareID: `${newProperty.propertyID}00`,
       });
 
+      // console.log("shareDocID: ", propertyShareFound._id);
+
       const shareDocIDList = [];
       shareDocIDList.push({ shareDocID: propertyShareFound._id });
 
       const newShareholder = new Shareholders({
         userID: userFound._id,
-        username: username,
+        username: body.username,
         purchasedShareIDList: shareDocIDList,
       });
-
-      userFound.role = "shareholder";
-      await userFound.save();
 
       userFound.role = "shareholder";
       await userFound.save();
@@ -861,7 +860,7 @@ const fetchShareInspectionByUsername = async (req, res) => {
         .json({ message: "Fetched", success: true, body: inspectionsList });
     } else {
       return res
-        .status(404)
+        .status(403)
         .json({ message: "Forbidden or invalid action", success: true });
     }
   } catch (error) {

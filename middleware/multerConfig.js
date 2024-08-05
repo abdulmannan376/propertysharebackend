@@ -47,7 +47,11 @@ const storage = multer.diskStorage({
       .readdirSync(directory)
       .filter((file) => file.startsWith("image-"));
     const imageNumber = files.length + 1; // Assign next number in sequence
-    const filename = `image-${imageNumber}${path.extname(file.originalname)}`;
+    const filename = `image-${imageNumber}${
+      path.extname(file.originalname) !== ".png"
+        ? ".png"
+        : path.extname(file.originalname)
+    }`;
     cb(null, filename);
   },
 });

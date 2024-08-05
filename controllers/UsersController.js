@@ -272,6 +272,11 @@ const userSignUp = async (req, res) => {
 
     // res.status(201).json({ message: "User signed up.", success: true });
   } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "getUserDefaultSetting",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error, success: false });
