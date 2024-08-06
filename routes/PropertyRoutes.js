@@ -24,6 +24,10 @@ router.put(
   updatedUpload.array("imageFiles", 10),
   PropertyController.handleInspectionSubmission
 );
+router.put(
+  "/update-inspection-action",
+  PropertyController.handleInspectionAction
+);
 
 //GET
 router.get(
@@ -59,6 +63,11 @@ router.get("/get-property-by-id/:key", PropertyController.getPropertyByID);
 router.get(
   "/get-inspections-by-user/:username/:action",
   PropertyController.fetchShareInspectionByUsername
+);
+
+router.get(
+  "/get-inspection-detail/:key",
+  PropertyController.getInspectionDetail
 );
 
 // router.get("/test-share-ID", PropertyController.testGenerateShareID)

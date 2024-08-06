@@ -15,6 +15,7 @@ const compCities = require("countrycitystatejson");
 const Shareholders = require("../models/ShareholderSchema");
 const Users = require("../models/UserSchema");
 const { sendUpdateNotification } = require("./notificationController");
+const { model } = require("mongoose");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -27,6 +28,8 @@ const addPropertyRequest = async (req, res) => {
       type: "Point",
       coordinates: [body.long, body.lat],
     };
+
+    console.log(body);
 
     let areaRange = [];
 
@@ -163,9 +166,9 @@ const getPropertyByUsername = async (req, res) => {
 
 const testRun = async (req, res) => {
   const { propertyID, propertyType, area, price } = req.body;
-  findNearbyMarkers(propertyID, propertyType, area, price);
-  // const result = await openInspections();
-  res.status(200).json({ message: true });
+  // findNearbyMarkers(propertyID, propertyType, area, price);
+  const result = await openInspections();
+  res.status(200).json({ message: true, body: result });
 };
 
 async function findNearbyMarkers(propertyID, propertyType, area, price) {
@@ -799,7 +802,17 @@ const fetchShareInspectionByUsername = async (req, res) => {
             select: "roomDetails",
           },
         })
-        .populate("shareDocID", "availableInDuration shareID");
+        .populate("shareDocID", "availableInDuration shareID")
+        .populate({
+          path: "shareholderDocID",
+          model: "shareholders",
+          select: "username userID",
+          populate: {
+            path: "userID",
+            model: "users",
+            select: "name",
+          },
+        });
 
       return res
         .status(200)
@@ -850,7 +863,17 @@ const fetchShareInspectionByUsername = async (req, res) => {
               select: "roomDetails",
             },
           })
-          .populate("shareDocID", "availableInDuration shareID");
+          .populate("shareDocID", "availableInDuration shareID")
+          .populate({
+            path: "shareholderDocID",
+            model: "shareholders",
+            select: "username userID",
+            populate: {
+              path: "userID",
+              model: "users",
+              select: "name",
+            },
+          });
 
         if (inspection) {
           inspectionsList.push(inspection);
@@ -925,6 +948,109 @@ const handleInspectionSubmission = async (req, res) => {
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "handleInspectionSubmission",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const handleInspectionAction = async (req, res) => {
+  try {
+    const { inspectionID, action, username } = req.body;
+
+    const inspectionFound = await PropertyInspection.findOne({
+      inspectionID: inspectionID,
+    });
+    if (!inspectionFound) {
+      throw new Error("inspection not found");
+    }
+
+    if (action === "approved") {
+      if (inspectionFound.rejectedUsersList.includes(username)) {
+        const newRejectedList = inspectionFound.rejectedUsersList.filter(
+          (username) => {
+            return username !== username;
+          }
+        );
+        inspectionFound.rejectedUsersList = newRejectedList;
+      }
+      inspectionFound.approvedByUsersList.push(username);
+    } else if (action === "rejected") {
+      if (inspectionFound.approvedByUsersList.includes(username)) {
+        const newApprovedList = inspectionFound.approvedByUsersList.filter(
+          (username) => {
+            return username !== username;
+          }
+        );
+        inspectionFound.approvedByUsersList = newApprovedList;
+      }
+      inspectionFound.rejectedUsersList.push(username);
+    } else {
+      return res
+        .status(403)
+        .json({ message: "Forbidden or no action provided", success: false });
+    }
+
+    await inspectionFound.save().then(() => {
+      res.status(200).json({
+        message: "Inspection Updated.",
+        success: true,
+        body: inspectionFound,
+      });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleInspectionAction",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const getInspectionDetail = async (req, res) => {
+  try {
+    const { key } = req.params;
+
+    const inspectionFound = await PropertyInspection.findOne({
+      inspectionID: key,
+    });
+    if (!inspectionFound) {
+      throw new Error("inspection not found");
+    }
+
+    const propertyFound = await Properties.findOne(
+      {
+        _id: inspectionFound.propertyDocID,
+      },
+      "shareDocIDList"
+    ).populate({
+      path: "shareDocIDList",
+      model: "property_shares",
+      populate: {
+        path: "currentOwnerDocID",
+        model: "shareholders",
+        select: "username",
+      },
+    });
+
+    const purchasedShareList = propertyFound.shareDocIDList.filter((share) => {
+      return share.utilisedStatus !== "Listed";
+    });
+
+    res.status(200).json({
+      message: "Fetched",
+      success: true,
+      body: { inspection: inspectionFound, sharesList: purchasedShareList },
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getInspectionDetail",
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
@@ -1672,4 +1798,6 @@ module.exports = {
   getPropertyByID,
   fetchShareInspectionByUsername,
   handleInspectionSubmission,
+  getInspectionDetail,
+  handleInspectionAction,
 };

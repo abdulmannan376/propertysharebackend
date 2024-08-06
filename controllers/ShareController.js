@@ -146,20 +146,22 @@ const getBuySharesDetailByUsername = async (req, res) => {
     // Assuming sharesByUsername is an array of share objects
     const sharesPerProperty = sharesByUsername.reduce((acc, share) => {
       console.log("acc: ", acc);
-      const propertyID = share.propertyDocID.propertyID;
-      // Check if the propertyID already has an entry in the accumulator
-      if (acc[propertyID]) {
-        // If yes, increment the count
-        acc[propertyID].count++;
-      } else {
-        // If no, create a new entry
-        acc[propertyID] = {
-          propertyID: propertyID,
-          propertyDetails: share.propertyDocID,
-          count: 1,
-        };
+      if (!share.shareID.endsWith("00")) {
+        const propertyID = share.propertyDocID.propertyID;
+        // Check if the propertyID already has an entry in the accumulator
+        if (acc[propertyID]) {
+          // If yes, increment the count
+          acc[propertyID].count++;
+        } else {
+          // If no, create a new entry
+          acc[propertyID] = {
+            propertyID: propertyID,
+            propertyDetails: share.propertyDocID,
+            count: 1,
+          };
+        }
+        return acc;
       }
-      return acc;
     }, {});
 
     console.log(sharesPerProperty);
@@ -251,11 +253,14 @@ const getSharesByUsername = async (req, res) => {
       )
       .exec();
 
+    const sharesListWithoutOwner = sharesByUsername.filter((share) => {
+      return !share.shareID.endsWith("00");
+    });
     console.log(sharesByUsername);
     res.status(200).json({
       message: "Fetched",
       success: true,
-      body: sharesByUsername,
+      body: sharesListWithoutOwner,
     });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
@@ -372,6 +377,7 @@ async function sendSellOfferToPropertyOwner(shareID, category, price) {
 
 async function notifyWishlistUsers(propertyID, propertyTitle, category) {
   try {
+    console.log(propertyID, propertyTitle, category);
     // Find user profiles where wishList contains the given propertyID
     const userProfiles = await UserProfile.find({
       wishList: propertyID, // Direct match since both are strings
@@ -473,11 +479,11 @@ const handleShareByCategory = async (req, res) => {
 
         await Promise.all(updatedShareOfferListPromises);
       } else {
-        // notifyWishlistUsers(
-        //   propertyFound.propertyID,
-        //   propertyFound.title,
-        //   category
-        // );
+        notifyWishlistUsers(
+          propertyFound.propertyID,
+          propertyFound.title,
+          category
+        );
 
         propertyFound.stakesOnRent += 1;
 
@@ -1560,7 +1566,9 @@ const handleShareSellOfferAction = async (req, res) => {
         { _id: prevShareholder._id },
         {
           $pull: {
-            purchasedShareIDList: propertyShareFound._id,
+            purchasedShareIDList: {
+              shareDocID: propertyShareFound._id,
+            },
           },
           $addToSet: {
             soldShareIDList: {
@@ -1593,15 +1601,19 @@ const handleShareSellOfferAction = async (req, res) => {
           // shareDocIDList.push({ shareDocID: propertyShareFound._id });
 
           const newShareholder = new Shareholders({
-            username: username,
-            userID: userFound._id,
+            username: shareOfferFound.userDocID.username,
+            userID: shareOfferFound.userDocID._id,
             // purchasedShareIDList: shareDocIDList,
           });
 
-          userFound.role = "shareholder";
+          const newOwnerUserFound = await Users.findOne({
+            username: shareOfferFound.userDocID.username,
+          });
+
+          newOwnerUserFound.role = "shareholder";
 
           await newShareholder.save();
-          await userFound.save();
+          await newOwnerUserFound.save();
 
           await Shareholders.updateOne(
             { _id: newShareholder._id },
