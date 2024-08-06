@@ -795,7 +795,7 @@ const fetchShareInspectionByUsername = async (req, res) => {
           path: "propertyDocID",
           model: "properties",
           select:
-            "propertyID imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
+            "propertyID area imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
           populate: {
             path: "amenitiesID",
             model: "property_amenities",
@@ -856,7 +856,7 @@ const fetchShareInspectionByUsername = async (req, res) => {
             path: "propertyDocID",
             model: "properties",
             select:
-              "propertyID imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
+              "propertyID area imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
             populate: {
               path: "amenitiesID",
               model: "property_amenities",
