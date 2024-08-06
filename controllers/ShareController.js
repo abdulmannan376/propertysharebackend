@@ -206,10 +206,14 @@ const getSharesByProperty = async (req, res) => {
         .json({ message: "No shares available.", success: true });
     }
 
+    const propertyShareExpectOwner = propertySharesFound.filter((share) => {
+      return !share.shareID.endsWith("00");
+    });
+
     res.status(200).json({
       message: "Fetch successfull",
       success: true,
-      body: propertySharesFound,
+      body: propertyShareExpectOwner,
     });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
