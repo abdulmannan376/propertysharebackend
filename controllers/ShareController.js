@@ -1299,7 +1299,9 @@ const handleShareRentOfferAction = async (req, res) => {
 
     const shareOfferFound = await ShareOffers.findOne({
       shareOfferID: offerID,
-    }).populate("shareholderDocID", "username");
+    })
+      .populate("shareholderDocID", "username")
+      .populate("userDocID", "username");
     if (!shareOfferFound) {
       throw new Error("share offer not found");
     }
@@ -1313,7 +1315,7 @@ const handleShareRentOfferAction = async (req, res) => {
     }).populate("propertyDocID", "title");
 
     if (action === "accepted") {
-      propertyShareFound.tenantUserDocID = userFound._id;
+      propertyShareFound.tenantUserDocID = shareOfferFound.userDocID._id;
       propertyShareFound.onRent = false;
       propertyShareFound.utilisedStatus = "On Rent";
 
@@ -1526,7 +1528,7 @@ const handleShareSellOfferAction = async (req, res) => {
       username: shareOfferFound.userDocID.username,
     });
 
-    console.log("shareholderFound: ", shareholderFound.username);
+    // console.log("shareholderFound: ", shareholderFound.username);
 
     if (action === "accepted") {
       // const sharePrevOwnerPurchasedIDList =
