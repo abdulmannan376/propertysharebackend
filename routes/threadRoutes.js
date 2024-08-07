@@ -19,6 +19,6 @@ router.get(
   "/get-childern-by-parent/:key",
   ThreadsController.getChildrenByParentThread
 );
-router.get("/get-root-threads/:key", ThreadsController.getRootThreads);
+router.get("/get-root-threads/:key/:category", ThreadsController.getRootThreads);
 
 module.exports = router;

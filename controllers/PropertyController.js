@@ -959,39 +959,65 @@ const handleInspectionSubmission = async (req, res) => {
 
 const handleInspectionAction = async (req, res) => {
   try {
-    const { inspectionID, action, username } = req.body;
+    const { inspectionID, action, username, occurence } = req.body;
+
+    console.log(req.body);
 
     const inspectionFound = await PropertyInspection.findOne({
       inspectionID: inspectionID,
-    });
+    })
+      .populate({
+        path: "shareholderDocID",
+        model: "shareholders",
+        select: "username userID",
+        populate: {
+          path: "userID",
+          model: "users",
+          select: "name",
+        },
+      })
+      .populate({
+        path: "propertyDocID",
+        model: "properties",
+        select:
+          "propertyID area imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
+        populate: {
+          path: "amenitiesID",
+          model: "property_amenities",
+          select: "roomDetails",
+        },
+      })
+      .populate("shareDocID", "availableInDuration shareID");
     if (!inspectionFound) {
       throw new Error("inspection not found");
     }
 
-    if (action === "approved") {
-      if (inspectionFound.rejectedUsersList.includes(username)) {
-        const newRejectedList = inspectionFound.rejectedUsersList.filter(
-          (username) => {
-            return username !== username;
-          }
-        );
-        inspectionFound.rejectedUsersList = newRejectedList;
+    for (let index = 0; index < occurence; index++) {
+      if (action === "approved") {
+        if (inspectionFound.rejectedUsersList.includes(username)) {
+          const newRejectedList = inspectionFound.rejectedUsersList.filter(
+            (username) => {
+              return username !== username;
+            }
+          );
+          inspectionFound.rejectedUsersList = newRejectedList;
+        }
+        inspectionFound.approvedByUsersList.push(username);
+      } else if (action === "rejected") {
+        if (inspectionFound.approvedByUsersList.includes(username)) {
+          const newApprovedList = inspectionFound.approvedByUsersList.filter(
+            (username) => {
+              return username !== username;
+            }
+          );
+          inspectionFound.approvedByUsersList = newApprovedList;
+        }
+        inspectionFound.rejectedUsersList.push(username);
+      } else {
+        return res
+          .status(403)
+          .json({ message: "Forbidden or no action provided", success: false });
       }
-      inspectionFound.approvedByUsersList.push(username);
-    } else if (action === "rejected") {
-      if (inspectionFound.approvedByUsersList.includes(username)) {
-        const newApprovedList = inspectionFound.approvedByUsersList.filter(
-          (username) => {
-            return username !== username;
-          }
-        );
-        inspectionFound.approvedByUsersList = newApprovedList;
-      }
-      inspectionFound.rejectedUsersList.push(username);
-    } else {
-      return res
-        .status(403)
-        .json({ message: "Forbidden or no action provided", success: false });
     }
 
     await inspectionFound.save().then(() => {

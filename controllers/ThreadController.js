@@ -142,7 +142,7 @@ const addRootThreadToShare = async (req, res) => {
 
 const getRootThreads = async (req, res) => {
   try {
-    const { key } = req.params;
+    const { key, category } = req.params;
 
     const propertyShareFound = await PropertyShares.findOne({ shareID: key });
     if (!propertyShareFound) {
@@ -153,6 +153,7 @@ const getRootThreads = async (req, res) => {
     const threadsList = await Threads.find({
       shareDocID: propertyShareFound._id,
       status: "root",
+      category: category
     }).populate("author", "name username");
 
     res.status(200).json({

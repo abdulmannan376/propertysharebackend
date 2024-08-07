@@ -141,27 +141,31 @@ const getBuySharesDetailByUsername = async (req, res) => {
 
     const sharesByUsername = await Promise.all(sharesByUsernamePromises);
 
-    console.log("sharesByUsername: ", sharesByUsername);
+    // console.log("sharesByUsername: ", sharesByUsername);
 
+    const sharesListWithoutOwner = sharesByUsername.filter((share) => {
+      return !share.shareID.endsWith("00");
+    });
+
+    console.log("sharesList: ", sharesListWithoutOwner)
     // Assuming sharesByUsername is an array of share objects
-    const sharesPerProperty = sharesByUsername.reduce((acc, share) => {
-      console.log("acc: ", acc);
-      if (!share.shareID.endsWith("00")) {
-        const propertyID = share.propertyDocID.propertyID;
-        // Check if the propertyID already has an entry in the accumulator
-        if (acc[propertyID]) {
-          // If yes, increment the count
-          acc[propertyID].count++;
-        } else {
-          // If no, create a new entry
-          acc[propertyID] = {
-            propertyID: propertyID,
-            propertyDetails: share.propertyDocID,
-            count: 1,
-          };
-        }
-        return acc;
+    const sharesPerProperty = sharesListWithoutOwner.reduce((acc, share) => {
+      // console.log("acc: ", acc);
+      // console.log("share: ", share);
+      const propertyID = share.propertyDocID.propertyID;
+      // Check if the propertyID already has an entry in the accumulator
+      if (acc[propertyID]) {
+        // If yes, increment the count
+        acc[propertyID].count++;
+      } else {
+        // If no, create a new entry
+        acc[propertyID] = {
+          propertyID: propertyID,
+          propertyDetails: share.propertyDocID,
+          count: 1,
+        };
       }
+      return acc;
     }, {});
 
     console.log(sharesPerProperty);
