@@ -28,6 +28,10 @@ router.put(
   "/update-inspection-action",
   PropertyController.handleInspectionAction
 );
+router.put(
+  "/update-inspection-action-by-PO",
+  PropertyController.handleInspectionActionPropertyOwner
+); //PO = Property Owner
 
 //GET
 router.get(

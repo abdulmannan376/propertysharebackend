@@ -41,6 +41,11 @@ const InspectionSchema = new mongoose.Schema(
       ref: "property_shares",
       required: true,
     },
+    propertyOwnerDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "shareholders",
+      required: true,
+    },
     shareholderDocID: {
       type: mongoose.Types.ObjectId,
       ref: "shareholders",

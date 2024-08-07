@@ -729,6 +729,12 @@ async function openInspections() {
         try {
           const propertyShare = await PropertyShare.findOne({
             shareID: share.shareID,
+          })
+            .populate("currentOwnerDocID", "username")
+            .populate("propertyDocID", "propertyID");
+
+          const ownerShare = await PropertyShare.findOne({
+            shareID: `${propertyShare.propertyDocID.propertyID}00`,
           }).populate("currentOwnerDocID", "username");
 
           if (propertyShare) {
@@ -737,6 +743,7 @@ async function openInspections() {
               propertyDocID: propertyShare.propertyDocID,
               shareDocID: propertyShare._id,
               shareholderDocID: propertyShare.currentOwnerDocID,
+              propertyOwnerDocID: ownerShare.currentOwnerDocID,
             });
             await newInspection.save(); // Save the inspection first
 
@@ -879,6 +886,36 @@ const fetchShareInspectionByUsername = async (req, res) => {
           inspectionsList.push(inspection);
         }
       }
+
+      return res
+        .status(200)
+        .json({ message: "Fetched", success: true, body: inspectionsList });
+    } else if (action === "pending_approvals") {
+      const inspectionsList = await PropertyInspection.find({
+        propertyOwnerDocID: shareholderFound._id,
+      })
+        .populate({
+          path: "propertyDocID",
+          model: "properties",
+          select:
+            "propertyID area imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
+          populate: {
+            path: "amenitiesID",
+            model: "property_amenities",
+            select: "roomDetails",
+          },
+        })
+        .populate("shareDocID", "availableInDuration shareID")
+        .populate({
+          path: "shareholderDocID",
+          model: "shareholders",
+          select: "username userID",
+          populate: {
+            path: "userID",
+            model: "users",
+            select: "name",
+          },
+        });
 
       return res
         .status(200)
@@ -1030,6 +1067,91 @@ const handleInspectionAction = async (req, res) => {
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "handleInspectionAction",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const handleInspectionActionPropertyOwner = async (req, res) => {
+  try {
+    const { inspectionID, usernameList, username } = req.body;
+
+    const shareholderFound = await Shareholders.findOne({
+      username: username,
+    }).populate({
+      path: "userID",
+      model: "users",
+      select: "name userDefaultSettingID",
+      populate: {
+        path: "userDefaultSettingID",
+        model: "user_default_settings",
+        select: "notifyUpdates",
+      },
+    });
+    if (!shareholderFound) {
+      throw new Error("shareholder not found");
+    }
+
+    const inspectionFound = await PropertyInspection.findOne({
+      inspectionID: inspectionID,
+      propertyOwnerDocID: shareholderFound._id,
+    }).populate("propertyDocID", "title");
+    if (!inspectionFound) {
+      throw new Error("property inspection not found.");
+    }
+
+    usernameList.map((username) => {
+      if (
+        !inspectionFound.approvedByUsersList.includes(username) &&
+        !inspectionFound.rejectedUsersList.includes(username)
+      ) {
+        inspectionFound.approvedByUsersList.push(username);
+      }
+    });
+
+    inspectionFound.status = "Verified";
+
+    const usersFoundPromises = await usernameList.map((username) => {
+      return Users.findOne({ username: username }).populate(
+        "userDefaultSettingID",
+        "notifyUpdates"
+      );
+    });
+
+    const usersFoundList = await Promise.all(usersFoundPromises);
+
+    await inspectionFound.save().then(() => {
+      usersFoundList.map((user) => {
+        const userSubject = `Property ${inspectionFound.propertyDocID.title} Inspection status`;
+        const userBody = `Dear ${user.name}, \nProperty, ${inspectionFound.propertyDocID.title}, inspection is approved by the property owner. \nRegards, \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          userSubject,
+          userBody,
+          user.userDefaultSettingID.notifyUpdates,
+          user.username
+        );
+      });
+
+      const subject = `Property ${inspectionFound.propertyDocID.title} Inspection status`;
+      const body = `Dear ${shareholderFound.userID.name}, \nProperty, ${inspectionFound.propertyDocID.title}, inspection has been approved. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        subject,
+        body,
+        shareholderFound.userID.userDefaultSettingID.notifyUpdates,
+        username
+      );
+
+      res.status(200).json({ message: "Inspection approved", success: true})
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleInspectionActionPropertyOwner",
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
@@ -1826,4 +1948,5 @@ module.exports = {
   handleInspectionSubmission,
   getInspectionDetail,
   handleInspectionAction,
+  handleInspectionActionPropertyOwner,
 };
