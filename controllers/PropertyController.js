@@ -3,6 +3,7 @@ const PropertyListing = require("../models/PropertySchema");
 const PropertyAmenities = require("../models/AmenitiesSchema");
 const PropertyShare = require("../models/PropertyShareSchema");
 const PropertyInspection = require("../models/PropertyInspectionSchema");
+const RaiseRequest = require("../models/RaiseRequestSchema");
 const JWTController = require("../helpers/jwtController");
 const { sendEmail } = require("../helpers/emailController");
 const Properties = require("../models/PropertySchema");
@@ -165,9 +166,12 @@ const getPropertyByUsername = async (req, res) => {
 };
 
 const testRun = async (req, res) => {
-  const { propertyID, propertyType, area, price } = req.body;
+  const { propertyID, propertyType, area, price, category } = req.body;
   // findNearbyMarkers(propertyID, propertyType, area, price);
-  const result = await openInspections();
+  const result = await notifyPropertyShareOwnerByPropertyID(
+    propertyID,
+    category
+  );
   res.status(200).json({ message: true, body: result });
 };
 
@@ -1147,11 +1151,119 @@ const handleInspectionActionPropertyOwner = async (req, res) => {
         username
       );
 
-      res.status(200).json({ message: "Inspection approved", success: true})
+      res.status(200).json({ message: "Inspection approved", success: true });
     });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "handleInspectionActionPropertyOwner",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+async function notifyPropertyShareOwnerByPropertyID(propertyID, category) {
+  const propertyFound = await Properties.findOne(
+    { propertyID: propertyID },
+    "shareDocIDList title"
+  ).populate({
+    path: "shareDocIDList",
+    model: "property_shares",
+    select: "currentOwnerDocID shareID",
+    populate: {
+      path: "currentOwnerDocID",
+      model: "shareholders",
+      select: "username userID",
+      populate: {
+        path: "userID",
+        model: "users",
+        select: "name userDefaultSettingID",
+        populate: {
+          path: "userDefaultSettingID",
+          model: "user_default_settings",
+          select: "notifyUpdates",
+        },
+      },
+    },
+  });
+
+  const usernameList = [];
+  const shareList = propertyFound.shareDocIDList.filter((share) => {
+    if (!share.shareID.endsWith("00")) {
+      if (!usernameList.includes(share.currentOwnerDocID.username)) {
+        usernameList.push(share.currentOwnerDocID.username);
+        return share;
+      }
+    }
+  });
+
+  shareList.map((share) => {
+    const subject = `Property ${propertyFound.title} ${category} requested`;
+    const body = `Dear ${share.currentOwnerDocID.userID.name}, It is to inform you a new ${category} is requested for property ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
+
+    sendUpdateNotification(
+      subject,
+      body,
+      share.currentOwnerDocID.userID.userDefaultSettingID.notifyUpdates,
+      share.currentOwnerDocID.username
+    );
+  });
+
+  return shareList;
+}
+
+const genRaiseRequest = async (req, res) => {
+  try {
+    const { propertyID, username, title, details, price, type } = req.body;
+
+    const shareholderFound = await Shareholders.findOne({
+      username: username,
+    }).populate({
+      path: "userID",
+      model: "users",
+      select: "name userDefaultSettingID",
+      populate: {
+        path: "userDefaultSettingID",
+        model: "user_default_settings",
+        select: "notifyUpdates",
+      },
+    });
+
+    if (!shareholderFound) {
+      throw new Error("shareholder not found.");
+    }
+
+    const propertyFound = await Properties.findOne({ propertyID: propertyID });
+    if (!propertyFound) {
+      throw new Error("property not found.");
+    }
+
+    const newRaiseRequest = new RaiseRequest({
+      title: title,
+      estimatedPrice: price,
+      details: details,
+      requestType: type,
+      propertyDocID: propertyFound._id,
+      shareholderDocID: shareholderFound._id,
+    });
+
+    const uploadPath = `uploads/Inspections/${propertyID}/RaisedRequests/${newRaiseRequest.raisedRequestID}`;
+
+    // Update property with new information
+    newRaiseRequest.imageDir = uploadPath;
+    newRaiseRequest.imageCount = fs
+      .readdirSync(uploadPath)
+      .filter((file) => file.startsWith("image-")).length;
+
+    await newRaiseRequest.save().then(() => {
+      notifyPropertyShareOwnerByPropertyID(propertyID, type);
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "genRaiseRequest",
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
@@ -1949,4 +2061,5 @@ module.exports = {
   getInspectionDetail,
   handleInspectionAction,
   handleInspectionActionPropertyOwner,
+  genRaiseRequest,
 };

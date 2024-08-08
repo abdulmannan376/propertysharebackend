@@ -12,6 +12,7 @@ router.post(
   upload.array("imageFiles", 10),
   PropertyController.addPropertyImages
 );
+router.post("/gen-raise-request", PropertyController.genRaiseRequest)
 
 //PUT
 router.put("/update-property/:id", PropertyController.updateProperty);

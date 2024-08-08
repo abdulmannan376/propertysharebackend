@@ -82,6 +82,11 @@ const PropertySchema = new mongoose.Schema(
       type: mongoose.Types.ObjectId,
       ref: "property_amenities",
     },
+    raisedRequest: {
+      type: [mongoose.Types.ObjectId],
+      ref: "property_raised_requests",
+      default: []
+    }
   },
   { timestamps: true }
 );

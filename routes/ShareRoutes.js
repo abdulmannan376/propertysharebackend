@@ -10,6 +10,7 @@ router.post("/open-share-by-category", ShareController.handleShareByCategory);
 router.post("/gen-new-offer", ShareController.genNewShareOffer);
 router.post("/gen-share-swap-offer", ShareController.genShareSwapOffer);
 
+
 //PUT
 router.put(
   "/update-share-rent-offer",

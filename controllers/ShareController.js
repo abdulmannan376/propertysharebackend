@@ -42,57 +42,41 @@ const buyShare = async (req, res) => {
         username: username,
         purchasedShareIDList: shareDocIDList,
       });
-
-      userFound.role = "shareholder";
-      await userFound.save();
-
       await newShareholder.save();
-      propertyShareFound.currentBoughtAt = price;
-      propertyShareFound.utilisedStatus = "Purchased";
-      propertyShareFound.currentOwnerDocID = newShareholder._id;
 
-      propertyFound.stakesOccupied += 1;
-      await propertyFound.save();
+      await Users.updateOne(
+        { _id: userFound._id },
+        {
+          $set: {
+            role: "shareholder",
+          },
+        }
+      );
 
-      propertyShareFound.save().then(() => {
-        const recipient = userFound.email;
-        const subject = "Successful Purchase of Share.";
-        const body = `Dear ${userFound.name}, \nThis email is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
+      await PropertyShares.updateOne(
+        { _id: propertyShareFound._id },
+        {
+          $set: {
+            currentBoughtAt: price,
+            utilisedStatus: "Purchased",
+            currentOwnerDocID: newShareholder._id,
+          },
+        }
+      );
 
-        sendUpdateNotification(
-          subject,
-          body,
-          userFound.userDefaultSettingID.notifyUpdates,
-          username
-        );
-      });
-      return res
-        .status(201)
-        .json({ message: "Purchase successfull", success: true });
-    }
+      const stakesOccupied = propertyFound.stakesOccupied;
+      await Properties.updateOne(
+        { _id: propertyFound._id },
+        {
+          $set: {
+            stakesOccupied: stakesOccupied + 1,
+          },
+        }
+      );
 
-    propertyShareFound.currentBoughtAt = price;
-    propertyShareFound.utilisedStatus = "Purchased";
-    propertyShareFound.currentOwnerDocID = shareholderFound._id;
-
-    await propertyShareFound.save();
-
-    const shareDocIDList = [...shareholderFound.purchasedShareIDList];
-    shareDocIDList.push({ shareDocID: propertyShareFound._id });
-    shareholderFound.purchasedShareIDList = shareDocIDList;
-
-    propertyFound.stakesOccupied += 1;
-    await propertyFound.save();
-
-    const userFound = await Users.findOne({ username: username }).populate(
-      "userDefaultSettingID",
-      "notifyUpdates"
-    );
-
-    shareholderFound.save().then(() => {
-      const recipient = shareholderFound.userID.email;
-      const subject = "Successfull Purchase of Share.";
-      const body = `Dear ${shareholderFound.userID.name}, \nThis email is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
+      const recipient = userFound.email;
+      const subject = "Successful Purchase of Share.";
+      const body = `Dear ${userFound.name}, \nThis email is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
@@ -100,7 +84,58 @@ const buyShare = async (req, res) => {
         userFound.userDefaultSettingID.notifyUpdates,
         username
       );
-    });
+      return res
+        .status(201)
+        .json({ message: "Purchase successfull", success: true });
+    }
+
+    await PropertyShares.updateOne(
+      { _id: propertyShareFound._id },
+      {
+        $set: {
+          currentBoughtAt: price,
+          utilisedStatus: "Purchased",
+          currentOwnerDocID: shareholderFound._id,
+        },
+      }
+    );
+
+    await Shareholders.updateOne(
+      { _id: shareholderFound._id },
+      {
+        $addToSet: {
+          purchasedShareIDList: {
+            shareDocID: propertyShareFound._id,
+          },
+        },
+      }
+    );
+
+    const stakesOccupied = propertyFound.stakesOccupied;
+    await Properties.updateOne(
+      { _id: propertyFound._id },
+      {
+        $set: {
+          stakesOccupied: stakesOccupied + 1,
+        },
+      }
+    );
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+
+    const recipient = shareholderFound.userID.email;
+    const subject = "Successfull Purchase of Share.";
+    const body = `Dear ${shareholderFound.userID.name}, \nThis email is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
+
+    sendUpdateNotification(
+      subject,
+      body,
+      userFound.userDefaultSettingID.notifyUpdates,
+      username
+    );
     res.status(201).json({ message: "Purchase successfull", success: true });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
@@ -147,7 +182,7 @@ const getBuySharesDetailByUsername = async (req, res) => {
       return !share.shareID.endsWith("00");
     });
 
-    console.log("sharesList: ", sharesListWithoutOwner)
+    console.log("sharesList: ", sharesListWithoutOwner);
     // Assuming sharesByUsername is an array of share objects
     const sharesPerProperty = sharesListWithoutOwner.reduce((acc, share) => {
       // console.log("acc: ", acc);
