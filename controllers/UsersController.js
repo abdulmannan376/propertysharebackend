@@ -752,6 +752,21 @@ const getUserProfileDetails = async (req, res) => {
       throw new Error(`user not found. entry: ${username}`);
     }
 
+    if (userFound.userProfile.paymentDetails) {
+      const bytes = CryptoJS.AES.decrypt(
+        userFound.userProfile.paymentDetails.cardNumber,
+        process.env.USER_CARD_SECRET
+      );
+      userFound.userProfile.paymentDetails.cardNumber = bytes.toString(CryptoJS.enc.Utf8);
+    }
+    if (userFound.userProfile.withdrawalDetails) {
+      const bytes = CryptoJS.AES.decrypt(
+        userFound.userProfile.withdrawalDetails.ibanNumber,
+        process.env.USER_IBAN_SECRET
+      );
+      userFound.userProfile.withdrawalDetails.ibanNumber = bytes.toString(CryptoJS.enc.Utf8);
+    }
+
     res
       .status(200)
       .json({ message: "Fetched", success: true, body: userFound });
@@ -788,13 +803,11 @@ const uploadProfilePic = async (req, res) => {
 
     await userProfileFound.save();
 
-    res
-      .status(201)
-      .json({
-        message: "Profile pic updated.",
-        success: true,
-        body: uploadPath,
-      });
+    res.status(201).json({
+      message: "Profile pic updated.",
+      success: true,
+      body: uploadPath,
+    });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "getUserProfileDetails",
@@ -833,9 +846,23 @@ const updateUserProfileDetails = async (req, res) => {
       userProfileFound.nationality = body.nationality;
       userProfileFound.religion = body.religion;
       userProfileFound.bloodGroup = body.bloodGroup;
-    } else if(action === "Contact Details") {
-      userFound.contact = body.contact 
-      userProfileFound.permanentAddress = body.permanentAddress
+    } else if (action === "Contact Details") {
+      userFound.contact = body.contact;
+      userProfileFound.permanentAddress = body.permanentAddress;
+    } else if (action === "Next of Kin") {
+      userProfileFound.nextOfKinDetails = body.nextOfKinDetails;
+    } else if (action === "Payment Details") {
+      userProfileFound.paymentDetails = body.paymentDetails;
+      userProfileFound.paymentDetails.cardNumber = CryptoJS.AES.encrypt(
+        body.paymentDetails.cardNumber,
+        process.env.USER_CARD_SECRET
+      );
+    } else if (action === "Withdrawal Details") {
+      userProfileFound.withdrawalDetails = body.withdrawalDetails;
+      userProfileFound.withdrawalDetails.ibanNumber = CryptoJS.AES.encrypt(
+        body.withdrawalDetails.ibanNumber,
+        process.env.USER_IBAN_SECRET
+      );
     }
 
     await userFound.save();
