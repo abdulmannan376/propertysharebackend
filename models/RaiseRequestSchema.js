@@ -65,6 +65,7 @@ const RaisedRequestSchema = new mongoose.Schema(
         "Property Owner Rejected",
         "Expired",
       ],
+      default: "Decision Pending"
     },
   },
   { timestamps: true }

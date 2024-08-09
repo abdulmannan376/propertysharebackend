@@ -3,6 +3,7 @@ const router = express.Router();
 const PropertyController = require("../controllers/PropertyController");
 const upload = require("../middleware/multerConfig");
 const updatedUpload = require("../middleware/multerConfigUpdated");
+const uploadRaiseRequestImages = require("../middleware/multerRaiseRequest");
 
 //POST
 router.post("/add-property-request", PropertyController.addPropertyRequest);
@@ -12,7 +13,11 @@ router.post(
   upload.array("imageFiles", 10),
   PropertyController.addPropertyImages
 );
-router.post("/gen-raise-request", PropertyController.genRaiseRequest)
+router.post(
+  "/gen-raise-request",
+  uploadRaiseRequestImages.array("imageFiles", 10),
+  PropertyController.genRaiseRequest
+);
 
 //PUT
 router.put("/update-property/:id", PropertyController.updateProperty);
@@ -73,6 +78,10 @@ router.get(
 router.get(
   "/get-inspection-detail/:key",
   PropertyController.getInspectionDetail
+);
+router.get(
+  "/get-raise-request-by-username/:username/:type",
+  PropertyController.fetchRaisedRequestByUsername
 );
 
 // router.get("/test-share-ID", PropertyController.testGenerateShareID)

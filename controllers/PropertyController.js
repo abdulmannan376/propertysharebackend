@@ -1217,7 +1217,8 @@ async function notifyPropertyShareOwnerByPropertyID(propertyID, category) {
 
 const genRaiseRequest = async (req, res) => {
   try {
-    const { propertyID, username, title, details, price, type } = req.body;
+    const { propertyID, username, title, details, price, type, URLsList } =
+      req.body;
 
     const shareholderFound = await Shareholders.findOne({
       username: username,
@@ -1248,9 +1249,14 @@ const genRaiseRequest = async (req, res) => {
       requestType: type,
       propertyDocID: propertyFound._id,
       shareholderDocID: shareholderFound._id,
+      attachedURLsList: URLsList,
     });
 
-    const uploadPath = `uploads/Inspections/${propertyID}/RaisedRequests/${newRaiseRequest.raisedRequestID}`;
+    const today = new Date();
+
+    const uploadPath = `uploads/RaiseRequest/${propertyID}/${
+      today.getDate() + 1
+    }-${today.getMonth()}-${today.getFullYear()}/`;
 
     // Update property with new information
     newRaiseRequest.imageDir = uploadPath;
@@ -1261,6 +1267,8 @@ const genRaiseRequest = async (req, res) => {
     await newRaiseRequest.save().then(() => {
       notifyPropertyShareOwnerByPropertyID(propertyID, type);
     });
+
+    res.status(201).json({ message: "New Request added.", success: true });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "genRaiseRequest",
@@ -1270,6 +1278,58 @@ const genRaiseRequest = async (req, res) => {
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const fetchRaisedRequestByUsername = async (req, res) => {
+  try {
+    const { username, type } = req.params;
+
+    console.log(req.params)
+    const shareholderFound = await Shareholders.findOne({ username: username });
+    if (!shareholderFound) {
+      throw new Error("shareholder not found");
+    }
+
+    const requestsFound = await RaiseRequest.find({
+      shareholderDocID: shareholderFound._id,
+      requestType: type,
+    })
+      .populate({
+        path: "propertyDocID",
+        model: "properties",
+        select:
+          "propertyID area imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
+        populate: {
+          path: "amenitiesID",
+          model: "property_amenities",
+          select: "roomDetails",
+        },
+      })
+      .populate({
+        path: "shareholderDocID",
+        model: "shareholders",
+        select: "username userID",
+        populate: {
+          path: "userID",
+          model: "users",
+          select: "name",
+        },
+      });
+    res
+      .status(200)
+      .json({ message: "Fetched", success: true, body: requestsFound });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "fetchRaisedRequestByUsername",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -2062,4 +2122,5 @@ module.exports = {
   handleInspectionAction,
   handleInspectionActionPropertyOwner,
   genRaiseRequest,
+  fetchRaisedRequestByUsername,
 };
