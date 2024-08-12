@@ -39,6 +39,16 @@ router.put(
   PropertyController.handleInspectionActionPropertyOwner
 ); //PO = Property Owner
 
+router.put(
+  "/update-raise-request-action",
+  PropertyController.handleRaiseRequestAction
+);
+
+router.put(
+  "/update-raise-request-action-by-PO",
+  PropertyController.handleRaiseRequestActionPropertyOwner
+); //PO = Property Owner
+
 //GET
 router.get(
   "/fetch-coordinates-of-property",
@@ -80,8 +90,12 @@ router.get(
   PropertyController.getInspectionDetail
 );
 router.get(
-  "/get-raise-request-by-username/:username/:type",
+  "/get-raise-request-by-username/:username/:type/:action",
   PropertyController.fetchRaisedRequestByUsername
+);
+router.get(
+  "/get-raise-request-detail/:key",
+  PropertyController.getRaiseRequestDetail
 );
 
 // router.get("/test-share-ID", PropertyController.testGenerateShareID)

@@ -87,9 +87,11 @@ const addPropertyRequest = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -113,9 +115,11 @@ const fetchCoordinatesOfRequestes = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -159,9 +163,11 @@ const getPropertyByUsername = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -356,9 +362,11 @@ const updateProperty = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -575,9 +583,11 @@ const addNewProperty = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -603,9 +613,11 @@ const deletePropertyData = async () => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -698,7 +710,7 @@ function reorganizeFiles(directory, deleteIndices = []) {
 //     });
 //     res
 //       .status(500)
-//       .json({ message: "Internal Server Error", error: error, success: false });
+//       .json({ message: error.message || "Internal Server Error", error: error, success: false });
 //   }
 // };
 
@@ -935,9 +947,11 @@ const fetchShareInspectionByUsername = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -992,9 +1006,11 @@ const handleInspectionSubmission = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1074,9 +1090,11 @@ const handleInspectionAction = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1159,9 +1177,11 @@ const handleInspectionActionPropertyOwner = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1192,7 +1212,7 @@ async function notifyPropertyShareOwnerByPropertyID(propertyID, category) {
 
   const usernameList = [];
   const shareList = propertyFound.shareDocIDList.filter((share) => {
-    if (!share.shareID.endsWith("00")) {
+    if (!share.shareID.endsWith("00") && share.currentOwnerDocID) {
       if (!usernameList.includes(share.currentOwnerDocID.username)) {
         usernameList.push(share.currentOwnerDocID.username);
         return share;
@@ -1237,10 +1257,16 @@ const genRaiseRequest = async (req, res) => {
       throw new Error("shareholder not found.");
     }
 
-    const propertyFound = await Properties.findOne({ propertyID: propertyID });
+    const propertyFound = await Properties.findOne({
+      propertyID: propertyID,
+    }).populate("shareDocIDList", "shareID currentOwnerDocID");
     if (!propertyFound) {
       throw new Error("property not found.");
     }
+
+    const ownerShare = propertyFound.shareDocIDList.filter((share) => {
+      return share.shareID.endsWith("00");
+    });
 
     const newRaiseRequest = new RaiseRequest({
       title: title,
@@ -1250,6 +1276,7 @@ const genRaiseRequest = async (req, res) => {
       propertyDocID: propertyFound._id,
       shareholderDocID: shareholderFound._id,
       attachedURLsList: URLsList,
+      propertyOwnerDocID: ownerShare.currentOwnerDocID,
     });
 
     const today = new Date();
@@ -1275,50 +1302,152 @@ const genRaiseRequest = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
 const fetchRaisedRequestByUsername = async (req, res) => {
   try {
-    const { username, type } = req.params;
+    const { username, type, action } = req.params;
 
-    console.log(req.params)
+    console.log(req.params);
     const shareholderFound = await Shareholders.findOne({ username: username });
     if (!shareholderFound) {
       throw new Error("shareholder not found");
     }
 
-    const requestsFound = await RaiseRequest.find({
-      shareholderDocID: shareholderFound._id,
-      requestType: type,
-    })
-      .populate({
-        path: "propertyDocID",
-        model: "properties",
-        select:
-          "propertyID area imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
-        populate: {
-          path: "amenitiesID",
-          model: "property_amenities",
-          select: "roomDetails",
-        },
+    if (action === "my") {
+      const requestsFound = await RaiseRequest.find({
+        shareholderDocID: shareholderFound._id,
+        requestType: type,
       })
-      .populate({
-        path: "shareholderDocID",
-        model: "shareholders",
-        select: "username userID",
-        populate: {
-          path: "userID",
-          model: "users",
-          select: "name",
-        },
-      });
-    res
-      .status(200)
-      .json({ message: "Fetched", success: true, body: requestsFound });
+        .populate({
+          path: "propertyDocID",
+          model: "properties",
+          select:
+            "propertyID area imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
+          populate: {
+            path: "amenitiesID",
+            model: "property_amenities",
+            select: "roomDetails",
+          },
+        })
+        .populate({
+          path: "shareholderDocID",
+          model: "shareholders",
+          select: "username userID",
+          populate: {
+            path: "userID",
+            model: "users",
+            select: "name",
+          },
+        });
+      return res
+        .status(200)
+        .json({ message: "Fetched", success: true, body: requestsFound });
+    } else if (action === "all") {
+      const sharesByUsernamePromises =
+        shareholderFound.purchasedShareIDList.map((share) => {
+          const shareDetail = PropertyShare.findOne(share.shareDocID)
+            .populate("propertyDocID", "propertyID")
+            .exec();
+          console.log("shareDetail: ", shareDetail);
+          return shareDetail;
+        });
+
+      const sharesByUsername = await Promise.all(sharesByUsernamePromises);
+
+      // Assuming sharesByUsername is an array of share objects
+      const sharesPerProperty = sharesByUsername.reduce((acc, share) => {
+        // console.log("acc: ", acc);
+        const propertyID = share.propertyDocID.propertyID;
+
+        acc[propertyID] = {
+          propertyID: propertyID,
+          propertyDetails: share.propertyDocID,
+        };
+        return acc;
+      }, {});
+
+      // To convert the object back into an array if needed:
+      const shareholderPropertyList = Object.values(sharesPerProperty);
+
+      const raiseRequestsList = [];
+
+      for (const property of shareholderPropertyList) {
+        const raiseRequestFound = await RaiseRequest.findOne({
+          propertyDocID: property.propertyDetails._id,
+          requestType: type,
+        })
+          .populate({
+            path: "propertyDocID",
+            model: "properties",
+            select:
+              "propertyID area imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          })
+          .populate({
+            path: "shareholderDocID",
+            model: "shareholders",
+            select: "username userID",
+            populate: {
+              path: "userID",
+              model: "users",
+              select: "name",
+            },
+          });
+
+        if (raiseRequestFound) {
+          raiseRequestsList.push(raiseRequestFound);
+        }
+      }
+
+      return res
+        .status(200)
+        .json({ message: "Fetched", success: true, body: raiseRequestsList });
+    } else if (action === "pending_approval") {
+      const raiseRequestsList = await RaiseRequest.find({
+        propertyOwnerDocID: shareholderFound._id,
+        requestType: type,
+      })
+        .populate({
+          path: "propertyDocID",
+          model: "properties",
+          select:
+            "propertyID area imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
+          populate: {
+            path: "amenitiesID",
+            model: "property_amenities",
+            select: "roomDetails",
+          },
+        })
+        .populate({
+          path: "shareholderDocID",
+          model: "shareholders",
+          select: "username userID",
+          populate: {
+            path: "userID",
+            model: "users",
+            select: "name",
+          },
+        });
+
+      return res
+        .status(200)
+        .json({ message: "Fetched", success: true, body: raiseRequestsList });
+    } else {
+      return res
+        .status(403)
+        .json({ message: "Forbidden or invalid action", success: true });
+    }
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "fetchRaisedRequestByUsername",
@@ -1374,9 +1503,273 @@ const getInspectionDetail = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
+const getRaiseRequestDetail = async (req, res) => {
+  try {
+    const { key } = req.params;
+
+    const raiseRequestFound = await RaiseRequest.findOne({
+      raisedRequestID: key,
+    }).populate({
+      path: "shareholderDocID",
+      model: "shareholders",
+      select: "userID username",
+      populate: {
+        path: "userID",
+        model: "users",
+        select: "name",
+      },
+    });
+    if (!raiseRequestFound) {
+      throw new Error("raise request not found");
+    }
+
+    const propertyFound = await Properties.findOne(
+      {
+        _id: raiseRequestFound.propertyDocID,
+      },
+      "shareDocIDList"
+    ).populate({
+      path: "shareDocIDList",
+      model: "property_shares",
+      populate: {
+        path: "currentOwnerDocID",
+        model: "shareholders",
+        select: "username",
+      },
+    });
+
+    const purchasedShareList = propertyFound.shareDocIDList.filter((share) => {
+      return share.utilisedStatus !== "Listed";
+    });
+
+    res.status(200).json({
+      message: "Fetched",
+      success: true,
+      body: { raiseRequest: raiseRequestFound, sharesList: purchasedShareList },
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getInspectionDetail",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
+const handleRaiseRequestAction = async (req, res) => {
+  try {
+    const { requestID, action, username, occurence } = req.body;
+
+    console.log(req.body);
+
+    const raiseRequestFound = await RaiseRequest.findOne({
+      raisedRequestID: requestID,
+    })
+      .populate({
+        path: "shareholderDocID",
+        model: "shareholders",
+        select: "username userID",
+        populate: {
+          path: "userID",
+          model: "users",
+          select: "name",
+        },
+      })
+      .populate({
+        path: "propertyDocID",
+        model: "properties",
+        select:
+          "propertyID area imageDirURL imageCount title stakesOccupied totalStakes pinnedImageIndex addressOfProperty amenitiesID",
+        populate: {
+          path: "amenitiesID",
+          model: "property_amenities",
+          select: "roomDetails",
+        },
+      });
+    if (!raiseRequestFound) {
+      throw new Error("request not found");
+    }
+
+    for (let index = 0; index < occurence; index++) {
+      if (action === "approved") {
+        if (raiseRequestFound.rejectedByUsersList.includes(username)) {
+          const newRejectedList = raiseRequestFound.rejectedByUsersList.filter(
+            (username) => {
+              return username !== username;
+            }
+          );
+          raiseRequestFound.rejectedByUsersList = newRejectedList;
+        }
+        raiseRequestFound.approvedByUsersList.push(username);
+      } else if (action === "rejected") {
+        if (raiseRequestFound.approvedByUsersList.includes(username)) {
+          const newApprovedList = raiseRequestFound.approvedByUsersList.filter(
+            (username) => {
+              return username !== username;
+            }
+          );
+          raiseRequestFound.approvedByUsersList = newApprovedList;
+        }
+        raiseRequestFound.rejectedByUsersList.push(username);
+      } else {
+        return res
+          .status(403)
+          .json({ message: "Forbidden or no action provided", success: false });
+      }
+    }
+
+    const propertyFound = await Properties.findOne(
+      {
+        _id: raiseRequestFound.propertyDocID,
+      },
+      "shareDocIDList"
+    ).populate({
+      path: "shareDocIDList",
+      model: "property_shares",
+      populate: {
+        path: "currentOwnerDocID",
+        model: "shareholders",
+        select: "username",
+      },
+    });
+
+    const purchasedShareList = propertyFound.shareDocIDList.filter((share) => {
+      return share.utilisedStatus !== "Listed";
+    });
+
+    const answer =
+      raiseRequestFound.approvedByUsersList.length / purchasedShareList.length;
+    const percentage = Math.round(answer * 100);
+    if (
+      percentage >= 80 &&
+      raiseRequestFound.status !== "Property Owner Approval Pending"
+    )
+      raiseRequestFound.status = "Property Owner Approval Pending";
+    await raiseRequestFound.save().then(() => {
+      res.status(200).json({
+        message: "Inspection Updated.",
+        success: true,
+        body: raiseRequestFound,
+      });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleRaiseRequestAction",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
+const handleRaiseRequestActionPropertyOwner = async (req, res) => {
+  try {
+    const { requestID, usernameList, username } = req.body;
+
+    console.log(req.body)
+    const shareholderFound = await Shareholders.findOne({
+      username: username,
+    }).populate({
+      path: "userID",
+      model: "users",
+      select: "name userDefaultSettingID",
+      populate: {
+        path: "userDefaultSettingID",
+        model: "user_default_settings",
+        select: "notifyUpdates",
+      },
+    });
+    if (!shareholderFound) {
+      throw new Error("shareholder not found");
+    }
+
+    const raiseRequestFound = await RaiseRequest.findOne({
+      raisedRequestID: requestID,
+      propertyOwnerDocID: shareholderFound._id,
+    }).populate("propertyDocID", "title propertyID");
+    if (!raiseRequestFound) {
+      throw new Error("raised request not found.");
+    }
+
+    usernameList.map((username) => {
+      if (
+        !raiseRequestFound.approvedByUsersList.includes(username) &&
+        !raiseRequestFound.rejectedByUsersList.includes(username)
+      ) {
+        raiseRequestFound.approvedByUsersList.push(username);
+      }
+    });
+
+    raiseRequestFound.status = "Payment Pending";
+
+    const usersFoundPromises = await usernameList.map((username) => {
+      return Users.findOne({ username: username }).populate(
+        "userDefaultSettingID",
+        "notifyUpdates"
+      );
+    });
+
+    const usersFoundList = await Promise.all(usersFoundPromises);
+
+    await raiseRequestFound.save().then(() => {
+      usersFoundList.map((user) => {
+        const userSubject = `Property ${raiseRequestFound.propertyDocID.title} ${raiseRequestFound.requestType} status`;
+        const userBody = `Dear ${user.name}, \nProperty, ${
+          raiseRequestFound.propertyDocID.title
+        }, ${raiseRequestFound.requestType.toLowerCase()} request is approved by the property owner. \nRegards, \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          userSubject,
+          userBody,
+          user.userDefaultSettingID.notifyUpdates,
+          user.username
+        );
+      });
+
+      const subject = `Property ${raiseRequestFound.propertyDocID.title} ${raiseRequestFound.requestType} status`;
+      const body = `Dear ${shareholderFound.userID.name}, \nProperty, ${
+        raiseRequestFound.propertyDocID.title
+      }, ${raiseRequestFound.requestType.toLowerCase()} request has been approved. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        subject,
+        body,
+        shareholderFound.userID.userDefaultSettingID.notifyUpdates,
+        username
+      );
+
+      res
+        .status(200)
+        .json({ message: "Raised Request approved", success: true });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleRaiseRequestActionPropertyOwner",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1452,9 +1845,11 @@ const addPropertyImages = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: new Date().toISOString(),
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1497,9 +1892,11 @@ const deleteAllImages = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1566,7 +1963,7 @@ const deleteAllImages = async (req, res) => {
 //     });
 //     res
 //       .status(500)
-//       .json({ message: "Internal Server Error", error: error, success: false });
+//       .json({ message: error.message || "Internal Server Error", error: error, success: false });
 //   }
 // };
 
@@ -1699,9 +2096,11 @@ const getFeaturedProperty = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: new Date().toISOString(),
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1833,9 +2232,11 @@ const getMostViewedProperties = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: new Date().toISOString(),
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1974,9 +2375,11 @@ const getRecentlyAddedProperties = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: new Date().toISOString(),
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -2015,9 +2418,11 @@ const getPropertiesByType = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: new Date().toISOString(),
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -2066,9 +2471,11 @@ const getPropertiesByAvailableShares = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: new Date().toISOString(),
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -2095,9 +2502,11 @@ const getPropertyByID = async (req, res) => {
       fileLocation: "controllers/PropertyController.js",
       timestamp: new Date().toISOString(),
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -2123,4 +2532,7 @@ module.exports = {
   handleInspectionActionPropertyOwner,
   genRaiseRequest,
   fetchRaisedRequestByUsername,
+  getRaiseRequestDetail,
+  handleRaiseRequestAction,
+  handleRaiseRequestActionPropertyOwner,
 };

@@ -15,6 +15,11 @@ const RaisedRequestSchema = new mongoose.Schema(
       ref: "properties",
       required: true,
     },
+    propertyOwnerDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "shareholders",
+      required: true,
+    },
     title: {
       type: String,
       required: true,
@@ -60,12 +65,13 @@ const RaisedRequestSchema = new mongoose.Schema(
       type: String,
       enum: [
         "Decision Pending",
+        "Property Owner Approval Pending",
         "Payment Pending",
         "SuccessFull",
         "Property Owner Rejected",
         "Expired",
       ],
-      default: "Decision Pending"
+      default: "Decision Pending",
     },
   },
   { timestamps: true }
