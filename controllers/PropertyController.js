@@ -2570,6 +2570,13 @@ async function handleDraftProperties() {
 
     if (propertiesToDiscard.length > 0) {
       const idsToDelete = propertiesToDiscard.map((doc) => doc._id);
+      for (const id of idsToDelete) {
+        const shareDocIDs = await PropertyShare.find(
+          { propertyDocID: id },
+          "_id"
+        );
+        await PropertyShare.deleteMany({ _id: { $in: shareDocIDs } });
+      }
       const deletionResult = await Properties.deleteMany({
         _id: { $in: idsToDelete },
       });
