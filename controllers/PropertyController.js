@@ -432,7 +432,7 @@ const addNewProperty = async (req, res) => {
       listingStatus: listingStatus,
       valuePerShare: Math.round(body.totalPrice / body.numOfShares),
       publishedBy: body.username,
-      publisherRole: body.userRole,
+      publisherRole: body.userRole === "user" ? "shareholder" : body.userRole,
       amenitiesID: newAmenities._id,
     });
 
@@ -1235,6 +1235,55 @@ async function notifyPropertyShareOwnerByPropertyID(propertyID, category) {
   return shareList;
 }
 
+const getInspectionDetail = async (req, res) => {
+  try {
+    const { key } = req.params;
+
+    const inspectionFound = await PropertyInspection.findOne({
+      inspectionID: key,
+    });
+    if (!inspectionFound) {
+      throw new Error("inspection not found");
+    }
+
+    const propertyFound = await Properties.findOne(
+      {
+        _id: inspectionFound.propertyDocID,
+      },
+      "shareDocIDList"
+    ).populate({
+      path: "shareDocIDList",
+      model: "property_shares",
+      populate: {
+        path: "currentOwnerDocID",
+        model: "shareholders",
+        select: "username",
+      },
+    });
+
+    const purchasedShareList = propertyFound.shareDocIDList.filter((share) => {
+      return share.utilisedStatus !== "Listed";
+    });
+
+    res.status(200).json({
+      message: "Fetched",
+      success: true,
+      body: { inspection: inspectionFound, sharesList: purchasedShareList },
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getInspectionDetail",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
 const genRaiseRequest = async (req, res) => {
   try {
     const { propertyID, username, title, details, price, type, URLsList } =
@@ -1462,55 +1511,6 @@ const fetchRaisedRequestByUsername = async (req, res) => {
   }
 };
 
-const getInspectionDetail = async (req, res) => {
-  try {
-    const { key } = req.params;
-
-    const inspectionFound = await PropertyInspection.findOne({
-      inspectionID: key,
-    });
-    if (!inspectionFound) {
-      throw new Error("inspection not found");
-    }
-
-    const propertyFound = await Properties.findOne(
-      {
-        _id: inspectionFound.propertyDocID,
-      },
-      "shareDocIDList"
-    ).populate({
-      path: "shareDocIDList",
-      model: "property_shares",
-      populate: {
-        path: "currentOwnerDocID",
-        model: "shareholders",
-        select: "username",
-      },
-    });
-
-    const purchasedShareList = propertyFound.shareDocIDList.filter((share) => {
-      return share.utilisedStatus !== "Listed";
-    });
-
-    res.status(200).json({
-      message: "Fetched",
-      success: true,
-      body: { inspection: inspectionFound, sharesList: purchasedShareList },
-    });
-  } catch (error) {
-    console.log(`Error: ${error}`, "\nlocation: ", {
-      function: "getInspectionDetail",
-      fileLocation: "controllers/PropertyController.js",
-      timestamp: currentDateString,
-    });
-    res.status(500).json({
-      message: error.message || "Internal Server Error",
-      error: error,
-      success: false,
-    });
-  }
-};
-
 const getRaiseRequestDetail = async (req, res) => {
   try {
     const { key } = req.params;
@@ -1683,7 +1683,7 @@ const handleRaiseRequestActionPropertyOwner = async (req, res) => {
   try {
     const { requestID, usernameList, username } = req.body;
 
-    console.log(req.body)
+    console.log(req.body);
     const shareholderFound = await Shareholders.findOne({
       username: username,
     }).populate({
@@ -2510,6 +2510,93 @@ const getPropertyByID = async (req, res) => {
   }
 };
 
+async function handleDraftProperties() {
+  try {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    today.setDate(today.getDate() - 7);
+
+    const piplineForDraftProperties = [
+      {
+        $match: {
+          createdAt: { $gte: today },
+          listingStatus: "draft",
+        },
+      },
+    ];
+
+    const properties = await Properties.aggregate(piplineForDraftProperties);
+    console.log("properties: ", properties);
+    const response = {
+      message: "",
+    };
+    if (properties.length > 0) {
+      for (const property of properties) {
+        const userFound = await Users.findOne({
+          username: property.publishedBy,
+        }).populate("userDefaultSettingID", "notifyUpdates");
+
+        const subject = `Property (${property.title}) status of listing`;
+        const body = `Dear ${userFound.name}, \nYou property listing ${property.title} is waiting to be live please fill up the necessary fields to make it live. \nRegards, \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          subject,
+          body,
+          userFound.userDefaultSettingID.notifyUpdates,
+          userFound.username
+        );
+      }
+
+      response.message += `${properties.length} properties with draft status has been notified.`;
+    } else {
+      response.message += `0 properties with draft status notified.`;
+    }
+
+    const piplineForDeleteDocs = [
+      {
+        $match: {
+          createdAt: { $lt: today },
+          listingStatus: "draft",
+        },
+      },
+      {
+        $project: { _id: 1 }, // Only project the _id as it's needed for deletion
+      },
+    ];
+
+    const propertiesToDiscard = await Properties.aggregate(
+      piplineForDeleteDocs
+    );
+
+    if (propertiesToDiscard.length > 0) {
+      const idsToDelete = propertiesToDiscard.map((doc) => doc._id);
+      const deletionResult = await Properties.deleteMany({
+        _id: { $in: idsToDelete },
+      });
+      response.message += `\nDeleted ${deletionResult.deletedCount} properties.`;
+    } else {
+      response.message += "\nNo properties to delete.";
+    }
+
+    console.log(`Response: ${response.message}`, "\nlocation: ", {
+      function: "handleShareReservation",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleDraftProperties",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    return {
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    };
+  }
+}
+
 module.exports = {
   testRun,
   addPropertyRequest,
@@ -2535,4 +2622,5 @@ module.exports = {
   getRaiseRequestDetail,
   handleRaiseRequestAction,
   handleRaiseRequestActionPropertyOwner,
+  handleDraftProperties,
 };

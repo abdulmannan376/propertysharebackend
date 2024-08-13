@@ -13,11 +13,13 @@ const shareRoutes = require("./routes/ShareRoutes");
 const threadRoutes = require("./routes/threadRoutes");
 const path = require("path");
 const { sendEmail } = require("./helpers/emailController");
+const startCronJobs = require("./helpers/cronJobs");
 
 app.use(cors());
 app.use(express.json());
 
 require("./middleware/dbConnect");
+startCronJobs()
 
 app.use("/user", userRoutes);
 app.use("/property", propertyRoutes);

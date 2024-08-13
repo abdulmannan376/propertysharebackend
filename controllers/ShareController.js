@@ -701,7 +701,7 @@ const reserveShare = async (req, res) => {
       startDateTime: startDate,
       startDateString: startDate.toISOString().split("T")[0],
       endDateTime: endDate,
-      endDateString: startDate.toISOString().split("T")[0],
+      endDateString: endDate.toISOString().split("T")[0],
     };
 
     propertyShareFound.utilisedStatus = "Reserved";
@@ -2182,6 +2182,276 @@ const handleShareSwapOfferAction = async (req, res) => {
   }
 };
 
+async function handleShareReservation() {
+  try {
+    const today = new Date(); // Get the current date and time
+    const twoDaysLater = new Date(today); // Copy today's date to a new variable
+    twoDaysLater.setDate(twoDaysLater.getDate() + 2); // Add two days
+
+    // Format dates to ignore the time component, if necessary
+    today.setHours(23, 59, 59, 999); // Set time to 00:00:00.000
+    twoDaysLater.setHours(23, 59, 59, 999); // Set time to the end of the day
+
+    const pipelineAboutToExpire = [
+      {
+        $match: {
+          "reservationDuration.endDateTime": {
+            $gt: today, // Greater than the start of today
+            $lte: twoDaysLater, // Less than or equal to the end of the day two days later
+          },
+          // utilisedStatus: "Purchased",
+        },
+      },
+      {
+        $lookup: {
+          from: "users", // The collection to join
+          localField: "reservedByUserDocID", // The field from the input documents
+          foreignField: "_id", // The field from the documents of the "from" collection
+          pipeline: [
+            {
+              $project: {
+                // Selecting only the required fields
+                username: 1,
+                email: 1,
+                userDefaultSettingID: 1,
+              },
+            },
+          ],
+          as: "reservedByUser", // The array field added to input documents; contains the matching documents from the "from" collection
+        },
+      },
+      {
+        $unwind: {
+          // Optional, if you want to convert the 'reservedByUser' array to an object
+          path: "$reservedByUser",
+          preserveNullAndEmptyArrays: true, // Optional, keeps documents even if 'reservedByUser' is empty
+        },
+      },
+      {
+        $lookup: {
+          from: "properties", // The collection to join
+          localField: "propertyDocID", // The field from the input documents
+          foreignField: "_id", // The field from the documents of the "from" collection
+          pipeline: [
+            {
+              $project: {
+                // Selecting only the required fields
+                title: 1,
+              },
+            },
+          ],
+          as: "property", // The array field added to input documents; contains the matching documents from the "from" collection
+        },
+      },
+      {
+        $unwind: {
+          // Optional, if you want to convert the 'reservedByUser' array to an object
+          path: "$property",
+          preserveNullAndEmptyArrays: true, // Optional, keeps documents even if 'reservedByUser' is empty
+        },
+      },
+      {
+        $lookup: {
+          from: "user_default_settings", // The collection containing user settings
+          localField: "reservedByUser.userDefaultSettingID",
+          foreignField: "_id",
+          pipeline: [
+            {
+              $project: {
+                // Selecting only the required settings
+                notifyUpdates: 1,
+              },
+            },
+          ],
+          as: "reservedByUser.userSettings",
+        },
+      },
+      {
+        $unwind: {
+          path: "$reservedByUser.userSettings",
+          preserveNullAndEmptyArrays: true, // Keep shares even if no user settings are found
+        },
+      },
+      {
+        $project: {
+          // Final projection to shape the output
+          shareID: 1,
+          reservationDuration: 1,
+          "reservedByUser.username": 1,
+          "reservedByUser.email": 1,
+          "reservedByUser.userSettings.notifyUpdates": 1,
+          "property.title": 1,
+        },
+      },
+    ];
+
+    const sharesListAboutToExpire = await PropertyShares.aggregate(
+      pipelineAboutToExpire
+    );
+
+    const pipelineOfExpired = [
+      {
+        $match: {
+          "reservationDuration.endDateTime": {
+            $lte: today,
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "users", // The collection to join
+          localField: "reservedByUserDocID", // The field from the input documents
+          foreignField: "_id", // The field from the documents of the "from" collection
+          pipeline: [
+            {
+              $project: {
+                // Selecting only the required fields
+                username: 1,
+                email: 1,
+                name: 1,
+                userDefaultSettingID: 1,
+              },
+            },
+          ],
+          as: "reservedByUser", // The array field added to input documents; contains the matching documents from the "from" collection
+        },
+      },
+      {
+        $unwind: {
+          // Optional, if you want to convert the 'reservedByUser' array to an object
+          path: "$reservedByUser",
+          preserveNullAndEmptyArrays: true, // Optional, keeps documents even if 'reservedByUser' is empty
+        },
+      },
+      {
+        $lookup: {
+          from: "properties", // The collection to join
+          localField: "propertyDocID", // The field from the input documents
+          foreignField: "_id", // The field from the documents of the "from" collection
+          pipeline: [
+            {
+              $project: {
+                // Selecting only the required fields
+                title: 1,
+              },
+            },
+          ],
+          as: "property", // The array field added to input documents; contains the matching documents from the "from" collection
+        },
+      },
+      {
+        $unwind: {
+          // Optional, if you want to convert the 'reservedByUser' array to an object
+          path: "$property",
+          preserveNullAndEmptyArrays: true, // Optional, keeps documents even if 'reservedByUser' is empty
+        },
+      },
+      {
+        $lookup: {
+          from: "user_default_settings", // The collection containing user settings
+          localField: "reservedByUser.userDefaultSettingID",
+          foreignField: "_id",
+          pipeline: [
+            {
+              $project: {
+                // Selecting only the required settings
+                notifyUpdates: 1,
+              },
+            },
+          ],
+          as: "reservedByUser.userSettings",
+        },
+      },
+      {
+        $unwind: {
+          path: "$reservedByUser.userSettings",
+          preserveNullAndEmptyArrays: true, // Keep shares even if no user settings are found
+        },
+      },
+      {
+        $project: {
+          // Final projection to shape the output
+          shareID: 1,
+          reservationDuration: 1,
+          "reservedByUser.username": 1,
+          "reservedByUser.email": 1,
+          "reservedByUser.name": 1,
+          "reservedByUser.userSettings.notifyUpdates": 1,
+          "property.title": 1,
+        },
+      },
+    ];
+
+    const sharesListOfExpired = await PropertyShares.aggregate(
+      pipelineOfExpired
+    );
+
+    const response = { message: "" };
+    if (sharesListAboutToExpire.length > 0) {
+      sharesListAboutToExpire.map((share) => {
+        const subject = `Property Reservation Reminder`;
+        const body = `Dear ${share.reservedByUser.name}, \nYou have reserved a share in ${share.property.title}. Please proceed to pay as it will be removed from reservation soon. \nRegards, \nBeach Bunny House.`;
+
+        // console.log(share);
+        sendUpdateNotification(
+          subject,
+          body,
+          share.reservedByUser.userSettings.notifyUpdates,
+          share.reservedByUser.username
+        );
+      });
+
+      response.message += `${sharesListAboutToExpire.length} reservations about to expire notified.`;
+    } else {
+      response.message += "0 reservations about to expire notified.";
+    }
+    if (sharesListOfExpired.length > 0) {
+      for (const share of sharesListOfExpired) {
+        const subject = `Property Reservation Expired.`;
+        const body = `Dear ${share.reservedByUser.name}, \nYour share reservation in ${share.property.title} is expired. \nRegards, \nBeach Bunny House.`;
+
+        sendUpdateNotification(
+          subject,
+          body,
+          share.reservedByUser.userSettings.notifyUpdates,
+          share.reservedByUser.username
+        );
+
+        await PropertyShares.updateOne(
+          { shareID: share.shareID },
+          {
+            $set: {
+              reservationDuration: null,
+              reservedByUserDocID: null,
+            },
+          }
+        );
+      }
+
+      response.message += `\n${sharesListOfExpired.length} reservations expired notified.`;
+    } else {
+      response.message += "\n0 reservations expired notified.";
+    }
+
+    console.log(`Response: ${response.message}`, "\nlocation: ", {
+      function: "handleShareReservation",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleShareReservation",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    return {
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    };
+  }
+}
+
 module.exports = {
   buyShare,
   getBuySharesDetailByUsername,
@@ -2200,6 +2470,7 @@ module.exports = {
   genShareSwapOffer,
   handleShareSwapOfferAction,
   getSwapShareByUsername,
+  handleShareReservation,
 
   testRun,
 };
