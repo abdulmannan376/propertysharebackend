@@ -855,12 +855,13 @@ const fetchShareInspectionByUsername = async (req, res) => {
       // Assuming sharesByUsername is an array of share objects
       const sharesPerProperty = sharesByUsername.reduce((acc, share) => {
         // console.log("acc: ", acc);
-        const propertyID = share.propertyDocID.propertyID;
+        const propertyID = share.propertyDocID?.propertyID;
 
-        acc[propertyID] = {
-          propertyID: propertyID,
-          propertyDetails: share.propertyDocID,
-        };
+        if (propertyID)
+          acc[propertyID] = {
+            propertyID: propertyID,
+            propertyDetails: share.propertyDocID,
+          };
         return acc;
       }, {});
 
@@ -1308,15 +1309,21 @@ const genRaiseRequest = async (req, res) => {
 
     const propertyFound = await Properties.findOne({
       propertyID: propertyID,
-    }).populate("shareDocIDList", "shareID currentOwnerDocID");
+    }).populate({
+      path: "shareDocIDList",
+      model: "property_shares",
+      select: "shareID currentOwnerDocID",
+    });
     if (!propertyFound) {
       throw new Error("property not found.");
     }
 
+    console.log(propertyFound);
     const ownerShare = propertyFound.shareDocIDList.filter((share) => {
       return share.shareID.endsWith("00");
     });
-
+    
+    console.log(ownerShare);
     const newRaiseRequest = new RaiseRequest({
       title: title,
       estimatedPrice: price,
@@ -1325,7 +1332,7 @@ const genRaiseRequest = async (req, res) => {
       propertyDocID: propertyFound._id,
       shareholderDocID: shareholderFound._id,
       attachedURLsList: URLsList,
-      propertyOwnerDocID: ownerShare.currentOwnerDocID,
+      propertyOwnerDocID: ownerShare[0].currentOwnerDocID,
     });
 
     const today = new Date();
@@ -1363,7 +1370,7 @@ const fetchRaisedRequestByUsername = async (req, res) => {
   try {
     const { username, type, action } = req.params;
 
-    console.log(req.params);
+    // console.log(req.params);
     const shareholderFound = await Shareholders.findOne({ username: username });
     if (!shareholderFound) {
       throw new Error("shareholder not found");
@@ -1403,7 +1410,6 @@ const fetchRaisedRequestByUsername = async (req, res) => {
         shareholderFound.purchasedShareIDList.map((share) => {
           const shareDetail = PropertyShare.findOne(share.shareDocID)
             .populate("propertyDocID", "propertyID")
-            .exec();
           console.log("shareDetail: ", shareDetail);
           return shareDetail;
         });
@@ -1413,13 +1419,15 @@ const fetchRaisedRequestByUsername = async (req, res) => {
       // Assuming sharesByUsername is an array of share objects
       const sharesPerProperty = sharesByUsername.reduce((acc, share) => {
         // console.log("acc: ", acc);
-        const propertyID = share.propertyDocID.propertyID;
-
-        acc[propertyID] = {
-          propertyID: propertyID,
-          propertyDetails: share.propertyDocID,
-        };
-        return acc;
+        const propertyID = share.propertyDocID?.propertyID;
+        console.log(propertyID)
+        console.log(share.propertyDocID)
+        if (propertyID)
+          acc[propertyID] = {
+            propertyID: propertyID,
+            propertyDetails: share.propertyDocID,
+          };
+        return acc
       }, {});
 
       // To convert the object back into an array if needed:
@@ -1547,7 +1555,7 @@ const getRaiseRequestDetail = async (req, res) => {
     });
 
     const purchasedShareList = propertyFound.shareDocIDList.filter((share) => {
-      return share.utilisedStatus !== "Listed";
+      return share.utilisedStatus !== "Listed" && share.utilisedStatus !== "Reserved";
     });
 
     res.status(200).json({

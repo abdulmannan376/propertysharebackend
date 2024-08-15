@@ -252,6 +252,8 @@ const userSignUp = async (req, res) => {
       userDefaultSettingID: newUserDefaultSetting._id,
       userProfile: newUserProfile._id,
     });
+    newUserDefaultSetting.userDocID = newUser._id;
+    newUserProfile.userDocID = newUser._id;
 
     await newUserDefaultSetting.save();
     await newUserProfile.save();
@@ -757,14 +759,18 @@ const getUserProfileDetails = async (req, res) => {
         userFound.userProfile.paymentDetails.cardNumber,
         process.env.USER_CARD_SECRET
       );
-      userFound.userProfile.paymentDetails.cardNumber = bytes.toString(CryptoJS.enc.Utf8);
+      userFound.userProfile.paymentDetails.cardNumber = bytes.toString(
+        CryptoJS.enc.Utf8
+      );
     }
     if (userFound.userProfile.withdrawalDetails) {
       const bytes = CryptoJS.AES.decrypt(
         userFound.userProfile.withdrawalDetails.ibanNumber,
         process.env.USER_IBAN_SECRET
       );
-      userFound.userProfile.withdrawalDetails.ibanNumber = bytes.toString(CryptoJS.enc.Utf8);
+      userFound.userProfile.withdrawalDetails.ibanNumber = bytes.toString(
+        CryptoJS.enc.Utf8
+      );
     }
 
     res
