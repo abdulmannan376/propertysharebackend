@@ -1,5 +1,9 @@
 const io = require("socket.io-client");
-const socket = io("ws://localhost:9000", { query: { username: "balaj.ali" } });
+const socket = io("wss://server.beachbunnyhouse.com", {
+  query: { username: "balaj.ali" },
+  transports: ["websocket"],
+  secure: true,
+});
 const readline = require("readline/promises");
 
 const rl = readline.createInterface({
@@ -12,8 +16,8 @@ let username;
 socket.on("connect", () => {
   console.log("Connected to the server.");
   socket.on("getOnlineUsers", (data) => {
-    console.log(data)
-  })
+    console.log(data);
+  });
   socket.on("response", (msg) => {
     const { message, Username } = msg;
     if (!message) {
@@ -33,6 +37,14 @@ socket.on("connect", () => {
   });
 
   askForUsername();
+});
+
+socket.on('connect_error', (error) => {
+  console.error('Connection failed:', error);
+});
+
+socket.on('error', (error) => {
+  console.error('Error:', error);
 });
 
 async function askForUsername() {
