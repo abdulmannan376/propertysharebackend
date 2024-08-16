@@ -1322,7 +1322,7 @@ const genRaiseRequest = async (req, res) => {
     const ownerShare = propertyFound.shareDocIDList.filter((share) => {
       return share.shareID.endsWith("00");
     });
-    
+
     console.log(ownerShare);
     const newRaiseRequest = new RaiseRequest({
       title: title,
@@ -1408,8 +1408,10 @@ const fetchRaisedRequestByUsername = async (req, res) => {
     } else if (action === "all") {
       const sharesByUsernamePromises =
         shareholderFound.purchasedShareIDList.map((share) => {
-          const shareDetail = PropertyShare.findOne(share.shareDocID)
-            .populate("propertyDocID", "propertyID")
+          const shareDetail = PropertyShare.findOne(share.shareDocID).populate(
+            "propertyDocID",
+            "propertyID"
+          );
           console.log("shareDetail: ", shareDetail);
           return shareDetail;
         });
@@ -1420,14 +1422,14 @@ const fetchRaisedRequestByUsername = async (req, res) => {
       const sharesPerProperty = sharesByUsername.reduce((acc, share) => {
         // console.log("acc: ", acc);
         const propertyID = share.propertyDocID?.propertyID;
-        console.log(propertyID)
-        console.log(share.propertyDocID)
+        console.log(propertyID);
+        console.log(share.propertyDocID);
         if (propertyID)
           acc[propertyID] = {
             propertyID: propertyID,
             propertyDetails: share.propertyDocID,
           };
-        return acc
+        return acc;
       }, {});
 
       // To convert the object back into an array if needed:
@@ -1555,7 +1557,9 @@ const getRaiseRequestDetail = async (req, res) => {
     });
 
     const purchasedShareList = propertyFound.shareDocIDList.filter((share) => {
-      return share.utilisedStatus !== "Listed" && share.utilisedStatus !== "Reserved";
+      return (
+        share.utilisedStatus !== "Listed" && share.utilisedStatus !== "Reserved"
+      );
     });
 
     res.status(200).json({
@@ -2079,6 +2083,7 @@ const getFeaturedProperty = async (req, res) => {
     // console.log(pipeline);
 
     const propertiesTotal = await Properties.aggregate(pipelineForTotalData);
+    // console.log(propertiesTotal);
     const properties = await Properties.aggregate(pipeline);
 
     const propertyPromises = properties.map(async (propertyData) => {
@@ -2215,6 +2220,7 @@ const getMostViewedProperties = async (req, res) => {
     pipeline.push({ $skip: skipDocuments }, { $limit: propertiesPerPage });
 
     const propertiesTotal = await Properties.aggregate(pipelineForTotalData);
+    // console.log(propertiesTotal)
     const properties = await Properties.aggregate(pipeline);
 
     const propertyPromises = properties.map(async (propertyData) => {

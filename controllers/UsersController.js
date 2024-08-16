@@ -7,6 +7,7 @@ const { sendEmail } = require("../helpers/emailController");
 const { sendUpdateNotification } = require("./notificationController");
 const { verifyJWT } = require("../helpers/jwtController");
 const Properties = require("../models/PropertySchema");
+const { removeRecieverID } = require("../socket/socket");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -134,6 +135,8 @@ const userLogout = async (req, res) => {
     userFound.loggedIn = false;
 
     await userFound.save();
+
+    removeRecieverID(userFound.username)
 
     res.status(200).json({ mesaage: "Logged out", success: true });
   } catch (error) {

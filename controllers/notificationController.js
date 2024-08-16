@@ -2,6 +2,7 @@ const Notification = require("../models/NotificationSchema");
 const Users = require("../models/UserSchema");
 const currentDate = require("../helpers/currentDate");
 const { sendEmail } = require("../helpers/emailController");
+const { io, getRecieverID } = require("../socket/socket");
 
 async function sendUpdateNotification(
   subject,
@@ -15,22 +16,28 @@ async function sendUpdateNotification(
       body: body,
       username: username,
     });
-
     const userFound = await Users.findOne({ username: username });
 
+    userFound.notificationByIDList.push(newNotification._id);
+
+    const savedData = await Promise.all([
+      userFound.save(),
+      newNotification.save(),
+    ]);
     sendingChannels.map(async (channel) => {
       if (channel === "email") {
         sendEmail(userFound.email, subject, body);
         newNotification.sentChannels.push("email");
       } else if (channel === "website") {
         newNotification.sentChannels.push("website");
+        const recieverSocketID = getRecieverID(username);
+        console.log("in sendUpdateNotification", recieverSocketID);
+        io.to(recieverSocketID).emit("getNewNotification", savedData[1]);
       } else if (channel === "contact") {
         newNotification.sentChannels.push("contact");
       }
     });
 
-    userFound.notificationByIDList.push(newNotification._id);
-    await userFound.save();
     await newNotification.save();
 
     return true;

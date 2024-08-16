@@ -1,10 +1,10 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const app = express();
 const port = process.env.PORT || 5000;
-const https = require("https");
-const fs = require("fs");
+
+
+
 const userRoutes = require("./routes/UserRoutes");
 const propertyRoutes = require("./routes/PropertyRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
@@ -14,12 +14,29 @@ const threadRoutes = require("./routes/threadRoutes");
 const path = require("path");
 const { sendEmail } = require("./helpers/emailController");
 const startCronJobs = require("./helpers/cronJobs");
+// const startWebsocket = require("./middleware/handleWebsocket");
+const { app, server } = require("./socket/socket");
 
-app.use(cors());
-app.use(express.json());
+// app.use(cors());
+// app.use(express.json());
+
+// io.on("connection", (socket) => {
+//   console.log("A user connected");
+
+//   socket.on("disconnect", () => {
+//     console.log("User disconnected");
+//   });
+
+//   // Example: listen for messages and broadcast
+//   socket.on("message", (msg) => {
+//     io.emit("message", "Hello Client"); // Emitting to all clients
+//   });
+// });
+
+// startWebsocket(io);
 
 require("./middleware/dbConnect");
-startCronJobs()
+startCronJobs();
 
 app.use("/user", userRoutes);
 app.use("/property", propertyRoutes);
@@ -74,28 +91,15 @@ app.post("/contact-us", async (req, res) => {
   }
 });
 
-//Read SSL certificate files
-const privateKey = fs.readFileSync(
-  "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
-  "utf8"
-);
-const certificate = fs.readFileSync(
-  "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
-  "utf8"
-);
-
-const credentials = {
-  key: privateKey,
-  cert: certificate,
-};
-
-// Create HTTPS server
-const httpsServer = https.createServer(credentials, app);
 
 // Listen on port 443
-httpsServer.listen(443, () => {
+server.listen(443, () => {
   console.log("HTTPS Server running on port 443");
 });
+
+// server.listen(port, () => {
+//   console.log(`Server is running on port ${port}`);
+// });
 
 // app.listen(port, () => {
 //   console.log(`Server is running on port ${port}`);
