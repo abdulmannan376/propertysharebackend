@@ -49,6 +49,8 @@ router.put(
   PropertyController.handleRaiseRequestActionPropertyOwner
 ); //PO = Property Owner
 
+router.put("/update-property-approval-action", PropertyController.handlePropertyAction)
+
 //GET
 router.get(
   "/fetch-coordinates-of-property",
@@ -97,6 +99,7 @@ router.get(
   "/get-raise-request-detail/:key",
   PropertyController.getRaiseRequestDetail
 );
+router.get("/get-pending-approval-properties/:username", PropertyController.getPendingApprovalProperties)
 
 // router.get("/test-share-ID", PropertyController.testGenerateShareID)
 

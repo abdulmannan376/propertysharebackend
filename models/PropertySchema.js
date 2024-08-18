@@ -58,7 +58,7 @@ const PropertySchema = new mongoose.Schema(
     },
     listingStatus: {
       type: String,
-      enum: ["draft", "live", "pending approval", "hidden"],
+      enum: ["draft", "live", "pending approval", "hidden", "rejected"],
     },
     startDurationFrom: { type: Date, required: true },
     publishedBy: { type: String, required: true, desc: "username" },
@@ -66,6 +66,16 @@ const PropertySchema = new mongoose.Schema(
       type: String,
       enum: ["admin", "shareholder", "user"],
       default: "user",
+    },
+    approvedBy: {
+      type: String,
+      default: "",
+      desc: "username",
+    },
+    rejectedBy: {
+      type: String,
+      default: "",
+      desc: "username",
     },
     viewedCount: { type: Number, default: 0 },
     detail: { type: String, required: true },
@@ -85,8 +95,8 @@ const PropertySchema = new mongoose.Schema(
     raisedRequest: {
       type: [mongoose.Types.ObjectId],
       ref: "property_raised_requests",
-      default: []
-    }
+      default: [],
+    },
   },
   { timestamps: true }
 );

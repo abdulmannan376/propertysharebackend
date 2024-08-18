@@ -1,8 +1,9 @@
 const io = require("socket.io-client");
-const socket = io("wss://server.beachbunnyhouse.com", {
+const socket = io("ws://localhost:9000", {
   query: { username: "balaj.ali" },
   transports: ["websocket"],
-  secure: true,
+  // secure: true,
+  path: "/socket.io"
 });
 const readline = require("readline/promises");
 

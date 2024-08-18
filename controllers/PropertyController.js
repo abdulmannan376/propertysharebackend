@@ -621,6 +621,171 @@ const deletePropertyData = async () => {
   }
 };
 
+const getPendingApprovalProperties = async (req, res) => {
+  try {
+    // Authorization header should be checked if it exists
+    if (!req.headers.authorization) {
+      return res.status(401).json({
+        message: "No authorization token provided.",
+        success: false,
+      });
+    }
+
+    const token = req.headers.authorization.split(" ")[1];
+
+    if (token.length === 0) {
+      return res.status(401).json({
+        message: "No authorization token provided.",
+        success: false,
+      });
+    }
+    const isTokenValid = await JWTController.verifyJWT(token);
+    if (!isTokenValid) {
+      return res.status(404).json({
+        message: "Session expired.",
+        success: false,
+        action: "login",
+      });
+    }
+
+    const { username } = req.params;
+
+    const userFound = await Users.findOne({ username: username }, "role");
+    if (!userFound && userFound.role !== "admin") {
+      return res.status(401).json({
+        message: "Not Authorized",
+        success: false,
+      });
+    }
+    const pipeline = [];
+
+    pipeline.push({
+      $match: {
+        listingStatus: "pending approval",
+      },
+    });
+
+    pipeline.push({
+      $sort: { createdAt: -1 },
+    });
+    const propertyList = await Properties.aggregate(pipeline);
+
+    res
+      .status(200)
+      .json({ message: "Fetched", success: true, body: propertyList });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "getPendingApprovals",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
+const handlePropertyAction = async (req, res) => {
+  try {
+    const { action, comment, username, propertyID } = req.body;
+
+    const propertyFound = await Properties.findOne({ propertyID: propertyID });
+    if (!propertyFound) {
+      throw new Error("property not found");
+    }
+    const publisherFound = await Users.findOne({
+      username: propertyFound.publishedBy,
+    }).populate("userDefaultSettingID", "notifyUpdates");
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+
+    if (action === "approved") {
+      await Properties.updateOne(
+        { _id: propertyFound._id },
+        {
+          $set: {
+            listingStatus: "live",
+            approvedBy: username,
+          },
+        }
+      );
+
+      const publisherSubject = `Property (${propertyFound.title}) listing status`;
+      const publisherBody = `Dear ${publisherFound.name}, \nYour property ${propertyFound.title} has been approved by our team and is live on beachbunnyhouse.com. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        publisherSubject,
+        publisherBody,
+        publisherFound.userDefaultSettingID.notifyUpdates,
+        publisherFound.username
+      );
+
+      const subject = `Property (${propertyFound.title}) listing status`;
+      const body = `Dear ${userFound.name}, \nYou approved property ${propertyFound.title} and is now live on. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        subject,
+        body,
+        userFound.userDefaultSettingID.notifyUpdates,
+        userFound.username
+      );
+
+      return res.status(200).json({ message: "Status Updated", success: true });
+    } else if (action === "rejected") {
+      await Properties.updateOne(
+        { _id: propertyFound._id },
+        {
+          $set: {
+            listingStatus: "rejected",
+            rejectedBy: username,
+          },
+        }
+      );
+
+      const publisherSubject = `Property (${propertyFound.title}) listing status`;
+      const publisherBody = `Dear ${publisherFound.name}, \nYour property ${propertyFound.title} has been rejected by our team. \nComments: ${comment} \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        publisherSubject,
+        publisherBody,
+        publisherFound.userDefaultSettingID.notifyUpdates,
+        publisherFound.username
+      );
+
+      const subject = `Property (${propertyFound.title}) listing status`;
+      const body = `Dear ${userFound.name}, \nYou rejected property ${propertyFound.title}. \nComments: ${comment} \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        subject,
+        body,
+        userFound.userDefaultSettingID.notifyUpdates,
+        userFound.username
+      );
+      return res.status(200).json({ message: "Status Updated", success: true });
+    } else {
+      return res
+        .status(200)
+        .json({ message: "Forbidden or No action provided", success: false });
+    }
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "handlePropertyAction",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
 // Function to reorganize files in the directory
 function reorganizeFiles(directory, deleteIndices = []) {
   // console.log(directory, deleteIndices);
@@ -2644,4 +2809,6 @@ module.exports = {
   handleRaiseRequestAction,
   handleRaiseRequestActionPropertyOwner,
   handleDraftProperties,
+  getPendingApprovalProperties,
+  handlePropertyAction,
 };
