@@ -9,6 +9,8 @@ const { Server } = require("socket.io");
 app.use(cors());
 app.use(express.json());
 
+//new update
+
 //Read SSL certificate files
 const privateKey = fs.readFileSync(
   "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
