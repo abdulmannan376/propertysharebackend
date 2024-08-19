@@ -11,25 +11,25 @@ app.use(express.json());
 
 //new update
 
-//Read SSL certificate files
-const privateKey = fs.readFileSync(
-  "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
-  "utf8"
-);
-const certificate = fs.readFileSync(
-  "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
-  "utf8"
-);
+// //Read SSL certificate files
+// const privateKey = fs.readFileSync(
+//   "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
+//   "utf8"
+// );
+// const certificate = fs.readFileSync(
+//   "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
+//   "utf8"
+// );
 
-const credentials = {
-  key: privateKey,
-  cert: certificate,
-};
+// const credentials = {
+//   key: privateKey,
+//   cert: certificate,
+// };
 
-// Create HTTPS server
-const server = https.createServer(credentials, app);
+// // Create HTTPS server
+// const server = https.createServer(credentials, app);
 
-// const server = http.createServer(app);
+const server = http.createServer(app);
 const io = new Server(server, {
   path: "/socket.io",
   transports: ["websocket"],
@@ -55,6 +55,7 @@ const getRecieverID = (username) => {
 
 const removeRecieverID = (username) => {
   delete userSocketMap[username];
+  console.log("in removeRecieverID", userSocketMap);
 };
 
 io.on("connection", (socket) => {
@@ -64,7 +65,6 @@ io.on("connection", (socket) => {
   if (username) userSocketMap[username] = socket.id;
 
   console.log(userSocketMap);
-
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
   // Handle incoming requests
@@ -88,10 +88,23 @@ io.on("connection", (socket) => {
     // socket.broadcast.emit('receiveMessage', message); // Emitting to all clients except sender
   });
 
+  socket.on("login", (data) => {
+    console.log("user login", socket.id);
+    userSocketMap[data.username] = socket.id;
+  });
+
+  socket.on("logout", (data) => {
+    console.log("user logout", userSocketMap[data.username]);
+    delete userSocketMap[data.username];
+    io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    console.log(userSocketMap);
+  });
+
   socket.on("disconnect", () => {
     console.log("user disconnected", socket.id);
     delete userSocketMap[username];
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    console.log(userSocketMap);
   });
 
   // Example: listen for messages and broadcast

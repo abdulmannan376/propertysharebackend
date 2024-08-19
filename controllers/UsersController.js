@@ -136,7 +136,7 @@ const userLogout = async (req, res) => {
 
     await userFound.save();
 
-    removeRecieverID(userFound.username)
+    // removeRecieverID(userFound.username)
 
     res.status(200).json({ mesaage: "Logged out", success: true });
   } catch (error) {
