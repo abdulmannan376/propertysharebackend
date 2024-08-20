@@ -98,7 +98,20 @@ const addNewMessage = async (req, res) => {
     const recieverSocketID = getRecieverID(reciever);
 
     if (recieverSocketID) {
-      io.to(recieverSocketID).emit("newMessage", newMessage);
+      const message = await Messages.findOne({ _id: newMessage._id }).populate({
+        path: "sender",
+        model: "users",
+        select: "name username userProfile",
+        populate: {
+          path: "userProfile",
+          model: "user_profiles",
+          select: "profilePicURL",
+        },
+      });
+      io.to(recieverSocketID).emit("newMessage", {
+        message: message,
+        conversationID: conversationFound.conversationID,
+      });
     }
 
     res.status(201).json({
@@ -171,7 +184,7 @@ const getConversationsByUser = async (req, res) => {
 
 const getConversationByID = async (req, res) => {
   try {
-    const { id } = req.params; // Assuming 'key' is the conversation ID
+    const { id, username } = req.params; // Assuming 'key' is the conversation ID
     const page = parseInt(req.query.page) || 1; // Default to first page if not specified
     const limit = 100; // Number of messages per page
     const skip = (page - 1) * limit; // Calculate offset
@@ -182,7 +195,6 @@ const getConversationByID = async (req, res) => {
       conversationID: id,
     }).populate({
       path: "messages",
-
       options: { limit: limit, skip: skip }, // Sort by newest messages first
       populate: {
         path: "sender",
@@ -203,10 +215,51 @@ const getConversationByID = async (req, res) => {
       });
     }
 
+    let reciever = "";
+    const messageIDs = [];
+    // Mark all the messages as opened before sending them in the response
+    const messageDocIds = conversation.messages.filter((message) => {
+      if (message.sender.username !== username && !message.isOpened) {
+        reciever = message.sender.username;
+        messageIDs.push(message.messageID);
+        return message._id;
+      }
+    });
+
+    await Messages.updateMany(
+      { _id: { $in: messageDocIds } },
+      { $set: { isOpened: true } }
+    );
+
+    const updatedConversation = await Conversations.findOne({
+      conversationID: id,
+    }).populate({
+      path: "messages",
+      options: { limit: limit, skip: skip },
+      populate: {
+        path: "sender",
+        model: "users",
+        select: "name username userProfile",
+        populate: {
+          path: "userProfile",
+          model: "user_profiles",
+          select: "profilePicURL",
+        },
+      },
+    });
+
+    if (reciever.length > 0) {
+      const recieverSocketID = getRecieverID(reciever);
+      io.to(recieverSocketID).emit("seenMessages", {
+        messageIDs: messageIDs,
+        conversationID: id,
+      });
+    }
+
     res.status(200).json({
       message: "Conversation fetched successfully",
       success: true,
-      body: conversation.messages, // Send only messages part if that's all you need
+      body: updatedConversation.messages, // Send only messages part if that's all you need
       currentPage: page,
     });
   } catch (error) {

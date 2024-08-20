@@ -2158,6 +2158,7 @@ const getFeaturedProperty = async (req, res) => {
     } = body;
     const matchQuery = { status: "Featured" }; // Default match query
 
+    matchQuery.listingStatus = { $in: ["live"] };
     if (category && category === "rent") {
       matchQuery.stakesOnRent = { $gt: 0 };
     }
@@ -2299,7 +2300,7 @@ const getMostViewedProperties = async (req, res) => {
     if (category && category === "rent") {
       matchQuery.stakesOnRent = { $gt: 0 };
     }
-
+    matchQuery.listingStatus = { $in: ["live"] };
     // console.log("body: ", body);
     // Adding dynamic filters based on the request body
     if (propertyType && propertyType.length > 0)
@@ -2444,7 +2445,7 @@ const getRecentlyAddedProperties = async (req, res) => {
     if (category && category === "rent") {
       matchQuery.stakesOnRent = { $gt: 0 };
     }
-
+    matchQuery.listingStatus = { $in: ["live"] };
     // console.log("body: ", body);
     // Adding dynamic filters based on the request body
     if (propertyType && propertyType.length > 0)
@@ -2572,6 +2573,7 @@ const getPropertiesByType = async (req, res) => {
     if (propertyType && propertyType.length > 0)
       matchQuery.propertyType = { $in: propertyType };
 
+    matchQuery.listingStatus = { $in: ["live"] };
     const pipeline = [];
     pipeline.push({ $match: matchQuery });
 
@@ -2628,6 +2630,7 @@ const getPropertiesByAvailableShares = async (req, res) => {
         matchQuery.stakesOccupied = { $eq: "$totalStakes" };
       }
     }
+    matchQuery.listingStatus = { $in: ["live"] };
     const properties = await Properties.aggregate([{ $match: matchQuery }]);
 
     const coordinates = [];
@@ -2662,7 +2665,7 @@ const getPropertyByID = async (req, res) => {
   try {
     const { key } = req.params;
 
-    const propertyFound = await Properties.findOne({ propertyID: key })
+    const propertyFound = await Properties.findOne({ propertyID: key, listingStatus: "live" })
       .populate("amenitiesID")
       .exec();
 

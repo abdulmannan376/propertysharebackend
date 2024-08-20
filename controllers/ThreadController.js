@@ -3,6 +3,7 @@ const Users = require("../models/UserSchema");
 const Properties = require("../models/PropertySchema");
 const PropertyShares = require("../models/PropertyShareSchema");
 const { sendUpdateNotification } = require("./notificationController");
+const RaisedRequests = require("../models/RaiseRequestSchema");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -84,7 +85,7 @@ const genNewRootThread = async (req, res) => {
 
 const addRootThreadToShare = async (req, res) => {
   try {
-    const { shareID, username, body, category } = req.body;
+    const { shareID, username, body, category, requestID } = req.body;
 
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
@@ -103,12 +104,21 @@ const addRootThreadToShare = async (req, res) => {
       throw new Error("property share not found.");
     }
 
+    const raisedRequestFound = await RaisedRequests.findOne({
+      raisedRequestID: requestID,
+    });
+    if (!raisedRequestFound) {
+      // res.status(400).json({ message: "Try Again", success: false });
+      throw new Error("property raised request not found.");
+    }
+
     const newThread = new Threads({
       shareDocID: propertyShareFound._id,
       propertyDocID: propertyShareFound.propertyDocID,
       author: userFound._id,
       body: body,
       category: category,
+      raisedRequestDocID: raisedRequestFound?._id || null,
       status: "root",
       threadLevel: "0",
     });
@@ -142,34 +152,63 @@ const addRootThreadToShare = async (req, res) => {
 
 const getRootThreads = async (req, res) => {
   try {
-    const { key, category } = req.params;
+    const { key, category, requestID } = req.params;
 
+    console.log(req.params)
     const propertyShareFound = await PropertyShares.findOne({ shareID: key });
     if (!propertyShareFound) {
       // res.status(400).json({ message: "Try Again", success: false });
       throw new Error("property share not found.");
     }
 
-    const threadsList = await Threads.find({
-      shareDocID: propertyShareFound._id,
-      status: "root",
-      category: category,
-    }).populate({
-      path: "author",
-      model: "users",
-      select: "name username userProfile",
-      populate: {
-        path: "userProfile",
-        model: "user_profiles",
-        select: "profilePicURL",
-      },
+    const raisedRequestFound = await RaisedRequests.findOne({
+      raisedRequestID: requestID,
     });
 
-    res.status(200).json({
-      message: "Fetched",
-      success: true,
-      body: threadsList,
-    });
+    if (raisedRequestFound) {
+      const threadsList = await Threads.find({
+        shareDocID: propertyShareFound._id,
+        status: "root",
+        category: category,
+        raisedRequestDocID: raisedRequestFound._id,
+      }).populate({
+        path: "author",
+        model: "users",
+        select: "name username userProfile",
+        populate: {
+          path: "userProfile",
+          model: "user_profiles",
+          select: "profilePicURL",
+        },
+      });
+
+      res.status(200).json({
+        message: "Fetched",
+        success: true,
+        body: threadsList,
+      });
+    } else {
+      const threadsList = await Threads.find({
+        shareDocID: propertyShareFound._id,
+        status: "root",
+        category: category,
+      }).populate({
+        path: "author",
+        model: "users",
+        select: "name username userProfile",
+        populate: {
+          path: "userProfile",
+          model: "user_profiles",
+          select: "profilePicURL",
+        },
+      });
+
+      res.status(200).json({
+        message: "Fetched",
+        success: true,
+        body: threadsList,
+      });
+    }
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "getRootThreads",

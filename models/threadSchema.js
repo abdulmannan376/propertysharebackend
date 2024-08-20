@@ -47,6 +47,11 @@ const ThreadSchema = new mongoose.Schema(
       ref: "property_shares",
       required: true,
     },
+    raisedRequestDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "property_raised_requests",
+      default: null
+    },
     propertyDocID: {
       type: mongoose.Types.ObjectId,
       ref: "properties",

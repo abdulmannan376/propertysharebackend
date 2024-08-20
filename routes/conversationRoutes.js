@@ -9,7 +9,7 @@ router.post("/add-new-message", ConversationController.addNewMessage)
 
 //GET
 router.get("/get-conversations-by-username/:username", ConversationController.getConversationsByUser)
-router.get("/get-conversation-by-id/:id", ConversationController.getConversationByID)
+router.get("/get-conversation-by-id/:id/:username", ConversationController.getConversationByID)
 
 
 module.exports = router
