@@ -92,13 +92,13 @@ app.post("/contact-us", async (req, res) => {
 });
 
 // Listen on port 443
-server.listen(443, () => {
-  console.log("HTTPS Server running on port 443");
-});
-
-// server.listen(port, () => {
-//   console.log(`Server is running on port ${port}`);
+// server.listen(443, () => {
+//   console.log("HTTPS Server running on port 443");
 // });
+
+server.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
 
 // app.listen(port, () => {
 //   console.log(`Server is running on port ${port}`);

@@ -5,6 +5,8 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const { Server } = require("socket.io");
+const Conversations = require("../models/ConversationSchema");
+const Messages = require("../models/MessageSchema");
 
 app.use(cors());
 app.use(express.json());
@@ -12,24 +14,24 @@ app.use(express.json());
 //new update
 
 //Read SSL certificate files
-const privateKey = fs.readFileSync(
-  "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
-  "utf8"
-);
-const certificate = fs.readFileSync(
-  "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
-  "utf8"
-);
+// const privateKey = fs.readFileSync(
+//   "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
+//   "utf8"
+// );
+// const certificate = fs.readFileSync(
+//   "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
+//   "utf8"
+// );
 
-const credentials = {
-  key: privateKey,
-  cert: certificate,
-};
+// const credentials = {
+//   key: privateKey,
+//   cert: certificate,
+// };
 
-// Create HTTPS server
-const server = https.createServer(credentials, app);
+// // Create HTTPS server
+// const server = https.createServer(credentials, app);
 
-// const server = http.createServer(app);
+const server = http.createServer(app);
 const io = new Server(server, {
   path: "/socket.io",
   transports: ["websocket"],
@@ -66,6 +68,30 @@ io.on("connection", (socket) => {
 
   console.log(userSocketMap);
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
+
+  socket.on("seenMessage", async (msg) => {
+    console.log(msg);
+
+    const { id, reciever, conversationID } = msg;
+
+    
+
+    const messageIDs = [id];
+
+    await Messages.updateOne(
+      { messageID: id },
+      { $set: { isOpened: true } }
+    );
+
+    const recieverSocketID = userSocketMap[reciever];
+
+    if (recieverSocketID) {
+      io.to(recieverSocketID).emit("seenMessages", {
+        messageIDs: messageIDs,
+        conversationID: conversationID,
+      });
+    }
+  });
 
   // Handle incoming requests
   socket.on("request", (msg) => {

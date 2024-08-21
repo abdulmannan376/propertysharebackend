@@ -174,11 +174,13 @@ const getPropertyByUsername = async (req, res) => {
 const testRun = async (req, res) => {
   const { propertyID, propertyType, area, price, category } = req.body;
   // findNearbyMarkers(propertyID, propertyType, area, price);
-  const result = await notifyPropertyShareOwnerByPropertyID(
-    propertyID,
-    category
-  );
-  res.status(200).json({ message: true, body: result });
+  // const result = await notifyPropertyShareOwnerByPropertyID(
+  //   propertyID,
+  //   category
+  // );
+
+  openInspections()
+  res.status(200).json({ message: true, body: "" });
 };
 
 async function findNearbyMarkers(propertyID, propertyType, area, price) {
@@ -912,7 +914,7 @@ async function openInspections() {
             shareID: share.shareID,
           })
             .populate("currentOwnerDocID", "username")
-            .populate("propertyDocID", "propertyID");
+            .populate("propertyDocID", "propertyID title");
 
           const ownerShare = await PropertyShare.findOne({
             shareID: `${propertyShare.propertyDocID.propertyID}00`,
@@ -955,7 +957,13 @@ async function openInspections() {
         user.userDefaultSettingID.notifyUpdates,
         user.username
       );
+
+      notifyPropertyShareOwnerByPropertyID(
+        share.propertyDocID.propertyID,
+        "Inspection"
+      );
     }
+
     return propertyShares;
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
@@ -1351,7 +1359,12 @@ const handleInspectionActionPropertyOwner = async (req, res) => {
   }
 };
 
-async function notifyPropertyShareOwnerByPropertyID(propertyID, category) {
+async function notifyPropertyShareOwnerByPropertyID(
+  propertyID,
+  category,
+  emailSubject,
+  emailBody
+) {
   const propertyFound = await Properties.findOne(
     { propertyID: propertyID },
     "shareDocIDList title"
@@ -1387,8 +1400,11 @@ async function notifyPropertyShareOwnerByPropertyID(propertyID, category) {
   });
 
   shareList.map((share) => {
-    const subject = `Property ${propertyFound.title} ${category} requested`;
-    const body = `Dear ${share.currentOwnerDocID.userID.name}, It is to inform you a new ${category} is requested for property ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
+    const subject =
+      emailSubject || `Property ${propertyFound.title} ${category} requested`;
+    const body =
+      emailBody ||
+      `Dear ${share.currentOwnerDocID.userID.name}, It is to inform you a new ${category} is requested for property ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
 
     sendUpdateNotification(
       subject,
@@ -2665,7 +2681,10 @@ const getPropertyByID = async (req, res) => {
   try {
     const { key } = req.params;
 
-    const propertyFound = await Properties.findOne({ propertyID: key, listingStatus: "live" })
+    const propertyFound = await Properties.findOne({
+      propertyID: key,
+      listingStatus: "live",
+    })
       .populate("amenitiesID")
       .exec();
 
@@ -2814,4 +2833,5 @@ module.exports = {
   handleDraftProperties,
   getPendingApprovalProperties,
   handlePropertyAction,
+  openInspections,
 };

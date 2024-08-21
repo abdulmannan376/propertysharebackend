@@ -67,6 +67,7 @@ const addNewMessage = async (req, res) => {
   try {
     const { conversationID, sender, reciever, text } = req.body;
 
+    console.log(req.body)
     const conversationFound = await Conversations.findOne({
       conversationID: conversationID,
     });
@@ -97,17 +98,17 @@ const addNewMessage = async (req, res) => {
 
     const recieverSocketID = getRecieverID(reciever);
 
+    const message = await Messages.findOne({ _id: newMessage._id }).populate({
+      path: "sender",
+      model: "users",
+      select: "name username userProfile",
+      populate: {
+        path: "userProfile",
+        model: "user_profiles",
+        select: "profilePicURL",
+      },
+    });
     if (recieverSocketID) {
-      const message = await Messages.findOne({ _id: newMessage._id }).populate({
-        path: "sender",
-        model: "users",
-        select: "name username userProfile",
-        populate: {
-          path: "userProfile",
-          model: "user_profiles",
-          select: "profilePicURL",
-        },
-      });
       io.to(recieverSocketID).emit("newMessage", {
         message: message,
         conversationID: conversationFound.conversationID,
@@ -117,7 +118,7 @@ const addNewMessage = async (req, res) => {
     res.status(201).json({
       message: "Message sent.",
       success: true,
-      body: newMessage,
+      body: message,
     });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
