@@ -179,7 +179,7 @@ const testRun = async (req, res) => {
   //   category
   // );
 
-  openInspections()
+  openInspections();
   res.status(200).json({ message: true, body: "" });
 };
 
@@ -2805,6 +2805,94 @@ async function handleDraftProperties() {
   }
 }
 
+const handlePropertyStatus = async (req, res) => {
+  try {
+    const { propertyID, action, username } = req.body;
+
+    const propertyFound = await Properties.findOne({
+      propertyID: propertyID,
+    }).populate({
+      path: "shareDocIDList",
+      model: "property_shares",
+      select: "shareID currentOwnerDocID",
+      populate: {
+        path: "currentOwnerDocID",
+        model: "shareholders",
+        select: "username",
+      },
+    });
+
+    if (propertyFound.shareDocIDList[0].currentOwnerDocID.username === username)
+      if (action === "Feature") {
+        await Properties.updateOne(
+          {
+            _id: propertyFound._id,
+          },
+          {
+            $set: {
+              status:
+                propertyFound.status === "Featured"
+                  ? "Non-Featured"
+                  : "Featured",
+            },
+          }
+        );
+      } else if (action === "Hide") {
+        await Properties.updateOne(
+          {
+            _id: propertyFound._id,
+          },
+          {
+            $set: {
+              listingStatus:
+                propertyFound.listingStatus === "hidden"
+                  ? "live"
+                  : "hidden",
+            },
+          }
+        );
+      } else {
+        return res
+          .status(403)
+          .json({ message: "Forbidden or No action provided", success: false });
+      }
+    else
+      return res
+        .status(401)
+        .json({ message: "Authorisation Error", success: false });
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    const subject = `Property (${propertyFound.title}) ${action} update`;
+    const body = `Dear ${userFound.name}, \nYour action: ${action} has been updated for property: ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
+
+    sendUpdateNotification(
+      subject,
+      body,
+      userFound.userDefaultSettingID.notifyUpdates,
+      username
+    );
+
+    res.status(200).json({ message: "Updated", success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handlePropertyStatus",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: new Date().toISOString(),
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
 module.exports = {
   testRun,
   addPropertyRequest,
@@ -2834,4 +2922,5 @@ module.exports = {
   getPendingApprovalProperties,
   handlePropertyAction,
   openInspections,
+  handlePropertyStatus,
 };

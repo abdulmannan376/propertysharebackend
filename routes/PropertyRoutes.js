@@ -50,6 +50,7 @@ router.put(
 ); //PO = Property Owner
 
 router.put("/update-property-approval-action", PropertyController.handlePropertyAction)
+router.put("/update-property-status", PropertyController.handlePropertyStatus)
 
 //GET
 router.get(
