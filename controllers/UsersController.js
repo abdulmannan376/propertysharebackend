@@ -487,7 +487,14 @@ const getUserData = async (req, res) => {
       });
     }
 
-    const data = jwt.decode(token);
+    let data = {};
+    const { username } = req.query;
+    console.log(req.query)
+    if (username) {
+      data.username = username;
+    } else {
+      data = jwt.decode(token);
+    }
 
     const userFound = await Users.findOne(
       { username: data.username },

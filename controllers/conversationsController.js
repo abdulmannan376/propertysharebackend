@@ -68,11 +68,6 @@ const addNewMessage = async (req, res) => {
   try {
     const { conversationID, sender, reciever, text } = req.body;
 
-    console.log(req.body);
-    const conversationFound = await Conversations.findOne({
-      conversationID: conversationID,
-    });
-
     const senderFound = await Users.findOne({
       username: sender,
     });
@@ -85,6 +80,17 @@ const addNewMessage = async (req, res) => {
     });
     if (!recieverFound) {
       throw new Error("reciever not found");
+    }
+
+    console.log(req.body);
+    let conversationFound = await Conversations.findOne({
+      participants: { $all: [senderFound._id, recieverFound._id] },
+    });
+
+    if (!conversationFound) {
+      conversationFound = new Conversations({
+        participants: [senderFound._id, recieverFound._id],
+      });
     }
 
     const newMessage = new Messages({
@@ -282,13 +288,14 @@ const handleMessageActions = async (req, res) => {
   try {
     const { action, recipient, username, id } = req.body;
 
-    console.log(req.body)
+    console.log(req.body);
 
     const messageFound = await Messages.findOne({ messageID: id });
     if (!messageFound) {
       throw new Error("message not found");
     }
 
+    let value;
     if (action === "Like") {
       await Messages.updateOne(
         {
@@ -300,6 +307,21 @@ const handleMessageActions = async (req, res) => {
           },
         }
       );
+
+      value = !messageFound.isLiked;
+    } else if (action === "Delete") {
+      await Messages.updateOne(
+        {
+          _id: messageFound._id,
+        },
+        {
+          $set: {
+            isDeleted: true,
+          },
+        }
+      );
+
+      value = true;
     } else {
       return res
         .status(403)
@@ -312,7 +334,7 @@ const handleMessageActions = async (req, res) => {
       io.to(recieverSocketID).emit("messageUpdate", {
         messageID: id,
         action: action,
-        value: !messageFound.isLiked,
+        value: value,
       });
     }
 
@@ -322,7 +344,7 @@ const handleMessageActions = async (req, res) => {
       body: {
         messageID: id,
         action: action,
-        value: !messageFound.isLiked,
+        value: value,
       },
     });
   } catch (error) {

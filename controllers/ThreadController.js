@@ -107,7 +107,7 @@ const addRootThreadToShare = async (req, res) => {
     const raisedRequestFound = await RaisedRequests.findOne({
       raisedRequestID: requestID,
     });
-    if (!raisedRequestFound) {
+    if (requestID?.length > 0 && !raisedRequestFound) {
       // res.status(400).json({ message: "Try Again", success: false });
       throw new Error("property raised request not found.");
     }
@@ -152,9 +152,10 @@ const addRootThreadToShare = async (req, res) => {
 
 const getRootThreads = async (req, res) => {
   try {
-    const { key, category, requestID } = req.params;
+    const { key, category } = req.params;
+    const { requestID } = req.query;
 
-    console.log(req.params)
+    console.log(req.params);
     const propertyShareFound = await PropertyShares.findOne({ shareID: key });
     if (!propertyShareFound) {
       // res.status(400).json({ message: "Try Again", success: false });

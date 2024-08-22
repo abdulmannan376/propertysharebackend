@@ -22,7 +22,7 @@ const MessageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    idDeleted: {
+    isDeleted: {
       type: Boolean,
       default: false
     }
