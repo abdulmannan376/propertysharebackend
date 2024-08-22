@@ -52,6 +52,11 @@ const ThreadSchema = new mongoose.Schema(
       ref: "property_raised_requests",
       default: null
     },
+    inspectionDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "property_inspections",
+      default: null
+    },
     propertyDocID: {
       type: mongoose.Types.ObjectId,
       ref: "properties",
