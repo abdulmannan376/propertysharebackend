@@ -1602,9 +1602,9 @@ const fetchRaisedRequestByUsername = async (req, res) => {
       // Assuming sharesByUsername is an array of share objects
       const sharesPerProperty = sharesByUsername.reduce((acc, share) => {
         // console.log("acc: ", acc);
-        const propertyID = share.propertyDocID?.propertyID;
+        const propertyID = share?.propertyDocID?.propertyID;
         console.log(propertyID);
-        console.log(share.propertyDocID);
+        console.log(share?.propertyDocID);
         if (propertyID)
           acc[propertyID] = {
             propertyID: propertyID,

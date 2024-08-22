@@ -1,3 +1,4 @@
+const { json } = require("express");
 const Conversations = require("../models/ConversationSchema");
 const Messages = require("../models/MessageSchema");
 const Users = require("../models/UserSchema");
@@ -67,7 +68,7 @@ const addNewMessage = async (req, res) => {
   try {
     const { conversationID, sender, reciever, text } = req.body;
 
-    console.log(req.body)
+    console.log(req.body);
     const conversationFound = await Conversations.findOne({
       conversationID: conversationID,
     });
@@ -277,9 +278,71 @@ const getConversationByID = async (req, res) => {
   }
 };
 
+const handleMessageActions = async (req, res) => {
+  try {
+    const { action, recipient, username, id } = req.body;
+
+    console.log(req.body)
+
+    const messageFound = await Messages.findOne({ messageID: id });
+    if (!messageFound) {
+      throw new Error("message not found");
+    }
+
+    if (action === "Like") {
+      await Messages.updateOne(
+        {
+          _id: messageFound._id,
+        },
+        {
+          $set: {
+            isLiked: !messageFound.isLiked,
+          },
+        }
+      );
+    } else {
+      return res
+        .status(403)
+        .json({ message: "Forbidden or No action provided", success: false });
+    }
+
+    const recieverSocketID = getRecieverID(recipient);
+
+    if (recieverSocketID) {
+      io.to(recieverSocketID).emit("messageUpdate", {
+        messageID: id,
+        action: action,
+        value: !messageFound.isLiked,
+      });
+    }
+
+    res.status(200).json({
+      message: "Updated",
+      success: true,
+      body: {
+        messageID: id,
+        action: action,
+        value: !messageFound.isLiked,
+      },
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getConversationsByUser",
+      fileLocation: "controllers/conversationsController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
 module.exports = {
   genConversation,
   getConversationsByUser,
   addNewMessage,
   getConversationByID,
+  handleMessageActions,
 };
