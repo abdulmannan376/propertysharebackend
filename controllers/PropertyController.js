@@ -2845,9 +2845,7 @@ const handlePropertyStatus = async (req, res) => {
           {
             $set: {
               listingStatus:
-                propertyFound.listingStatus === "hidden"
-                  ? "live"
-                  : "hidden",
+                propertyFound.listingStatus === "hidden" ? "live" : "hidden",
             },
           }
         );
@@ -2893,6 +2891,42 @@ const handlePropertyStatus = async (req, res) => {
   }
 };
 
+const getPropertySharesByID = async (req, res) => {
+  try {
+    const { propertyID } = req.query;
+
+    const propertyFound = await Properties.findOne(
+      { propertyID: propertyID },
+      "title shareDocIDList"
+    ).populate({
+      path: "shareDocIDList",
+      options: { skip: 1 },
+      model: "property_shares",
+      select: "availableInDuration currentOwnerDocID shareID",
+      populate: {
+        path: "currentOwnerDocID",
+        model: "shareholders",
+        select: "username",
+      },
+    });
+
+    res
+      .status(200)
+      .json({ message: "Fetched", success: true, body: propertyFound });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getPropertySharesByID",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: new Date().toISOString(),
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
 module.exports = {
   testRun,
   addPropertyRequest,
@@ -2923,4 +2957,5 @@ module.exports = {
   handlePropertyAction,
   openInspections,
   handlePropertyStatus,
+  getPropertySharesByID,
 };

@@ -101,6 +101,7 @@ router.get(
   PropertyController.getRaiseRequestDetail
 );
 router.get("/get-pending-approval-properties/:username", PropertyController.getPendingApprovalProperties)
+router.get("/get-property-shares", PropertyController.getPropertySharesByID)
 
 // router.get("/test-share-ID", PropertyController.testGenerateShareID)
 
