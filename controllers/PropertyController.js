@@ -1028,7 +1028,7 @@ const fetchShareInspectionByUsername = async (req, res) => {
       // Assuming sharesByUsername is an array of share objects
       const sharesPerProperty = sharesByUsername.reduce((acc, share) => {
         // console.log("acc: ", acc);
-        const propertyID = share.propertyDocID?.propertyID;
+        const propertyID = share?.propertyDocID?.propertyID;
 
         if (propertyID)
           acc[propertyID] = {
@@ -1444,7 +1444,7 @@ const getInspectionDetail = async (req, res) => {
     });
 
     const purchasedShareList = propertyFound.shareDocIDList.filter((share) => {
-      return share.utilisedStatus !== "Listed";
+      return share.utilisedStatus !== "Listed" && share.utilisedStatus !== "Reserved";
     });
 
     res.status(200).json({
@@ -1551,7 +1551,7 @@ const fetchRaisedRequestByUsername = async (req, res) => {
   try {
     const { username, type, action } = req.params;
 
-    // console.log(req.params);
+    console.log(req.params);
     const shareholderFound = await Shareholders.findOne({ username: username });
     if (!shareholderFound) {
       throw new Error("shareholder not found");
@@ -1965,6 +1965,28 @@ const handleRaiseRequestActionPropertyOwner = async (req, res) => {
     });
   }
 };
+
+async function handleVotingDaysOfRaisedRequest() {
+  try {
+    const raisedRequestList = await RaiseRequest.find({
+      status: { $in: ["Decision Pending", "Property Owner Approval Pending"] },
+    });
+
+
+
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleVotingDaysOfRaisedRequest",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+}
 
 const addPropertyImages = async (req, res) => {
   try {

@@ -179,7 +179,7 @@ const getBuySharesDetailByUsername = async (req, res) => {
     // console.log("sharesByUsername: ", sharesByUsername);
 
     const sharesListWithoutOwner = sharesByUsername.filter((share) => {
-      return !share.shareID.endsWith("00") && share.propertyDocID;
+      return !share?.shareID.endsWith("00") && share?.propertyDocID;
     });
 
     console.log("sharesList: ", sharesListWithoutOwner);
@@ -187,7 +187,7 @@ const getBuySharesDetailByUsername = async (req, res) => {
     const sharesPerProperty = sharesListWithoutOwner.reduce((acc, share) => {
       // console.log("acc: ", acc);
       // console.log("share: ", share);
-      const propertyID = share.propertyDocID.propertyID;
+      const propertyID = share?.propertyDocID.propertyID;
       // Check if the propertyID already has an entry in the accumulator
       if (acc[propertyID]) {
         // If yes, increment the count

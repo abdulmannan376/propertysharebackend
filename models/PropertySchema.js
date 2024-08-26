@@ -64,7 +64,7 @@ const PropertySchema = new mongoose.Schema(
     publishedBy: { type: String, required: true, desc: "username" },
     publisherRole: {
       type: String,
-      enum: ["admin", "shareholder", "user"],
+      enum: ["admin", "shareholder", "user", "super admin"],
       default: "user",
     },
     approvedBy: {
