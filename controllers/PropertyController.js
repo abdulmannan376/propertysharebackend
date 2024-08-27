@@ -295,7 +295,6 @@ const updateProperty = async (req, res) => {
         coordinates: [body.coordinates.long, body.coordinates.lat],
       }),
         (propertyFound.detail = body.overview);
-      propertyFound.totalStakes = body.numOfShares;
       propertyFound.valueOfProperty = body.totalPrice;
       propertyFound.area = body.areaSize;
       propertyFound.propertyType = body.propertyType;
@@ -1444,7 +1443,9 @@ const getInspectionDetail = async (req, res) => {
     });
 
     const purchasedShareList = propertyFound.shareDocIDList.filter((share) => {
-      return share.utilisedStatus !== "Listed" && share.utilisedStatus !== "Reserved";
+      return (
+        share.utilisedStatus !== "Listed" && share.utilisedStatus !== "Reserved"
+      );
     });
 
     res.status(200).json({
@@ -1971,9 +1972,6 @@ async function handleVotingDaysOfRaisedRequest() {
     const raisedRequestList = await RaiseRequest.find({
       status: { $in: ["Decision Pending", "Property Owner Approval Pending"] },
     });
-
-
-
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "handleVotingDaysOfRaisedRequest",
@@ -2029,7 +2027,7 @@ const addPropertyImages = async (req, res) => {
     }
 
     if (body.pinnedImage) {
-      propertyFound.pinnedImageIndex = parseInt(body.pinnedImage) + 1;
+      propertyFound.pinnedImageIndex = parseInt(body.pinnedImage);
     }
 
     // Update property with new information

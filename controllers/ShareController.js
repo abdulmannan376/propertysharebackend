@@ -1122,7 +1122,7 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 

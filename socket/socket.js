@@ -74,14 +74,9 @@ io.on("connection", (socket) => {
 
     const { id, reciever, conversationID } = msg;
 
-    
-
     const messageIDs = [id];
 
-    await Messages.updateOne(
-      { messageID: id },
-      { $set: { isOpened: true } }
-    );
+    await Messages.updateOne({ messageID: id }, { $set: { isOpened: true } });
 
     const recieverSocketID = userSocketMap[reciever];
 

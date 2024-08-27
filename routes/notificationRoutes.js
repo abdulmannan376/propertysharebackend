@@ -5,6 +5,6 @@ const NotificationController = require("../controllers/notificationController")
 
 //GET
 router.get("/get-website-notifications/:key", NotificationController.getUpdateNotificationByWebsite)
-router.put("/mark-notification-read/:key", NotificationController.markNotificationRead)
+router.put("/mark-notification-read", NotificationController.markNotificationRead)
 
 module.exports = router

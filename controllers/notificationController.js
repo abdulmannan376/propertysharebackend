@@ -103,23 +103,26 @@ const getUpdateNotificationByWebsite = async (req, res) => {
 
 const markNotificationRead = async (req, res) => {
   try {
-    const { key } = req.params;
+    const { key, username, all } = req.query;
     console.log(key);
-    const notificationFound = await Notification.findOne({
-      notificationID: key,
-    });
 
-    if (!notificationFound) {
-      throw new Error("notification not found in database.");
+    if (all) {
+      await Notification.updateMany(
+        { username: username, inAppStatus: "unread" },
+        { $set: { inAppStatus: "read" } }
+      );
+    } else {
+      await Notification.updateOne(
+        {
+          notificationID: key,
+        },
+        {
+          $set: { inAppStatus: "read" },
+        }
+      );
     }
-    console.log("notification: ", notificationFound);
-    notificationFound.inAppStatus = "read";
 
-    notificationFound.save().then(() => {
-      res
-        .status(200)
-        .json({ message: "Notification marked read", success: true });
-    });
+    res.status(200).json({ message: "Notification mark read", success: true });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "markNotificationRead",
