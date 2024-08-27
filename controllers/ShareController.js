@@ -1120,13 +1120,11 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({
-        message: error.message || "Internal Server Error",
-        error: error,
-        success: false,
-      });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1179,7 +1177,7 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
       shareOffersList = await ShareOffers.find({
         shareholderDocID: shareholderFound._id,
         category: category, // Assuming there is a field to filter by category
-        offerToPropertyOwner: false
+        offerToPropertyOwner: false,
       })
         .populate({
           path: "shareDocID",
@@ -1650,14 +1648,14 @@ const handleShareSellOfferAction = async (req, res) => {
             // purchasedShareIDList: shareDocIDList,
           });
 
-          const newOwnerUserFound = await Users.findOne({
-            username: shareOfferFound.userDocID.username,
-          });
-
-          newOwnerUserFound.role = "shareholder";
+          await Users.updateOne(
+            {
+              username: shareOfferFound.userDocID.username,
+            },
+            { $set: { role: "shareholder" } }
+          );
 
           await newShareholder.save();
-          await newOwnerUserFound.save();
 
           await Shareholders.updateOne(
             { _id: newShareholder._id },
@@ -1743,6 +1741,25 @@ const handleShareSellOfferAction = async (req, res) => {
           // await propertyShareFound.save();
         }
       }
+
+      const sharePendingOffers = await ShareOffers.find({
+        shareDocID: propertyShareFound._id,
+        category: "Sell",
+        status: "pending",
+      });
+
+      const sharePendingOffersDocIDs = sharePendingOffers.filter((offer) => {
+        return offer._id;
+      });
+
+      await ShareOffers.updateMany(
+        {
+          _id: { $in: sharePendingOffersDocIDs },
+        },
+        {
+          $set: { status: "expired" },
+        }
+      );
       // await prevShareholder.save();
       shareOfferFound.status = "accepted";
     } else if (action === "rejected") {
