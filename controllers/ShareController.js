@@ -1122,7 +1122,11 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+      .json({
+        message: error.message || "Internal Server Error",
+        error: error,
+        success: false,
+      });
   }
 };
 
@@ -1175,6 +1179,7 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
       shareOffersList = await ShareOffers.find({
         shareholderDocID: shareholderFound._id,
         category: category, // Assuming there is a field to filter by category
+        offerToPropertyOwner: false
       })
         .populate({
           path: "shareDocID",
@@ -1223,7 +1228,7 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
         .populate("userDocID", "username")
         .populate("shareholderDocID", "username")
         .populate("offeredShareDocID", "availableInDuration");
-
+      // console.log(userFound.username, "buyback offers: ", buybackOffers.length);
       shareOffersList = shareOffersList.concat(buybackOffers);
     }
 
