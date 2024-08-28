@@ -489,7 +489,7 @@ const getUserData = async (req, res) => {
 
     let data = {};
     const { username } = req.query;
-    console.log(req.query)
+    console.log(req.query);
     if (username) {
       data.username = username;
     } else {
@@ -880,6 +880,37 @@ const updateUserProfileDetails = async (req, res) => {
         process.env.USER_IBAN_SECRET
       );
     }
+
+    // Check if all necessary fields are completed
+    const isPrimaryDetailsComplete = Boolean(
+      userFound.name &&
+        userProfileFound.gender &&
+        userProfileFound.dob &&
+        userProfileFound.nicNumber &&
+        userProfileFound.nationality &&
+        userProfileFound.religion &&
+        userProfileFound.bloodGroup
+    );
+
+    const isContactDetailsComplete = Boolean(
+      userFound.contact && userProfileFound.permanentAddress
+    );
+
+    const isNextOfKinComplete = Boolean(
+      userProfileFound.nextOfKinDetails &&
+        userProfileFound.nextOfKinDetails.fullName &&
+        userProfileFound.nextOfKinDetails.contact &&
+        userProfileFound.nextOfKinDetails.relation &&
+        userProfileFound.nextOfKinDetails.email &&
+        userProfileFound.nextOfKinDetails.nicNumber &&
+        userProfileFound.nextOfKinDetails.dobString
+    );
+
+    // Determine if the profile is completed
+    userFound.isProfileCompleted =
+      isPrimaryDetailsComplete &&
+      isContactDetailsComplete &&
+      isNextOfKinComplete;
 
     await userFound.save();
     userProfileFound.save().then(() => {

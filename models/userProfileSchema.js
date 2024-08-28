@@ -8,7 +8,7 @@ const UserProfileSchema = new mongoose.Schema({
   wishList: { type: [String], default: [] },
   nicNumber: { type: String, default: "" },
   dobString: { type: String, default: "" },
-  dob: { type: Date },
+  dob: { type: String, default: null },
   profilePicURL: { type: String, default: "" },
   religion: { type: String, default: "" },
   bloodGroup: {

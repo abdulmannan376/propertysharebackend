@@ -16,6 +16,9 @@ const buyShare = async (req, res) => {
       .populate("userID")
       .exec();
 
+    if (!shareholderFound.userID.isProfileCompleted) {
+      throw new Error("user profile not completed.");
+    }
     const propertyShareFound = await PropertyShares.findOne({
       shareID: shareID,
     })
@@ -145,7 +148,7 @@ const buyShare = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -223,7 +226,7 @@ const getBuySharesDetailByUsername = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -264,7 +267,7 @@ const getSharesByProperty = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -309,7 +312,7 @@ const getSharesByUsername = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -624,7 +627,7 @@ const handleShareByCategory = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -666,7 +669,7 @@ const getSharesByCategory = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -679,6 +682,10 @@ const reserveShare = async (req, res) => {
     );
     if (!userFound) {
       return res.status(400).json({ message: "Try again.", success: false });
+    }
+
+    if (!userFound.isProfileCompleted) {
+      throw new Error("user profile not completed.");
     }
 
     const propertyShareFound = await PropertyShares.findOne({
@@ -733,7 +740,7 @@ const reserveShare = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -791,7 +798,7 @@ const getReservationsByUsername = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -831,6 +838,10 @@ const genNewShareOffer = async (req, res) => {
     );
     if (!userFound) {
       throw new Error("user not found.");
+    }
+
+    if (!userFound.isProfileCompleted) {
+      throw new Error("user profile not completed.");
     }
 
     const ownerFound = await Shareholders.findOne({
@@ -908,7 +919,7 @@ const genNewShareOffer = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -1007,15 +1018,17 @@ const genShareSwapOffer = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
 const fetchShareOffersOfUserByCategory = async (req, res) => {
   try {
     const { username, category } = req.params;
+    const { showHistory } = req.query;
 
     // Find share offers and populate nested documents
+    // console.log(req.query);
     let shareOffersList = [];
     if (category !== "Sell") {
       const userFound = await Users.findOne({
@@ -1027,7 +1040,11 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
       shareOffersList = await ShareOffers.find({
         userDocID: userFound._id,
         category: category, // Assuming there is a field to filter by category
+        status: showHistory === "true"
+          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+          : "pending",
       })
+        .sort({ createdAt: -1 })
         .populate({
           path: "shareDocID",
           select: "availableInDuration",
@@ -1057,7 +1074,11 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
         userDocID: userFound._id,
         category: category, // Assuming there is a field to filter by category
         offerToPropertyOwner: false,
+        status: showHistory === "true"
+          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+          : "pending",
       })
+        .sort({ createdAt: -1 })
         .populate({
           path: "shareDocID",
           select: "availableInDuration",
@@ -1087,7 +1108,11 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
         shareholderDocID: shareholderFound._id,
         category: category, // Assuming there is a field to filter by category
         offerToPropertyOwner: true,
+        status: showHistory === "true"
+          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+          : "pending",
       })
+        .sort({ createdAt: -1 })
         .populate({
           path: "shareDocID",
           select: "availableInDuration",
@@ -1131,6 +1156,7 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
 const fetchShareOffersOfOwnerByCategory = async (req, res) => {
   try {
     const { username, category } = req.params;
+    const { showHistory } = req.query;
 
     let shareOffersList = [];
 
@@ -1146,7 +1172,11 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
       shareOffersList = await ShareOffers.find({
         shareholderDocID: shareholderFound._id,
         category: category, // Assuming there is a field to filter by category
+        status: showHistory === "true"
+          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+          : "pending",
       })
+        .sort({ createdAt: -1 })
         .populate({
           path: "shareDocID",
           select: "availableInDuration",
@@ -1178,7 +1208,11 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
         shareholderDocID: shareholderFound._id,
         category: category, // Assuming there is a field to filter by category
         offerToPropertyOwner: false,
+        status: showHistory === "true"
+          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+          : "pending",
       })
+        .sort({ createdAt: -1 })
         .populate({
           path: "shareDocID",
           select: "availableInDuration",
@@ -1207,7 +1241,11 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
         userDocID: userFound._id,
         category: category, // Assuming there is a field to filter by category
         offerToPropertyOwner: true,
+        status: showHistory === "true"
+          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+          : "pending",
       })
+        .sort({ createdAt: -1 })
         .populate({
           path: "shareDocID",
           select: "availableInDuration",
@@ -1243,7 +1281,7 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -1329,7 +1367,7 @@ const getSwapShareByUsername = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -1474,7 +1512,7 @@ const handleShareRentOfferAction = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -1531,7 +1569,7 @@ const fetchUserShareRentals = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -1546,6 +1584,10 @@ const handleShareSellOfferAction = async (req, res) => {
     if (!userFound) {
       throw new Error("user not found");
     }
+
+    // if (!userFound.isProfileCompleted) {
+    //   throw new Error("user profile not completed.");
+    // }
 
     console.log(req.body);
 
@@ -1866,7 +1908,7 @@ const handleShareSellOfferAction = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 
@@ -2200,7 +2242,7 @@ const handleShareSwapOfferAction = async (req, res) => {
     });
     res
       .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+      .json({ message: error.message || "Internal Server Error", error: error, success: false });
   }
 };
 

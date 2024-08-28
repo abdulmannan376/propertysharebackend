@@ -2303,7 +2303,9 @@ const getFeaturedProperty = async (req, res) => {
       success: true,
       body: properties,
       page: page,
-      totalPages: Math.floor(propertiesTotal.length / 8) + 1,
+      totalPages:
+        Math.floor(properties.length / propertiesPerPage) +
+        (properties.length % propertiesPerPage !== 0 ? 1 : 0),
     });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
@@ -2322,6 +2324,7 @@ const getFeaturedProperty = async (req, res) => {
 const getMostViewedProperties = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key); // Parsing the key from params which should be a JSON string
+    console.log(body);
     const {
       coordinates,
       propertyType,
@@ -2435,12 +2438,16 @@ const getMostViewedProperties = async (req, res) => {
 
     const allProperties = await Promise.all(propertyPromises);
 
+    console.log(properties.length);
+
     res.status(200).json({
       message: "Fetched properties with high view counts successfully",
       success: true,
       body: properties,
       page: page,
-      totalPages: Math.floor(propertiesTotal.length / 8) + 1,
+      totalPages:
+        Math.floor(properties.length / propertiesPerPage) +
+        (properties.length % propertiesPerPage !== 0 ? 1 : 0),
     });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
@@ -2511,7 +2518,7 @@ const getRecentlyAddedProperties = async (req, res) => {
       }
     }
 
-    const propertiesPerPage = 8;
+    const propertiesPerPage = 12;
     const skipDocuments = (page - 1) * propertiesPerPage; // Calculate number of documents to skip
 
     const pipeline = [];
@@ -2583,7 +2590,9 @@ const getRecentlyAddedProperties = async (req, res) => {
       success: true,
       body: properties,
       page: page,
-      totalPages: Math.floor(propertiesTotal.length / 8) + 1,
+      totalPages:
+        Math.floor(properties.length / propertiesPerPage) +
+        (properties.length % propertiesPerPage !== 0 ? 1 : 0),
     });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
@@ -2922,7 +2931,8 @@ const getPropertySharesByID = async (req, res) => {
       path: "shareDocIDList",
       options: { skip: 1 },
       model: "property_shares",
-      select: "availableInDuration currentOwnerDocID shareID",
+      select:
+        "availableInDuration currentOwnerDocID shareID onRent onSwap onSale",
       populate: {
         path: "currentOwnerDocID",
         model: "shareholders",
