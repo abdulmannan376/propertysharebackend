@@ -6,6 +6,7 @@ const startCronJobs = () => {
   cron.schedule("0 0 * * *", ShareController.handleShareReservation);
   cron.schedule("0 0 * * *", PropertyController.handleDraftProperties);
   cron.schedule("0 0 * * *", PropertyController.openInspections);
+  cron.schedule("0 0 * * *", PropertyController.calPropertyDurationCompletion);
 };
 
 module.exports = startCronJobs;

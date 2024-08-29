@@ -179,7 +179,8 @@ const testRun = async (req, res) => {
   //   category
   // );
 
-  openInspections();
+  // openInspections();
+  calPropertyDurationCompletion();
   res.status(200).json({ message: true, body: "" });
 };
 
@@ -2957,6 +2958,103 @@ const getPropertySharesByID = async (req, res) => {
   }
 };
 
+async function calPropertyDurationCompletion() {
+  const currentMidnight = new Date();
+  currentMidnight.setHours(23, 59, 59, 999);
+
+  // Find properties where the last share's end date is at current midnight
+  const properties = await Properties.find({
+    "shareDocIDList.availableInDuration.endDate": currentMidnight,
+    listingStatus: "live",
+  }).populate({
+    path: "shareDocIDList",
+    model: "property_shares",
+    select: "availableInDuration shareID _id currentOwnerDocID",
+    populate: {
+      path: "currentOwnerDocID",
+      model: "shareholders",
+      select: "userID username",
+      populate: {
+        path: "userID",
+        model: "users",
+        select: "name userDefaultSettingID",
+        populate: {
+          path: "userDefaultSettingID",
+          model: "user_default_settings",
+          select: "notifyUpdates",
+        },
+      },
+    },
+  });
+
+  for (const property of properties) {
+    const shareList = property.shareDocIDList;
+
+    // Rotate the share list (e.g., move the first element to the last position)
+    const rotatedShareList = [...shareList.slice(1), shareList[0]];
+
+    // Update the dates based on the end date of the previous share
+    for (let i = 0; i < rotatedShareList.length; i++) {
+      let previousEndDate;
+
+      if (i === 0) {
+        // For the first share, use the end date of the last share before rotation
+        previousEndDate =
+          shareList[shareList.length - 1].availableInDuration.endDate;
+      } else {
+        // For other shares, use the end date of the previous share in the rotated list
+        previousEndDate = rotatedShareList[i - 1].availableInDuration.endDate;
+      }
+
+      const currentDuration = rotatedShareList[i].availableInDuration;
+
+      // Set the new start date to the day after the previous end date
+      currentDuration.startDate = new Date(
+        previousEndDate.getTime() + 24 * 60 * 60 * 1000
+      ); // Adding 1 day
+
+      currentDuration.startDateString = currentDuration.startDate
+        .toISOString()
+        .split("T")[0];
+
+      // Adjust the end date to maintain the same duration as before
+      const originalDuration =
+        shareList[i].availableInDuration.endDate.getTime() -
+        shareList[i].availableInDuration.startDate.getTime();
+      currentDuration.endDate = new Date(
+        currentDuration.startDate.getTime() + originalDuration
+      );
+
+      currentDuration.endDateString = currentDuration.endDate
+        .toISOString()
+        .split("T")[0];
+
+      if (i === 0) {
+        await PropertyShare.updateOne(
+          { _id: shareList[0].availableInDuration.endDate },
+          {
+            $set: {
+              availableInDuration: currentDuration,
+            },
+          }
+        );
+      } else {
+        await PropertyShare.updateOne(
+          { _id: rotatedShareList[i].availableInDuration.endDate },
+          {
+            $set: {
+              availableInDuration: currentDuration,
+            },
+          }
+        );
+      }
+    }
+
+    // Log the updated share list to see the new dates after rotation and rearrangement
+    console.log(rotatedShareList);
+  }
+}
+
 module.exports = {
   testRun,
   addPropertyRequest,
@@ -2988,4 +3086,5 @@ module.exports = {
   openInspections,
   handlePropertyStatus,
   getPropertySharesByID,
+  calPropertyDurationCompletion,
 };

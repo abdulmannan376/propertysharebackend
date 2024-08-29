@@ -104,11 +104,22 @@ const getUpdateNotificationByWebsite = async (req, res) => {
 const markNotificationRead = async (req, res) => {
   try {
     const { key, username, all } = req.query;
-    console.log(key);
+    console.log(req.query);
 
-    if (all) {
+    if (all === "true") {
+      const notificationsFound = await Notification.find({
+        username: username,
+        inAppStatus: "unread",
+      });
+
+      const notificationDocIDlist = notificationsFound.filter(
+        (notification) => {
+          return notification._id;
+        }
+      );
+      console.log("in if");
       await Notification.updateMany(
-        { username: username, inAppStatus: "unread" },
+        { _id: { $in: notificationDocIDlist } },
         { $set: { inAppStatus: "read" } }
       );
     } else {
