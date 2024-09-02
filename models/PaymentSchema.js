@@ -3,7 +3,11 @@ const mongoose = require("mongoose");
 const PaymentSchema = new mongoose.Schema(
   {
     paymentID: { type: String },
-    paymentType: { type: String, enum: ["credit_card","card", "paypal"], default: "card" },
+    paymentType: {
+      type: String,
+      enum: ["credit_card", "card", "paypal"],
+      default: "card",
+    },
     gatewayTransactionID: {
       type: String,
       required: true,
@@ -12,9 +16,19 @@ const PaymentSchema = new mongoose.Schema(
       type: mongoose.Types.ObjectId,
       ref: "users",
     },
+    initiatedBy: {
+      type: mongoose.Types.ObjectId,
+      ref: "users",
+      default: null,
+    },
     purpose: {
       type: String,
       required: true,
+    },
+    status: {
+      type: String,
+      enum: ["Successful", "Pending", "Cancelled", "Declined by gateway"],
+      default: "Successful",
     },
   },
   { timestamps: true }

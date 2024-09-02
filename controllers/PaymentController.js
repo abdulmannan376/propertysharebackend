@@ -86,7 +86,7 @@ const getPaymentsByUser = async (req, res) => {
     const payments = await Payments.find({ userDocID: userFound._id }).populate(
       "userDocID",
       "name username"
-    );
+    ).sort({ createdAt: -1})
 
     res.status(200).json({ message: "Fetched", body: payments, success: true });
   } catch (error) {

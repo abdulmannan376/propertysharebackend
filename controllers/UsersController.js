@@ -932,11 +932,43 @@ const updateUserProfileDetails = async (req, res) => {
       fileLocation: "controllers/UserController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.mesaage || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
+
+const searchUsers = async (req, res) => {
+  try {
+    const { username } = req.query;
+
+    if (username.length === 0) {
+      return res
+        .status(200)
+        .json({ users: [], success: true });
+    }
+
+    const users = await Users.find({
+      username: { $regex: username, $options: "i" }, // 'i' makes it case-insensitive
+    }, "name email username");
+
+    res.status(200).json({ users, success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "searchUsers",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.mesaage || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
 module.exports = {
   userSignUp,
   verifyEmailVerficationCode,
@@ -956,4 +988,5 @@ module.exports = {
   getUserProfileDetails,
   uploadProfilePic,
   updateUserProfileDetails,
+  searchUsers,
 };

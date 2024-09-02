@@ -44,6 +44,7 @@ router.get(
   "/get-user-profile-details/:username",
   UsersController.getUserProfileDetails
 );
+router.get("/search-users", UsersController.searchUsers)
 
 router.get("/decrypt-password", UsersController.decryptPassword);
 
