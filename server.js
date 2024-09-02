@@ -10,6 +10,7 @@ const upload = require("./middleware/multerConfig");
 const shareRoutes = require("./routes/ShareRoutes");
 const threadRoutes = require("./routes/threadRoutes");
 const converstaionRoutes = require("./routes/conversationRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 const path = require("path");
 const { sendEmail } = require("./helpers/emailController");
 const startCronJobs = require("./helpers/cronJobs");
@@ -43,6 +44,7 @@ app.use("/notification", notificationRoutes);
 app.use("/share", shareRoutes);
 app.use("/thread", threadRoutes);
 app.use("/conversation", converstaionRoutes);
+app.use("/payment", paymentRoutes);
 
 // Serve images as static files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -92,13 +94,13 @@ app.post("/contact-us", async (req, res) => {
 });
 
 // Listen on port 443
-server.listen(443, () => {
-  console.log("HTTPS Server running on port 443");
-});
-
-// server.listen(port, () => {
-//   console.log(`Server is running on port ${port}`);
+// server.listen(443, () => {
+//   console.log("HTTPS Server running on port 443");
 // });
+
+server.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
 
 // app.listen(port, () => {
 //   console.log(`Server is running on port ${port}`);

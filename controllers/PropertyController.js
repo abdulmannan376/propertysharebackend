@@ -485,7 +485,11 @@ const addNewProperty = async (req, res) => {
 
     // console.log("2");-
 
-    if (body.userRole === "user") {
+    const shareholderFound = await Shareholders.findOne({
+      username: body.username,
+    });
+
+    if (!shareholderFound) {
       const userFound = await Users.findOne({ username: body.username });
 
       const propertyShareFound = await PropertyShare.findOne({
@@ -515,9 +519,6 @@ const addNewProperty = async (req, res) => {
 
       propertyShareFound.save();
     } else {
-      const shareholderFound = await Shareholders.findOne({
-        username: body.username,
-      });
 
       const propertyShareFound = await PropertyShare.findOne({
         shareID: `${newProperty.propertyID}00`,
@@ -2710,10 +2711,14 @@ const getPropertiesByAvailableShares = async (req, res) => {
 const getPropertyByID = async (req, res) => {
   try {
     const { key } = req.params;
+    const { role } = req.query;
 
     const propertyFound = await Properties.findOne({
       propertyID: key,
-      listingStatus: "live",
+      listingStatus:
+        role && role === "admin"
+          ? { $in: ["live", "pending approval"] }
+          : "live",
     })
       .populate("amenitiesID")
       .exec();

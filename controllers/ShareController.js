@@ -9,33 +9,39 @@ const UserProfile = require("../models/userProfileSchema");
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
 
-const buyShare = async (req, res) => {
+const buyShare = async (data, session) => {
   try {
-    const { username, shareID, price } = req.body;
+    const { username, shareID, price } = data;
+    console.log("in buyShare", data);
     const shareholderFound = await Shareholders.findOne({ username: username })
       .populate("userID")
+      .session(session)
       .exec();
 
-    if (!shareholderFound.userID.isProfileCompleted) {
+    const userDocFound = await Users.findOne({
+      username: username,
+    });
+
+    if (!userDocFound.isProfileCompleted) {
       throw new Error("user profile not completed.");
     }
     const propertyShareFound = await PropertyShares.findOne({
       shareID: shareID,
     })
       .populate("propertyDocID")
+      .session(session)
       .exec();
     // console.log("propertyShareFound: ", propertyShareFound);
     const propertyFound = await Properties.findOne({
       _id: propertyShareFound.propertyDocID._id,
-    });
+    }).session(session);
 
     if (!shareholderFound) {
-      const userFound = await Users.findOne({ username: username }).populate(
-        "userDefaultSettingID",
-        "notifyUpdates"
-      );
+      const userFound = await Users.findOne({ username: username })
+        .populate("userDefaultSettingID", "notifyUpdates")
+        .session(session);
       if (!userFound) {
-        return res.status(400).json({ message: "Try again.", success: false });
+        throw new Error("user not found");
       }
       const shareDocIDList = [];
       shareDocIDList.push({ shareDocID: propertyShareFound._id });
@@ -45,15 +51,16 @@ const buyShare = async (req, res) => {
         username: username,
         purchasedShareIDList: shareDocIDList,
       });
-      await newShareholder.save();
+      await newShareholder.save({ session: session });
 
       await Users.updateOne(
         { _id: userFound._id },
         {
           $set: {
-            role: "shareholder",
+            role: userFound.role === "user" ? "shareholder" : userFound.role,
           },
-        }
+        },
+        { session: session }
       );
 
       await PropertyShares.updateOne(
@@ -64,7 +71,8 @@ const buyShare = async (req, res) => {
             utilisedStatus: "Purchased",
             currentOwnerDocID: newShareholder._id,
           },
-        }
+        },
+        { session: session }
       );
 
       const stakesOccupied = propertyFound.stakesOccupied;
@@ -74,7 +82,8 @@ const buyShare = async (req, res) => {
           $set: {
             stakesOccupied: stakesOccupied + 1,
           },
-        }
+        },
+        { session: session }
       );
 
       const recipient = userFound.email;
@@ -87,9 +96,7 @@ const buyShare = async (req, res) => {
         userFound.userDefaultSettingID.notifyUpdates,
         username
       );
-      return res
-        .status(201)
-        .json({ message: "Purchase successfull", success: true });
+      return true;
     }
 
     await PropertyShares.updateOne(
@@ -100,7 +107,8 @@ const buyShare = async (req, res) => {
           utilisedStatus: "Purchased",
           currentOwnerDocID: shareholderFound._id,
         },
-      }
+      },
+      { session: session }
     );
 
     await Shareholders.updateOne(
@@ -111,7 +119,8 @@ const buyShare = async (req, res) => {
             shareDocID: propertyShareFound._id,
           },
         },
-      }
+      },
+      { session: session }
     );
 
     const stakesOccupied = propertyFound.stakesOccupied;
@@ -121,13 +130,13 @@ const buyShare = async (req, res) => {
         $set: {
           stakesOccupied: stakesOccupied + 1,
         },
-      }
+      },
+      { session: session }
     );
 
-    const userFound = await Users.findOne({ username: username }).populate(
-      "userDefaultSettingID",
-      "notifyUpdates"
-    );
+    const userFound = await Users.findOne({ username: username })
+      .populate("userDefaultSettingID", "notifyUpdates")
+      .session(session);
 
     const recipient = shareholderFound.userID.email;
     const subject = "Successfull Purchase of Share.";
@@ -139,16 +148,14 @@ const buyShare = async (req, res) => {
       userFound.userDefaultSettingID.notifyUpdates,
       username
     );
-    res.status(201).json({ message: "Purchase successfull", success: true });
+    return true;
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "buyShare",
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    return new Error(error.message || "Internal Server Error");
   }
 };
 
@@ -224,9 +231,11 @@ const getBuySharesDetailByUsername = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -265,9 +274,11 @@ const getSharesByProperty = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -310,9 +321,11 @@ const getSharesByUsername = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -625,9 +638,11 @@ const handleShareByCategory = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -667,9 +682,11 @@ const getSharesByCategory = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -738,9 +755,11 @@ const reserveShare = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -796,9 +815,11 @@ const getReservationsByUsername = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -917,9 +938,11 @@ const genNewShareOffer = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1016,9 +1039,11 @@ const genShareSwapOffer = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1040,9 +1065,10 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
       shareOffersList = await ShareOffers.find({
         userDocID: userFound._id,
         category: category, // Assuming there is a field to filter by category
-        status: showHistory === "true"
-          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
-          : "pending",
+        status:
+          showHistory === "true"
+            ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+            : "pending",
       })
         .sort({ createdAt: -1 })
         .populate({
@@ -1074,9 +1100,10 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
         userDocID: userFound._id,
         category: category, // Assuming there is a field to filter by category
         offerToPropertyOwner: false,
-        status: showHistory === "true"
-          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
-          : "pending",
+        status:
+          showHistory === "true"
+            ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+            : "pending",
       })
         .sort({ createdAt: -1 })
         .populate({
@@ -1108,9 +1135,10 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
         shareholderDocID: shareholderFound._id,
         category: category, // Assuming there is a field to filter by category
         offerToPropertyOwner: true,
-        status: showHistory === "true"
-          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
-          : "pending",
+        status:
+          showHistory === "true"
+            ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+            : "pending",
       })
         .sort({ createdAt: -1 })
         .populate({
@@ -1172,9 +1200,10 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
       shareOffersList = await ShareOffers.find({
         shareholderDocID: shareholderFound._id,
         category: category, // Assuming there is a field to filter by category
-        status: showHistory === "true"
-          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
-          : "pending",
+        status:
+          showHistory === "true"
+            ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+            : "pending",
       })
         .sort({ createdAt: -1 })
         .populate({
@@ -1208,9 +1237,10 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
         shareholderDocID: shareholderFound._id,
         category: category, // Assuming there is a field to filter by category
         offerToPropertyOwner: false,
-        status: showHistory === "true"
-          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
-          : "pending",
+        status:
+          showHistory === "true"
+            ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+            : "pending",
       })
         .sort({ createdAt: -1 })
         .populate({
@@ -1241,9 +1271,10 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
         userDocID: userFound._id,
         category: category, // Assuming there is a field to filter by category
         offerToPropertyOwner: true,
-        status: showHistory === "true"
-          ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
-          : "pending",
+        status:
+          showHistory === "true"
+            ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+            : "pending",
       })
         .sort({ createdAt: -1 })
         .populate({
@@ -1279,9 +1310,11 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1365,9 +1398,11 @@ const getSwapShareByUsername = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1510,9 +1545,11 @@ const handleShareRentOfferAction = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1567,9 +1604,11 @@ const fetchUserShareRentals = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -1906,9 +1945,11 @@ const handleShareSellOfferAction = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
@@ -2240,9 +2281,11 @@ const handleShareSwapOfferAction = async (req, res) => {
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: error.message || "Internal Server Error", error: error, success: false });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
   }
 };
 
