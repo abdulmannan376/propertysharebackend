@@ -4,7 +4,8 @@ const PaymentController = require("../controllers/PaymentController");
 
 //POST
 router.post("/test-checkout", PaymentController.testCheckout);
-router.post("/buy-share-transaction", PaymentController.buyShareTransaction)
+router.post("/generate-payment", PaymentController.genPayment);
+router.post("/buy-share-transaction", PaymentController.buyShareTransaction);
 
 //GET
 router.get("/client-token", PaymentController.GetClientToken);

@@ -952,6 +952,7 @@ const searchUsers = async (req, res) => {
 
     const users = await Users.find({
       username: { $regex: username, $options: "i" }, // 'i' makes it case-insensitive
+      role: { $in: ["user", "shareholder"]}
     }, "name email username");
 
     res.status(200).json({ users, success: true });

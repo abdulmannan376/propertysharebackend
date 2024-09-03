@@ -10,7 +10,24 @@ const PaymentSchema = new mongoose.Schema(
     },
     gatewayTransactionID: {
       type: String,
+      default: "",
+    },
+    totalAmount: {
+      type: Number,
       required: true,
+    },
+    payingAmount: {
+      type: Number,
+      required: true,
+    },
+    discountType: {
+      type: String,
+      enum: ["no discount", "percentage", "currency"],
+      default: "no discount",
+    },
+    discountAmount: {
+      type: Number,
+      default: 0
     },
     userDocID: {
       type: mongoose.Types.ObjectId,
