@@ -34,7 +34,7 @@ const GetClientToken = async (req, res) => {
 const testCheckout = async (body, session) => {
   const { nonce, amount, username, purpose } = body;
 
-  console.log(body);
+  // console.log(body);
   try {
     const result = await gateway.transaction.sale({
       amount: amount,
@@ -58,7 +58,7 @@ const testCheckout = async (body, session) => {
         paymentType: paymentInstrumentType,
         userDocID: userFound._id,
         totalAmount: amount,
-        payingAmount: amount
+        payingAmount: amount,
       });
 
       // console.log(newPayment);
@@ -81,15 +81,28 @@ const testCheckout = async (body, session) => {
 
 const getPaymentsByUser = async (req, res) => {
   try {
-    const { username } = req.query;
+    const { username, status } = req.query;
 
-    console.log(req.query);
-    const userFound = await Users.findOne({ username: username });
+    let paymentStatus = status;
 
-    const payments = await Payments.find({ userDocID: userFound._id })
+    if (paymentStatus === "all") {
+      paymentStatus = ["Successful", "Cancelled", "Declined by gateway"];
+    } else {
+      paymentStatus = [status];
+    }
+    console.log(req.query, paymentStatus);
+    const userFound = await Users.findOne({
+      username: username,
+    });
+
+    const payments = await Payments.find({  
+      userDocID: userFound._id,
+      status: { $in: paymentStatus },
+    })
       .populate("userDocID", "name username")
       .sort({ createdAt: -1 });
 
+    console.log(payments, payments.length)
     res.status(200).json({ message: "Fetched", body: payments, success: true });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
@@ -127,7 +140,7 @@ const genPayment = async (req, res) => {
       discountValue,
     } = req.body;
 
-    console.log("body: ",req.body)
+    console.log("body: ", req.body);
     const recipientFound = await Users.findOne({
       username: recipient,
     }).populate("userDefaultSettingID", "notifyUpdates");
@@ -162,7 +175,7 @@ const genPayment = async (req, res) => {
 
     const newPayment = new Payments({
       initiatedBy: userFound._id,
-      userDocID: recipient._id,
+      userDocID: recipientFound._id,
       status: "Pending",
       purpose: purpose,
       totalAmount: totalAmount,
