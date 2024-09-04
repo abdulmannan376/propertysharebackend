@@ -31,7 +31,7 @@ const ShareOfferSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected", "cancelled", "expired"],
+      enum: ["pending", "accepted", "rejected", "cancelled", "expired", "payment pending"],
       default: "pending",
     },
     category: {

@@ -61,6 +61,7 @@ const PropertyShareSchema = new mongoose.Schema({
     type: String,
     enum: [
       "Purchased",
+      "Payment Pending",
       "Reserved",
       "On Rent",
       "On Swap",

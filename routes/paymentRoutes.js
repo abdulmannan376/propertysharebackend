@@ -7,6 +7,9 @@ router.post("/test-checkout", PaymentController.testCheckout);
 router.post("/generate-payment", PaymentController.genPayment);
 router.post("/buy-share-transaction", PaymentController.buyShareTransaction);
 
+//PUT
+router.put("/pending-payment-transaction", PaymentController.pendingPaymentTransaction)
+
 //GET
 router.get("/client-token", PaymentController.GetClientToken);
 router.get("/get-payments-by-user", PaymentController.getPaymentsByUser);

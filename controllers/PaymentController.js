@@ -2,8 +2,13 @@ const { gateway } = require("../middleware/paymentConfig");
 const Users = require("../models/UserSchema");
 const Payments = require("../models/PaymentSchema");
 const { default: mongoose } = require("mongoose");
-const { buyShare } = require("./ShareController");
+const {
+  buyShare,
+  shareRentAction,
+  shareSellAction,
+} = require("./ShareController");
 const { sendUpdateNotification } = require("./notificationController");
+const PropertyShare = require("../models/PropertyShareSchema");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -32,10 +37,12 @@ const GetClientToken = async (req, res) => {
 };
 
 const testCheckout = async (body, session) => {
-  const { nonce, amount, username, purpose } = body;
+  const { nonce, amount, username, purpose, paymentID } = body;
 
-  // console.log(body);
+  console.log(body);
   try {
+    const paymentFound = await Payments.findOne({ paymentID: paymentID });
+
     const result = await gateway.transaction.sale({
       amount: amount,
       paymentMethodNonce: nonce,
@@ -43,7 +50,7 @@ const testCheckout = async (body, session) => {
         submitForSettlement: true,
       },
     });
-    // console.log(result)
+    // console.log(result);
     if (result.success) {
       const { processorResponseType, id, paymentInstrumentType } =
         result.transaction;
@@ -51,18 +58,35 @@ const testCheckout = async (body, session) => {
         session
       );
 
-      // console.log(userFound);
-      const newPayment = new Payments({
-        gatewayTransactionID: id,
-        purpose: purpose,
-        paymentType: paymentInstrumentType,
-        userDocID: userFound._id,
-        totalAmount: amount,
-        payingAmount: amount,
-      });
+      if (paymentFound) {
+        console.log("in if");
+        await Payments.updateOne(
+          { _id: paymentFound._id },
+          {
+            $set: {
+              status: "Successful",
+              gatewayTransactionID: id,
+              paymentType: paymentInstrumentType,
+            },
+          },
+          {
+            session: session,
+          }
+        );
+      } else {
+        // console.log(userFound);
+        const newPayment = new Payments({
+          gatewayTransactionID: id,
+          purpose: purpose,
+          paymentType: paymentInstrumentType,
+          userDocID: userFound._id,
+          totalAmount: amount,
+          payingAmount: amount,
+        });
 
-      // console.log(newPayment);
-      await newPayment.save({ session });
+        // console.log(newPayment);
+        await newPayment.save({ session });
+      }
 
       return true;
     } else {
@@ -90,19 +114,22 @@ const getPaymentsByUser = async (req, res) => {
     } else {
       paymentStatus = [status];
     }
-    console.log(req.query, paymentStatus);
+    // console.log(req.query, paymentStatus);
     const userFound = await Users.findOne({
       username: username,
     });
 
-    const payments = await Payments.find({  
+    const payments = await Payments.find({
       userDocID: userFound._id,
       status: { $in: paymentStatus },
     })
       .populate("userDocID", "name username")
+      .populate("initiatedBy", "name username")
+      .populate("shareDocID", "shareID")
+      .populate("shareOfferDocID", "shareOfferID offerToPropertyOwner")
       .sort({ createdAt: -1 });
 
-    console.log(payments, payments.length)
+    // console.log(payments, payments.length);
     res.status(200).json({ message: "Fetched", body: payments, success: true });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
@@ -166,7 +193,7 @@ const genPayment = async (req, res) => {
           totalAmount,
           discountValue
         );
-      else if (discountType === "percentage")
+      else if (discountType === "currency")
         [payingAmount, discountAmount] = calDiscountByCurrency(
           totalAmount,
           discountValue
@@ -180,6 +207,7 @@ const genPayment = async (req, res) => {
       purpose: purpose,
       totalAmount: totalAmount,
       payingAmount: payingAmount,
+      discountType: discountType,
       discountAmount: discountAmount,
     });
 
@@ -210,6 +238,34 @@ const genPayment = async (req, res) => {
   }
 };
 
+const handlePendingOfferPayments = async () => {
+  try {
+    const paymentsList = await Payments.find({
+      status: "Pending",
+      category: { $in: ["Rent Offer", "Sell Offer"] },
+    }).populate("shareDocID", "shareID");
+
+    for (const payment of paymentsList) {
+      if (payment.category === "Rent Offer") {
+        const data = { shareID: payment.shareDocID.shareID };
+        shareRentAction(data, {}, "expired");
+      } else if (payment.category === "Sell Offer") {
+        const data = { shareID: payment.shareDocID.shareID };
+        shareSellAction(data, {}, "expired");
+      }
+    }
+
+    console.log(`${paymentsList.length} number of payments expired`)
+    return true;
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handlePendingOfferPayments",
+      fileLocation: "controllers/PaymentController.js",
+      timestamp: currentDateString,
+    });
+  }
+};
+
 //Transaction Controllers
 const buyShareTransaction = async (req, res) => {
   const session = await mongoose.startSession();
@@ -219,14 +275,15 @@ const buyShareTransaction = async (req, res) => {
 
     session.startTransaction();
 
-    const paymentResult = await testCheckout(payment, session);
-    if (paymentResult instanceof Error) {
-      throw paymentResult;
-    }
-
     const controllerResult = await buyShare(data, session);
     if (controllerResult instanceof Error) {
       throw controllerResult;
+    }
+
+    payment.shareID = data.shareID;
+    const paymentResult = await testCheckout(payment, session);
+    if (paymentResult instanceof Error) {
+      throw paymentResult;
     }
 
     // session.commitTransaction()
@@ -249,10 +306,99 @@ const buyShareTransaction = async (req, res) => {
   }
 };
 
+const pendingPaymentTransaction = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    const { payment, data, category } = req.body;
+
+    console.log(req.body);
+
+    session.startTransaction();
+
+    if (category === "Rent Offer") {
+      const controllerResult = await shareRentAction(
+        data,
+        session,
+        "payment proceed"
+      );
+      if (controllerResult instanceof Error) {
+        throw controllerResult;
+      }
+    } else if (category === "Sell Offer") {
+      const controllerResult = await shareSellAction(
+        data,
+        session,
+        "payment proceed"
+      );
+      if (controllerResult instanceof Error) {
+        throw controllerResult;
+      }
+    }
+
+    const paymentResult = await testCheckout(payment, session);
+    if (paymentResult instanceof Error) {
+      throw paymentResult;
+    }
+
+    await session.commitTransaction();
+
+    res.status(200).json({ message: "Transaction Successfull", success: true });
+  } catch (error) {
+    await session.abortTransaction();
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "pendingPaymentTransaction",
+      fileLocation: "controllers/PaymentController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+const rentOfferTransaction = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    const { payment, data } = req.body;
+
+    session.startTransaction();
+
+    const paymentResult = await testCheckout(payment, session);
+    if (paymentResult instanceof Error) {
+      throw paymentResult;
+    }
+
+    await session.commitTransaction();
+
+    res.status(200).json({ message: "Transaction Successfull", success: true });
+  } catch (error) {
+    await session.abortTransaction();
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "rentOfferTransaction",
+      fileLocation: "controllers/PaymentController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
 module.exports = {
   GetClientToken,
   testCheckout,
   getPaymentsByUser,
   buyShareTransaction,
   genPayment,
+  pendingPaymentTransaction,
+  rentOfferTransaction,
+  handlePendingOfferPayments,
 };

@@ -519,7 +519,6 @@ const addNewProperty = async (req, res) => {
 
       propertyShareFound.save();
     } else {
-
       const propertyShareFound = await PropertyShare.findOne({
         shareID: `${newProperty.propertyID}00`,
       })
@@ -814,73 +813,6 @@ function reorganizeFiles(directory, deleteIndices = []) {
     fs.renameSync(oldFilePath, newFilePath);
   });
 }
-
-// const addPropertyImages = async (req, res) => {
-//   try {
-//     const body = req.body;
-//     const files = req.files;
-//     const propertyFound = await Properties.findOne({
-//       propertyID: body.propertyID,
-//     });
-
-//     if (!propertyFound) {
-//       return res.status(400).json({ message: "Error occured", success: false });
-//     }
-//     // console.log("body: ", body);
-
-//     let listingStatus = "";
-//     if (body.userRole === "admin") {
-//       listingStatus = "live";
-//     } else if (body.userRole === "user") {
-//       listingStatus = "pending approval";
-//     }
-
-//     const uploadPath = `uploads/${req.body.propertyID}/`;
-//     // Ensure the upload directory exists
-//     fs.mkdirSync(uploadPath, { recursive: true });
-//     // Delete specified images before saving new ones
-//     console.log(req.body);
-//     if (req.body.deleteImageList) {
-//       reorganizeFiles(uploadPath, req.body.deleteImageList.map(Number));
-//     }
-
-//     propertyFound.imageDirURL = uploadPath;
-//     const updatedImageCount = fs
-//       .readdirSync(propertyFound.imageDirURL)
-//       .filter((file) => file.startsWith("image-")).length;
-//     propertyFound.imageCount = updatedImageCount;
-//     propertyFound.listingStatus = listingStatus;
-
-//     await propertyFound.save().then(() => {
-//       if (listingStatus === "live") {
-//         const subject = `Property (${body.propertyID}) status of listing.`;
-//         const emailBody = `Hello ${body.userName},\nYour property with title: ${propertyFound.title}, is successfully live on our platform and is ready for operations from the start date: ${propertyFound.startDate}. \nRegards,\nBunny Beach House.`;
-//         sendEmail(body.email, subject, emailBody);
-//         return res.status(200).json({
-//           message: `Successfull.`,
-//           success: true,
-//         });
-//       } else if (listingStatus === "pending approval") {
-//         const subject = `Property (${body.propertyID}) status of listing.`;
-//         const emailBody = `Hello ${body.userName},\nYour property with title: ${body.title}, is successfully sent for approval. Our team will review your request and get back to you for further proceedings. \nRegards,\nBunny Beach House.`;
-//         sendEmail(body.email, subject, emailBody);
-//         return res.status(200).json({
-//           message: `Successfull.`,
-//           success: true,
-//         });
-//       }
-//     });
-//   } catch (error) {
-//     console.log(`Error: ${error}`, "\nlocation: ", {
-//       function: "addPropertyImages",
-//       fileLocation: "controllers/PropertyController.js",
-//       timestamp: currentDateString,
-//     });
-//     res
-//       .status(500)
-//       .json({ message: error.message || "Internal Server Error", error: error, success: false });
-//   }
-// };
 
 async function openInspections() {
   try {
@@ -2711,7 +2643,7 @@ const getPropertiesByAvailableShares = async (req, res) => {
 const getPropertyByID = async (req, res) => {
   try {
     const { key } = req.params;
-    const { role } = req.query;
+    const { role, filter } = req.query;
 
     const propertyFound = await Properties.findOne({
       propertyID: key,
@@ -2719,6 +2651,7 @@ const getPropertyByID = async (req, res) => {
         role && role === "admin"
           ? { $in: ["live", "pending approval"] }
           : "live",
+      status: filter ? filter : { $in: ["Featured", "Non-Featured"] },
     })
       .populate("amenitiesID")
       .exec();

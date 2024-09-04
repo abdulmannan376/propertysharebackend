@@ -27,7 +27,7 @@ const PaymentSchema = new mongoose.Schema(
     },
     discountAmount: {
       type: Number,
-      default: 0
+      default: 0,
     },
     userDocID: {
       type: mongoose.Types.ObjectId,
@@ -42,10 +42,32 @@ const PaymentSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    shareDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "property_shares",
+      default: null,
+    },
+    shareOfferDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "property_share_offers",
+      default: null,
+    },
     status: {
       type: String,
-      enum: ["Successful", "Pending", "Cancelled", "Declined by gateway"],
+      enum: ["Successful", "Pending", "Cancelled", "Declined by gateway", "Expired"],
       default: "Successful",
+    },
+    category: {
+      type: String,
+      enum: [
+        "Rent Offer",
+        "Sell Offer",
+        "Buy Share",
+        "Swap Offer",
+        "Buy Back Offer",
+        "Any",
+      ],
+      default: "Any",
     },
   },
   { timestamps: true }

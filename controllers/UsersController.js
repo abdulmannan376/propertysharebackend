@@ -364,25 +364,30 @@ const updateUserAccountSetting = async (req, res) => {
         .json({ message: "Error. Try Again", success: false });
     }
 
-    const userDefaultSetting = await UserDefaultSettings.findOne({
-      _id: userFound.userDefaultSettingID,
-    });
     console.log("userFound: ", userFound);
-    userDefaultSetting.currencySymbol = body.currencySymbol;
-    userDefaultSetting.currencyShortName = body.currencyShortName;
-    userDefaultSetting.languageChoosen = body.languageChoosen;
-    userDefaultSetting.areaUnit = body.areaUnit;
-    userDefaultSetting.notifyUpdates = body.notifyUpdates;
-    userDefaultSetting.notifyMessages = body.notifyMessages;
 
-    await userDefaultSetting.save().then(() => {
-      const subject = `Account Settings Updated`;
-      const emailBody = `Dear ${userFound.name}, \nYour account settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou. \nRegards, \nBeach Bunny House.`;
-      sendUpdateNotification(subject, emailBody, body.notifyUpdates, key);
-      res.status(201).json({
-        message: `Changes updated.`,
-        success: true,
-      });
+    await UserDefaultSettings.updateOne(
+      {
+        _id: userFound.userDefaultSettingID,
+      },
+      {
+        $set: {
+          currencySymbol: body.currencySymbol,
+          currencyShortName: body.currencyShortName,
+          languageChoosen: body.languageChoosen,
+          areaUnit: body.areaUnit,
+          notifyUpdates: body.notifyUpdates,
+          notifyMessages: body.notifyMessages,
+        },
+      }
+    );
+
+    const subject = `Account Settings Updated`;
+    const emailBody = `Dear ${userFound.name}, \nYour account settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou. \nRegards, \nBeach Bunny House.`;
+    sendUpdateNotification(subject, emailBody, body.notifyUpdates, key);
+    res.status(201).json({
+      message: `Changes updated.`,
+      success: true,
     });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
@@ -945,15 +950,16 @@ const searchUsers = async (req, res) => {
     const { username } = req.query;
 
     if (username.length === 0) {
-      return res
-        .status(200)
-        .json({ users: [], success: true });
+      return res.status(200).json({ users: [], success: true });
     }
 
-    const users = await Users.find({
-      username: { $regex: username, $options: "i" }, // 'i' makes it case-insensitive
-      role: { $in: ["user", "shareholder"]}
-    }, "name email username");
+    const users = await Users.find(
+      {
+        username: { $regex: username, $options: "i" }, // 'i' makes it case-insensitive
+        role: { $in: ["user", "shareholder"] },
+      },
+      "name email username"
+    );
 
     res.status(200).json({ users, success: true });
   } catch (error) {

@@ -5,6 +5,7 @@ const Shareholders = require("../models/ShareholderSchema");
 const ShareOffers = require("../models/PropertyShareOfferSchema");
 const { sendUpdateNotification } = require("./notificationController");
 const UserProfile = require("../models/userProfileSchema");
+const Payments = require("../models/PaymentSchema");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -1406,6 +1407,104 @@ const getSwapShareByUsername = async (req, res) => {
   }
 };
 
+const shareRentAction = async (data, session, action) => {
+  try {
+    if (action === "payment proceed") {
+      const { shareID, recipient, username, shareOfferID } = data;
+
+      const propertyShareFound = await PropertyShares.findOne({
+        shareID: shareID,
+      }).session(session);
+
+      const shareOfferFound = await ShareOffers.findOne({
+        shareOfferID: shareOfferID,
+      }).session(session);
+
+      const recipientFound = await Users.findOne({
+        username: recipient,
+      })
+        .populate("userDefaultSettingID", "notifyUpdates")
+        .session(session);
+      if (!recipientFound) {
+        throw new Error("recipient not found");
+      }
+
+      const userFound = await Users.findOne({
+        username: username,
+      })
+        .populate("userDefaultSettingID", "notifyUpdates")
+        .session(session);
+      if (!recipientFound) {
+        throw new Error("user not found");
+      }
+
+      await PropertyShares.updateOne(
+        {
+          _id: propertyShareFound._id,
+        },
+        {
+          $set: {
+            tenantUserDocID: recipientFound._id,
+            utilisedStatus: "On Rent",
+          },
+        },
+        { session }
+      );
+
+      await ShareOffers.updateOne(
+        { _id: shareOfferFound?._id },
+        {
+          $set: {
+            status: "accepted",
+          },
+        },
+        { session }
+      );
+    } else if (action === "expired") {
+      const { shareID } = data;
+      const shareFound = await PropertyShares.findOne({
+        shareID: shareID,
+      });
+
+      await PropertyShares.updateOne(
+        {
+          _id: shareFound._id,
+        },
+        {
+          onSale: true,
+          utilisedStatus: "Purchased",
+        }
+      );
+
+      const paymentsList = await Payments.find({
+        shareDocID: shareFound._id,
+        status: "Pending",
+        category: "Rent Offer"
+      });
+
+      const paymentIDList = paymentsList.filter((payment) => {
+        return payment._id;
+      });
+
+      await Payments.updateMany(
+        {
+          _id: { $in: paymentIDList },
+        },
+        { status: "Expired" }
+      );
+    }
+
+    return true;
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "shareRentAction",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    throw new Error(error.message);
+  }
+};
+
 const handleShareRentOfferAction = async (req, res) => {
   try {
     const { username, offerID, action } = req.body;
@@ -1433,16 +1532,29 @@ const handleShareRentOfferAction = async (req, res) => {
 
     const propertyShareFound = await PropertyShares.findOne({
       _id: shareOfferFound.shareDocID,
-    }).populate("propertyDocID", "title");
+    }).populate("propertyDocID", "title propertyID");
 
     if (action === "accepted") {
-      propertyShareFound.tenantUserDocID = shareOfferFound.userDocID._id;
+      const newPayment = new Payments({
+        gatewayTransactionID: "",
+        purpose: `Property: ${propertyShareFound.propertyDocID.propertyID} share rent payment required.`,
+        category: "Rent Offer",
+        userDocID: shareOfferFound.userDocID._id,
+        initiatedBy: shareOwnerFound._id,
+        totalAmount: propertyShareFound.priceByCategory,
+        payingAmount: propertyShareFound.priceByCategory,
+        status: "Pending",
+        shareDocID: propertyShareFound._id,
+        shareOfferDocID: shareOfferFound._id,
+      });
+
       propertyShareFound.onRent = false;
-      propertyShareFound.utilisedStatus = "On Rent";
+      propertyShareFound.utilisedStatus = "Payment Pending";
 
       await propertyShareFound.save();
+      await newPayment.save();
 
-      shareOfferFound.status = "accepted";
+      shareOfferFound.status = "payment pending";
     } else if (action === "rejected") {
       shareOfferFound.status = "rejected";
     } else if (action === "cancelled") {
@@ -1469,23 +1581,23 @@ const handleShareRentOfferAction = async (req, res) => {
           )
         }\nPrice: $${shareOfferFound.price} \nShare Owner Username: ${
           shareOwnerFound.username
-        } \nRegards, \nBeach Bunny House`;
+        }\nSoon you will get the payment confirmation as the tenant pays it. \nRegards, \nBeach Bunny House`;
 
         const ownerNotificationSubject = `Property Share Rent Offer Accepted`;
-        const ownerNotificationBody = `Dear ${shareOwnerFound.name}, \nYour share rent offer has been accepted by user: ${userFound.username} at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
+        const ownerNotificationBody = `Dear ${shareOwnerFound.name}, \nYour share rent offer has been accepted by user: ${userFound.username} at price: $${shareOfferFound.price}. Payment Pending. \nRegards, \nBeach Bunny House.`;
 
         sendUpdateNotification(
           userNotificationsubject,
           userNotificationbody,
-          userFound.userDefaultSettingID.notifyUpdates,
-          username
+          shareOwnerFound.userDefaultSettingID.notifyUpdates,
+          shareOwnerFound.username
         );
 
         sendUpdateNotification(
           ownerNotificationSubject,
           ownerNotificationBody,
-          shareOwnerFound.userDefaultSettingID.notifyUpdates,
-          shareOwnerFound.username
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
         );
       } else if (action === "rejected") {
         const userNotificationsubject = `Rent Offer from ${shareOwnerFound.username} Rejected`;
@@ -1612,79 +1724,56 @@ const fetchUserShareRentals = async (req, res) => {
   }
 };
 
-const handleShareSellOfferAction = async (req, res) => {
+const shareSellAction = async (data, session, action) => {
   try {
-    const { username, offerID, action, isBuybackOffer } = req.body;
+    const { username, shareOfferID, isBuybackOffer, shareID } = data;
 
-    const userFound = await Users.findOne({ username: username }).populate(
-      "userDefaultSettingID",
-      "notifyUpdates"
-    );
-    if (!userFound) {
-      throw new Error("user not found");
-    }
+    // console.log(data)
+    // throw new Error("testing")
+    // const userFound = await Users.findOne({ username: username })
+    //   .populate("userDefaultSettingID", "notifyUpdates")
+    //   .session(session);
+    // if (!userFound) {
+    //   throw new Error("user not found");
+    // }
 
     // if (!userFound.isProfileCompleted) {
     //   throw new Error("user profile not completed.");
     // }
 
-    console.log(req.body);
-
     const shareOfferFound = await ShareOffers.findOne({
-      shareOfferID: offerID,
+      shareOfferID: shareOfferID,
     })
       .populate("shareholderDocID", "username")
-      .populate("userDocID", "username");
+      .populate("userDocID", "username")
+      .session(session);
     if (!shareOfferFound) {
       throw new Error("share offer not found");
     }
 
     const sharePrevOwnerFound = await Users.findOne({
       username: shareOfferFound.shareholderDocID.username,
-    }).populate("userDefaultSettingID", "notifyUpdates");
+    })
+      .populate("userDefaultSettingID", "notifyUpdates")
+      .session(session);
 
     const propertyShareFound = await PropertyShares.findOne({
       _id: shareOfferFound.shareDocID,
-    }).populate("propertyDocID", "title");
+    })
+      .populate("propertyDocID", "title propertyID")
+      .session(session);
 
     const prevShareholder = await Shareholders.findOne({
       username: shareOfferFound.shareholderDocID.username,
-    });
+    }).session(session);
 
     console.log("prevShareHolder:", prevShareholder.username);
 
     const shareholderFound = await Shareholders.findOne({
       username: shareOfferFound.userDocID.username,
-    });
+    }).session(session);
 
-    // console.log("shareholderFound: ", shareholderFound.username);
-
-    if (action === "accepted") {
-      // const sharePrevOwnerPurchasedIDList =
-      //   prevShareholder.purchasedShareIDList;
-
-      // prevShareholder.purchasedShareIDList =
-      //   sharePrevOwnerPurchasedIDList.filter((share) => {
-      //     // Convert Mongoose ObjectIDs to string for comparison
-      //     const shareDocIDString = share.shareDocID.toString();
-      //     const propertyShareDocIDString = propertyShareFound._id.toString();
-
-      //     // Return true if they are NOT equal, hence the filter will exclude matching IDs
-      //     return shareDocIDString !== propertyShareDocIDString;
-      //   });
-
-      // console.log(
-      //   "sharePrevOwnerPurchasedIDList: ",
-      //   sharePrevOwnerPurchasedIDList,
-      //   "prevShareholder: ",
-      //   prevShareholder
-      // );
-      // prevShareholder.soldShareIDList.push({
-      //   shareDocID: propertyShareFound._id,
-      // });
-
-      // console.log("prevShareholder: ", prevShareholder);
-
+    if (action === "payment proceed") {
       await Shareholders.updateOne(
         { _id: prevShareholder._id },
         {
@@ -1749,15 +1838,6 @@ const handleShareSellOfferAction = async (req, res) => {
             }
           );
 
-          // propertyShareFound.currentOwnerDocID = newShareholder._id;
-          // propertyShareFound.lastOwners.push({
-          //   username: sharePrevOwnerFound.username,
-          //   boughtAt: propertyShareFound.currentBoughtAt,
-          // });
-          // propertyShareFound.currentBoughtAt = shareOfferFound.price;
-          // propertyShareFound.onSale = false;
-          // propertyShareFound.utilisedStatus = "Purchased";
-
           await PropertyShares.updateOne(
             { _id: propertyShareFound._id },
             {
@@ -1776,10 +1856,6 @@ const handleShareSellOfferAction = async (req, res) => {
             }
           );
         } else {
-          // shareholderFound.purchasedShareIDList.push({
-          //   shareDocID: propertyShareFound._id,
-          // });
-
           await Shareholders.updateOne(
             { _id: shareholderFound._id },
             {
@@ -1790,16 +1866,6 @@ const handleShareSellOfferAction = async (req, res) => {
               },
             }
           );
-
-          // propertyShareFound.currentOwnerDocID = shareholderFound._id;
-          // propertyShareFound.lastOwners.push({
-          //   username: sharePrevOwnerFound.username,
-          //   boughtAt: propertyShareFound.currentBoughtAt,
-          // });
-          // await shareholderFound.save();
-          // propertyShareFound.currentBoughtAt = shareOfferFound.price;
-          // propertyShareFound.onSale = false;
-          // propertyShareFound.utilisedStatus = "Purchased";
 
           await PropertyShares.updateOne(
             { _id: propertyShareFound._id },
@@ -1818,8 +1884,6 @@ const handleShareSellOfferAction = async (req, res) => {
               },
             }
           );
-
-          // await propertyShareFound.save();
         }
       }
 
@@ -1841,8 +1905,156 @@ const handleShareSellOfferAction = async (req, res) => {
           $set: { status: "expired" },
         }
       );
+
+      await ShareOffers.updateOne(
+        {
+          _id: shareOfferFound._id,
+        },
+        { $set: { status: "accepted" } }
+      );
+    } else if (action === "expired") {
+      const shareFound = await PropertyShares.findOne({
+        shareID: shareID,
+      });
+
+      await PropertyShares.updateOne(
+        {
+          _id: shareFound._id,
+        },
+        {
+          onSale: true,
+          utilisedStatus: "Purchased",
+        }
+      );
+
+      const paymentsList = await Payments.find({
+        shareDocID: shareFound._id,
+        status: "Pending",
+        category: "Sell Offer"
+      });
+
+      const paymentIDList = paymentsList.filter((payment) => {
+        return payment._id;
+      });
+
+      await Payments.updateMany(
+        {
+          _id: { $in: paymentIDList },
+        },
+        { status: "Expired" }
+      );
+    }
+
+    return true;
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "shareSellAction",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: currentDateString,
+    });
+    throw new Error(error.message);
+  }
+};
+
+const handleShareSellOfferAction = async (req, res) => {
+  try {
+    const { username, offerID, action, isBuybackOffer } = req.body;
+
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    // if (!userFound.isProfileCompleted) {
+    //   throw new Error("user profile not completed.");
+    // }
+
+    console.log(req.body);
+
+    const shareOfferFound = await ShareOffers.findOne({
+      shareOfferID: offerID,
+    })
+      .populate("shareholderDocID", "username")
+      .populate("userDocID", "username");
+    if (!shareOfferFound) {
+      throw new Error("share offer not found");
+    }
+
+    const sharePrevOwnerFound = await Users.findOne({
+      username: shareOfferFound.shareholderDocID.username,
+    }).populate("userDefaultSettingID", "notifyUpdates");
+
+    const propertyShareFound = await PropertyShares.findOne({
+      _id: shareOfferFound.shareDocID,
+    }).populate("propertyDocID", "title propertyID");
+
+    const prevShareholder = await Shareholders.findOne({
+      username: shareOfferFound.shareholderDocID.username,
+    });
+
+    console.log("prevShareHolder:", prevShareholder.username);
+
+    const shareholderFound = await Shareholders.findOne({
+      username: shareOfferFound.userDocID.username,
+    });
+
+    const buyerFound = await Users.findOne({
+      username: shareOfferFound.userDocID.username,
+    });
+
+    // console.log("shareholderFound: ", shareholderFound.username);
+
+    if (action === "accepted") {
+      const newPayment = new Payments({
+        gatewayTransactionID: "",
+        purpose: `Property: ${propertyShareFound.propertyDocID.propertyID} Share Buy payment required.`,
+        category: "Sell Offer",
+        userDocID: buyerFound._id,
+        initiatedBy: sharePrevOwnerFound._id,
+        totalAmount: propertyShareFound.priceByCategory,
+        payingAmount: propertyShareFound.priceByCategory,
+        status: "Pending",
+        shareDocID: propertyShareFound._id,
+        shareOfferDocID: shareOfferFound._id,
+      });
+
+      await newPayment.save();
+
+      const sharePendingOffers = await ShareOffers.find({
+        shareDocID: propertyShareFound._id,
+        category: "Sell",
+        status: "pending",
+      });
+
+      const sharePendingOffersDocIDs = sharePendingOffers.filter((offer) => {
+        return offer._id;
+      });
+
+      await ShareOffers.updateMany(
+        {
+          _id: { $in: sharePendingOffersDocIDs },
+        },
+        {
+          $set: { status: "expired" },
+        }
+      );
+
+      await PropertyShares.updateOne(
+        {
+          _id: propertyShareFound._id,
+        },
+        {
+          $set: {
+            onSale: false,
+            utilisedStatus: "Payment Pending",
+          },
+        }
+      );
       // await prevShareholder.save();
-      shareOfferFound.status = "accepted";
+      shareOfferFound.status = "payment pending";
     } else if (action === "rejected") {
       shareOfferFound.status = "rejected";
     } else if (action === "cancelled") {
@@ -2578,6 +2790,8 @@ module.exports = {
   handleShareSwapOfferAction,
   getSwapShareByUsername,
   handleShareReservation,
+  shareRentAction,
+  shareSellAction,
 
   testRun,
 };
