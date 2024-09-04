@@ -246,10 +246,10 @@ const handlePendingOfferPayments = async () => {
     }).populate("shareDocID", "shareID");
 
     for (const payment of paymentsList) {
-      if (payment.category === "Rent Offer") {
+      if (payment.category === "Rent Offer" && payment.shareDocID) {
         const data = { shareID: payment.shareDocID.shareID };
         shareRentAction(data, {}, "expired");
-      } else if (payment.category === "Sell Offer") {
+      } else if (payment.category === "Sell Offer" && payment.shareDocID) {
         const data = { shareID: payment.shareDocID.shareID };
         shareSellAction(data, {}, "expired");
       }
