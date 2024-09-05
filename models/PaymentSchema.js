@@ -52,6 +52,11 @@ const PaymentSchema = new mongoose.Schema(
       ref: "property_share_offers",
       default: null,
     },
+    raisedRequestDocID: {
+      type: mongoose.Types.ObjectId,
+      ref: "property_raised_requests",
+      default: null,
+    },
     status: {
       type: String,
       enum: ["Successful", "Pending", "Cancelled", "Declined by gateway", "Expired"],
@@ -65,6 +70,7 @@ const PaymentSchema = new mongoose.Schema(
         "Buy Share",
         "Swap Offer",
         "Buy Back Offer",
+        "Raised Request",
         "Any",
       ],
       default: "Any",

@@ -17,6 +17,7 @@ const Shareholders = require("../models/ShareholderSchema");
 const Users = require("../models/UserSchema");
 const { sendUpdateNotification } = require("./notificationController");
 const { model } = require("mongoose");
+const Payments = require("../models/PaymentSchema");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -1807,6 +1808,61 @@ const handleRaiseRequestAction = async (req, res) => {
   }
 };
 
+const handleRaisedRequestPaymentAction = async (data, session) => {
+  try {
+    const { requestID } = data;
+
+    const requestFound = await RaiseRequest.findOne({
+      raisedRequestID: requestID,
+    }).session(session);
+    if (!requestFound) {
+      throw new Error("raised request not found.");
+    }
+
+    const paidByUsers = requestFound.paidByUsersCount + 1;
+
+    if (requestFound.payingUserCount < paidByUsers) {
+      if (requestFound.payingUserCount === paidByUsers) {
+        await RaiseRequest.updateOne(
+          {
+            _id: requestFound._id,
+          },
+          {
+            $set: {
+              paidByUsersCount: paidByUsers,
+              status: "Successfull",
+            },
+          },
+          { session }
+        );
+      } else {
+        await RaiseRequest.updateOne(
+          {
+            _id: requestFound._id,
+          },
+          {
+            $set: {
+              paidByUsersCount: paidByUsers,
+            },
+          },
+          { session }
+        );
+      }
+    } else {
+      throw new Error("Forbidden request.");
+    }
+
+    return true;
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handleRaisedRequestPaymentAction",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: currentDateString,
+    });
+    throw new Error(error.message);
+  }
+};
+
 const handleRaiseRequestActionPropertyOwner = async (req, res) => {
   try {
     const { requestID, usernameList, username } = req.body;
@@ -1846,6 +1902,7 @@ const handleRaiseRequestActionPropertyOwner = async (req, res) => {
     });
 
     raiseRequestFound.status = "Payment Pending";
+    raiseRequestFound.payingUserCount = usernameList.length;
 
     const usersFoundPromises = await usernameList.map((username) => {
       return Users.findOne({ username: username }).populate(
@@ -1855,6 +1912,23 @@ const handleRaiseRequestActionPropertyOwner = async (req, res) => {
     });
 
     const usersFoundList = await Promise.all(usersFoundPromises);
+
+    const userFound = await Users.findOne({ username: username });
+
+    for (const user of usersFoundList) {
+      const newPayment = new Payments({
+        category: "Raised Request",
+        totalAmount: raiseRequestFound.estimatedPrice / raiseRequestFound.payingUserCount,
+        payingAmount: raiseRequestFound.estimatedPrice / raiseRequestFound.payingUserCount,
+        userDocID: user._id,
+        initiatedBy: userFound._id,
+        purpose: `Modification Request of ${raiseRequestFound.title} payment required`,
+        raisedRequestDocID: raiseRequestFound._id,
+        status: "Pending"
+      });
+
+      await newPayment.save();
+    }
 
     await raiseRequestFound.save().then(() => {
       usersFoundList.map((user) => {
@@ -3025,4 +3099,5 @@ module.exports = {
   handlePropertyStatus,
   getPropertySharesByID,
   calPropertyDurationCompletion,
+  handleRaisedRequestPaymentAction,
 };

@@ -67,11 +67,19 @@ const RaisedRequestSchema = new mongoose.Schema(
         "Decision Pending",
         "Property Owner Approval Pending",
         "Payment Pending",
-        "SuccessFull",
+        "Successfull",
         "Property Owner Rejected",
         "Expired",
       ],
       default: "Decision Pending",
+    },
+    payingUserCount: {
+      type: Number,
+      default: 0,
+    },
+    paidByUsersCount: {
+      type: Number,
+      default: 0,
     },
   },
   { timestamps: true }

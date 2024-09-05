@@ -9,6 +9,7 @@ const {
 } = require("./ShareController");
 const { sendUpdateNotification } = require("./notificationController");
 const PropertyShare = require("../models/PropertyShareSchema");
+const { handleRaisedRequestPaymentAction } = require("./PropertyController");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -55,7 +56,7 @@ const testCheckout = async (body, session) => {
       const { processorResponseType, id, paymentInstrumentType } =
         result.transaction;
 
-      console.log(processorResponseType)
+      console.log(processorResponseType);
       if (paymentFound) {
         console.log("in if");
 
@@ -88,7 +89,7 @@ const testCheckout = async (body, session) => {
           }
         );
       } else {
-        console.log("in else")
+        console.log("in else");
         const { shareID } = body;
 
         const shareFound = await PropertyShare.findOne(
@@ -171,6 +172,7 @@ const getPaymentsByUser = async (req, res) => {
       .populate("initiatedBy", "name username")
       .populate("shareDocID", "shareID")
       .populate("shareOfferDocID", "shareOfferID offerToPropertyOwner")
+      .populate("raisedRequestDocID", "raisedRequestID")
       .sort({ createdAt: -1 });
 
     // console.log(payments, payments.length);
@@ -178,6 +180,50 @@ const getPaymentsByUser = async (req, res) => {
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "getPaymentsByUser",
+      fileLocation: "controllers/PaymentController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
+const getPaymentsByReciever = async (req, res) => {
+  try {
+    const { username, status } = req.query;
+
+    let paymentStatus = [
+      "Successful",
+      "Pending",
+      "Cancelled",
+      "Declined by gateway",
+      "Expired",
+    ];
+
+    // console.log(req.query, paymentStatus);
+    const userFound = await Users.findOne({
+      username: username,
+    });
+
+    const payments = await Payments.find({
+      initiatedBy: userFound._id,
+      status: { $in: paymentStatus },
+    })
+      .populate("userDocID", "name username")
+      .populate("initiatedBy", "name username")
+      .populate("shareDocID", "shareID")
+      .populate("shareOfferDocID", "shareOfferID offerToPropertyOwner")
+      .populate("raisedRequestDocID", "raisedRequestID")
+      .sort({ createdAt: -1 });
+
+    // console.log(payments, payments.length);
+    res.status(200).json({ message: "Fetched", body: payments, success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getPaymentsByReciever",
       fileLocation: "controllers/PaymentController.js",
       timestamp: currentDateString,
     });
@@ -330,7 +376,7 @@ const buyShareTransaction = async (req, res) => {
       throw paymentResult;
     }
 
-    await session.commitTransaction()
+    await session.commitTransaction();
 
     res.status(201).json({ message: "Transaction Successfull", success: true });
   } catch (error) {
@@ -373,6 +419,14 @@ const pendingPaymentTransaction = async (req, res) => {
         data,
         session,
         "payment proceed"
+      );
+      if (controllerResult instanceof Error) {
+        throw controllerResult;
+      }
+    } else if (category === "Raised Request") {
+      const controllerResult = await handleRaisedRequestPaymentAction(
+        data,
+        session
       );
       if (controllerResult instanceof Error) {
         throw controllerResult;
@@ -445,4 +499,5 @@ module.exports = {
   pendingPaymentTransaction,
   rentOfferTransaction,
   handlePendingOfferPayments,
+  getPaymentsByReciever,
 };
