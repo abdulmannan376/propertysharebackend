@@ -54,12 +54,15 @@ const testCheckout = async (body, session) => {
     if (result.success) {
       const { processorResponseType, id, paymentInstrumentType } =
         result.transaction;
-      const userFound = await Users.findOne({ username: username }).session(
-        session
-      );
 
+      console.log(processorResponseType)
       if (paymentFound) {
         console.log("in if");
+
+        const userFound = await Users.findOne({
+          _id: paymentFound.initiatedBy,
+        });
+
         await Payments.updateOne(
           { _id: paymentFound._id },
           {
@@ -73,19 +76,60 @@ const testCheckout = async (body, session) => {
             session: session,
           }
         );
+
+        await Users.updateOne(
+          {
+            _id: paymentFound.initiatedBy,
+          },
+          {
+            $set: {
+              availBalnc: userFound.availBalnc + paymentFound.payingAmount,
+            },
+          }
+        );
       } else {
+        console.log("in else")
+        const { shareID } = body;
+
+        const shareFound = await PropertyShare.findOne(
+          { shareID: shareID },
+          "propertyDocID"
+        )
+          .populate("propertyDocID", "publishedBy")
+          .session(session);
+
+        const userFound = await Users.findOne({ username: username }).session(
+          session
+        );
+
+        const ownerFound = await Users.findOne({
+          username: shareFound.propertyDocID.publishedBy,
+        }).session(session);
         // console.log(userFound);
         const newPayment = new Payments({
           gatewayTransactionID: id,
           purpose: purpose,
           paymentType: paymentInstrumentType,
           userDocID: userFound._id,
+          initiatedBy: ownerFound._id,
           totalAmount: amount,
           payingAmount: amount,
         });
 
         // console.log(newPayment);
         await newPayment.save({ session });
+
+        await Users.updateOne(
+          {
+            _id: ownerFound._id,
+          },
+          {
+            $set: {
+              availBalnc: ownerFound.availBalnc + amount,
+            },
+          },
+          { session }
+        );
       }
 
       return true;
@@ -255,7 +299,7 @@ const handlePendingOfferPayments = async () => {
       }
     }
 
-    console.log(`${paymentsList.length} number of payments expired`)
+    console.log(`${paymentsList.length} number of payments expired`);
     return true;
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
@@ -286,7 +330,7 @@ const buyShareTransaction = async (req, res) => {
       throw paymentResult;
     }
 
-    // session.commitTransaction()
+    await session.commitTransaction()
 
     res.status(201).json({ message: "Transaction Successfull", success: true });
   } catch (error) {

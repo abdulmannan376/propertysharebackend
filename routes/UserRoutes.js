@@ -2,10 +2,12 @@ const express = require("express");
 const router = express.Router();
 const UsersController = require("../controllers/UsersController");
 const uploadUserProFilePic = require("../middleware/multerUserProfilePic");
+const upload = require("../middleware/multerWithdrawalReciept");
 
 //POST
 router.post("/user-signup", UsersController.userSignUp);
 router.post("/user-login", UsersController.userLogin);
+router.post("/gen-withdrawal", UsersController.genWithdrawal);
 
 //PUT
 router.put("/verify-email", UsersController.verifyEmailVerficationCode);
@@ -29,7 +31,12 @@ router.put(
   uploadUserProFilePic.single("imageFile"),
   UsersController.uploadProfilePic
 );
-router.put("/update-user-profile", UsersController.updateUserProfileDetails)
+router.put("/update-user-profile", UsersController.updateUserProfileDetails);
+router.put(
+  "/update-withdrawal",
+  upload.single("imageFile"),
+  UsersController.updateWithdrawal
+);
 
 //GET
 router.get("/get-user-detail/:key", UsersController.getUserDetails);
@@ -44,7 +51,8 @@ router.get(
   "/get-user-profile-details/:username",
   UsersController.getUserProfileDetails
 );
-router.get("/search-users", UsersController.searchUsers)
+router.get("/search-users", UsersController.searchUsers);
+router.get("/get-user-withdrawals", UsersController.getUserWithdrawals);
 
 router.get("/decrypt-password", UsersController.decryptPassword);
 

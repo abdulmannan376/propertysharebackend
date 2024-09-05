@@ -27,6 +27,12 @@ const UserSchema = new mongoose.Schema({
   },
   isProfileCompleted: { type: Boolean, default: false },
   notificationByIDList: { type: [mongoose.Types.ObjectId], default: [] },
+  availBalnc: { type: Number, default: 0 },
+  withdrawalsListProcessed: {
+    type: [mongoose.Types.ObjectId],
+    ref: "withdrawals",
+    default: [],
+  },
 });
 
 const Users = mongoose.model("users", UserSchema);

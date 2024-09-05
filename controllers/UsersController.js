@@ -8,6 +8,7 @@ const { sendUpdateNotification } = require("./notificationController");
 const { verifyJWT } = require("../helpers/jwtController");
 const Properties = require("../models/PropertySchema");
 const { removeRecieverID } = require("../socket/socket");
+const Withdrawal = require("../models/WithdrawalSchema");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -531,6 +532,190 @@ const getUserData = async (req, res) => {
   }
 };
 
+const getUserWithdrawals = async (req, res) => {
+  try {
+    const { username, filter, isAdmin } = req.query;
+
+    const userFound = await Users.findOne({ username: username });
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    let statusList = [];
+    if (filter === "all") {
+      statusList = ["Dispatched", "Cancelled", "Expired"];
+    } else {
+      statusList = [filter];
+    }
+
+    if (isAdmin === "true") {
+      const withdrawalList = await Withdrawal.find({
+        status: { $in: statusList },
+      }).populate("userDocID", "username");
+
+      res
+        .status(200)
+        .json({ message: "Fetched", success: true, body: withdrawalList });
+    } else {
+      const withdrawalList = await Withdrawal.find({
+        userDocID: userFound._id,
+        status: { $in: statusList },
+      }).populate("userDocID", "username");
+
+      res
+        .status(200)
+        .json({ message: "Fetched", success: true, body: withdrawalList });
+    }
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "getUserWithdrawals",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
+const genWithdrawal = async (req, res) => {
+  try {
+    const { username, amount } = req.query;
+
+    const userFound = await Users.findOne({ username: username });
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    if (userFound.availBalnc < amount) {
+      return res
+        .status(400)
+        .json({ message: "Not enough balance available", success: false });
+    }
+
+    const newWithdrawalRequest = new Withdrawal({
+      amount: amount,
+      userDocID: userFound,
+    });
+
+    await newWithdrawalRequest.save();
+
+    await Users.updateOne(
+      {
+        _id: userFound._id,
+      },
+      {
+        $set: {
+          availBalnc: userFound.availBalnc - parseInt(amount),
+        },
+      }
+    );
+
+    res
+      .status(200)
+      .json({ message: "Withdrawal Request Generated", success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "genWithdrawal",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const updateWithdrawal = async (req, res) => {
+  try {
+    const { withdrawalID, action } = req.body;
+
+    const withdrawalFound = await Withdrawal.findOne({
+      withdrawalID: withdrawalID,
+    }).populate({
+      path: "userDocID",
+      model: "users",
+      select: "userDefaultSettingID username name availBalnc",
+      populate: {
+        path: "userDefaultSettingID",
+        model: "user_default_settings",
+        select: "notifyUpdates",
+      },
+    });
+    if (!withdrawalFound) {
+      throw new Error("withdrawal not found.");
+    }
+
+    if (action === "dispatched") {
+      const uploadPath = `uploads/withdrawal-reciepts/${req.body.withdrawalID}/`;
+
+      await Withdrawal.updateOne(
+        {
+          _id: withdrawalFound._id,
+        },
+        {
+          $set: {
+            status: "Dispatched",
+            imageDir: uploadPath,
+          },
+        }
+      );
+
+      const emailSubject = `Withdrawal (${withdrawalID}) dispatched`;
+      const emailBody = `Dear ${withdrawalFound.userDocID.name}, \nYou requested withdrawal (${withdrawalID}) of amount $${withdrawalFound.amount} is dispatched. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        emailSubject,
+        emailBody,
+        withdrawalFound.userDocID.userDefaultSettingID.notifyUpdates,
+        withdrawalFound.userDocID.username
+      );
+    } else if (action === "cancel") {
+      await Withdrawal.updateOne(
+        {
+          _id: withdrawalFound._id,
+        },
+        {
+          $set: {
+            status: "Cancelled",
+          },
+        }
+      );
+
+      await Users.updateOne(
+        { _id: withdrawalFound.userDocID._id },
+        {
+          $set: {
+            availBalnc:
+              withdrawalFound.userDocID.availBalnc + withdrawalFound.amount,
+          },
+        }
+      );
+    } else {
+      return res
+        .status(403)
+        .json({ messgae: "Forbidden or No action provided", success: false });
+    }
+
+    res
+      .status(200)
+      .json({ messgae: "Withdrawal updated", success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "updateWithdrawal",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
 const handleUserFavouriteList = async (req, res) => {
   try {
     const { propertyID, username, action } = req.body;
@@ -996,4 +1181,7 @@ module.exports = {
   uploadProfilePic,
   updateUserProfileDetails,
   searchUsers,
+  getUserWithdrawals,
+  genWithdrawal,
+  updateWithdrawal,
 };
