@@ -14,24 +14,24 @@ app.use(express.json());
 //new update
 
 //Read SSL certificate files
-const privateKey = fs.readFileSync(
-  "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
-  "utf8"
-);
-const certificate = fs.readFileSync(
-  "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
-  "utf8"
-);
+// const privateKey = fs.readFileSync(
+//   "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
+//   "utf8"
+// );
+// const certificate = fs.readFileSync(
+//   "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
+//   "utf8"
+// );
 
-const credentials = {
-  key: privateKey,
-  cert: certificate,
-};
+// const credentials = {
+//   key: privateKey,
+//   cert: certificate,
+// };
 
-// Create HTTPS server
-const server = https.createServer(credentials, app);
+// // Create HTTPS server
+// const server = https.createServer(credentials, app);
 
-// const server = http.createServer(app);
+const server = http.createServer(app);
 const io = new Server(server, {
   path: "/socket.io",
   transports: ["websocket"],
@@ -51,7 +51,7 @@ messagesNamespace.on("connection", (socket) => {
 const userSocketMap = {};
 
 const getRecieverID = (username) => {
-  console.log(userSocketMap);
+  console.log("in getRecieverID", userSocketMap);
   return userSocketMap[username];
 };
 
@@ -66,7 +66,7 @@ io.on("connection", (socket) => {
   const username = socket.handshake.query.username;
   if (username) userSocketMap[username] = socket.id;
 
-  console.log(userSocketMap);
+  console.log("in onConnection: ", userSocketMap);
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
   socket.on("seenMessage", async (msg) => {
@@ -110,6 +110,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("login", (data) => {
+    console.log("user login", userSocketMap);
     console.log("user login", socket.id);
     userSocketMap[data.username] = socket.id;
   });

@@ -56,6 +56,13 @@ const PropertySchema = new mongoose.Schema(
       enum: ["Featured", "Non-Featured"],
       default: "Non-Featured",
     },
+    featuredEndDate: {
+      type: {
+        date: Date,
+        dateString: String,
+      },
+      default: null,
+    },
     listingStatus: {
       type: String,
       enum: ["draft", "live", "pending approval", "hidden", "rejected"],

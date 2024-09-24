@@ -49,8 +49,17 @@ router.put(
   PropertyController.handleRaiseRequestActionPropertyOwner
 ); //PO = Property Owner
 
-router.put("/update-property-approval-action", PropertyController.handlePropertyAction)
-router.put("/update-property-status", PropertyController.handlePropertyStatus)
+router.put(
+  "/update-property-approval-action",
+  PropertyController.handlePropertyAction
+);
+router.put("/update-property-status", PropertyController.handlePropertyStatus);
+
+//PATCH
+router.patch(
+  "/update-property-status",
+  PropertyController.handlePropertyFeatured
+);
 
 //GET
 router.get(
@@ -100,8 +109,12 @@ router.get(
   "/get-raise-request-detail/:key",
   PropertyController.getRaiseRequestDetail
 );
-router.get("/get-pending-approval-properties/:username", PropertyController.getPendingApprovalProperties)
-router.get("/get-property-shares", PropertyController.getPropertySharesByID)
+router.get(
+  "/get-pending-approval-properties/:username",
+  PropertyController.getPendingApprovalProperties
+);
+router.get("/get-property-shares", PropertyController.getPropertySharesByID);
+router.get("/get-properties", PropertyController.getProperties);
 
 // router.get("/test-share-ID", PropertyController.testGenerateShareID)
 

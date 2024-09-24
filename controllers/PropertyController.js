@@ -1407,6 +1407,8 @@ const genRaiseRequest = async (req, res) => {
     const { propertyID, username, title, details, price, type, URLsList } =
       req.body;
 
+    const files = req.files;
+
     const shareholderFound = await Shareholders.findOne({
       username: username,
     }).populate({
@@ -1459,10 +1461,12 @@ const genRaiseRequest = async (req, res) => {
     }-${today.getMonth()}-${today.getFullYear()}/`;
 
     // Update property with new information
-    newRaiseRequest.imageDir = uploadPath;
-    newRaiseRequest.imageCount = fs
-      .readdirSync(uploadPath)
-      .filter((file) => file.startsWith("image-")).length;
+    if (files.length > 0) {
+      newRaiseRequest.imageDir = uploadPath;
+      newRaiseRequest.imageCount = fs
+        .readdirSync(uploadPath)
+        .filter((file) => file.startsWith("image-")).length;
+    }
 
     await newRaiseRequest.save().then(() => {
       notifyPropertyShareOwnerByPropertyID(propertyID, type);
@@ -1918,13 +1922,15 @@ const handleRaiseRequestActionPropertyOwner = async (req, res) => {
     for (const user of usersFoundList) {
       const newPayment = new Payments({
         category: "Raised Request",
-        totalAmount: raiseRequestFound.estimatedPrice / raiseRequestFound.payingUserCount,
-        payingAmount: raiseRequestFound.estimatedPrice / raiseRequestFound.payingUserCount,
+        totalAmount:
+          raiseRequestFound.estimatedPrice / raiseRequestFound.payingUserCount,
+        payingAmount:
+          raiseRequestFound.estimatedPrice / raiseRequestFound.payingUserCount,
         userDocID: user._id,
         initiatedBy: userFound._id,
         purpose: `Modification Request of ${raiseRequestFound.title} payment required`,
         raisedRequestDocID: raiseRequestFound._id,
-        status: "Pending"
+        status: "Pending",
       });
 
       await newPayment.save();
@@ -2188,6 +2194,78 @@ const deleteAllImages = async (req, res) => {
 //   }
 // };
 
+const getProperties = async (req, res) => {
+  try {
+    const { filter } = req.query;
+
+    let propertiesList = [];
+
+    if (filter === "Featured") {
+      propertiesList = await Properties.find({ status: "Featured" }).sort({
+        createdAt: -1,
+      });
+    } else {
+      throw new Error("No or invalid filter provided");
+    }
+
+    res
+      .status(200)
+      .json({ message: "Fetched", success: true, body: propertiesList });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getProperties",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: new Date().toISOString(),
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
+async function featuredExpiry() {
+  try {
+    const propertiesList = await Properties.find({ status: "Featured" });
+
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    let expiryCount = 0;
+    for (const property of propertiesList) {
+      if (property.featuredEndDate.date < today) {
+        await Properties.updateOne(
+          { _id: property._id },
+          {
+            $set: {
+              status: "Non-Featured",
+              featuredEndDate: null,
+            },
+          }
+        );
+        expiryCount++;
+      }
+    }
+
+    console.log({
+      message: `${expiryCount} expired featured properties.`,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "/nlocation: ", {
+      function: "featuredExpiry",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: new Date().toISOString(),
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+}
+
 const getFeaturedProperty = async (req, res) => {
   try {
     const body = JSON.parse(req.params.key);
@@ -2316,7 +2394,7 @@ const getFeaturedProperty = async (req, res) => {
         (properties.length % propertiesPerPage !== 0 ? 1 : 0),
     });
   } catch (error) {
-    console.log(`Error: ${error}`, "location: ", {
+    console.log(`Error: ${error}`, "\nlocation: ", {
       function: "getFeaturedProperty",
       fileLocation: "controllers/PropertyController.js",
       timestamp: new Date().toISOString(),
@@ -2753,6 +2831,71 @@ const getPropertyByID = async (req, res) => {
   }
 };
 
+const handlePropertyFeatured = async (req, res) => {
+  try {
+    const { id, action } = req.query;
+
+    const propertyFound = await Properties.findOne({ propertyID: id });
+
+    if (!propertyFound) {
+      throw new Error("property not found");
+    }
+
+    const userFound = await Users.findOne({
+      username: propertyFound.publishedBy,
+    }).populate("userDefaultSettingID", "notifyUpdates");
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    if (action === "true") {
+      const today = new Date();
+      const expiryDate = new Date();
+
+      expiryDate.setDate(today.getDate() + 30);
+      await Properties.updateOne(
+        {
+          _id: propertyFound._id,
+        },
+        {
+          $set: {
+            status: "Featured",
+            featuredEndDate: {
+              date: expiryDate,
+              dateString: expiryDate.toDateString(),
+            },
+          },
+        }
+      );
+
+      const notifySubject = `Property (${propertyFound.propertyID}) Featured`;
+      const notifyBody = `Dear ${userFound.name}, Your property \nTitle:${propertyFound.title} \nPropertyID:${propertyFound.propertyID} \nIs featured on our platform. \nRegards,\nBeach Bunny House. `;
+
+      sendUpdateNotification(
+        notifySubject,
+        notifyBody,
+        userFound.userDefaultSettingID.notifyUpdates,
+        userFound.username
+      );
+    } else {
+      throw new Error("No or forbidden action provided");
+    }
+
+    res.status(200).json({ message: "Status updated", success: true });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "handlePropertyFeatured",
+      fileLocation: "controllers/PropertyController.js",
+      timestamp: new Date().toISOString(),
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  }
+};
+
 async function handleDraftProperties() {
   try {
     const today = new Date();
@@ -3079,6 +3222,7 @@ module.exports = {
   getFeaturedProperty,
   getMostViewedProperties,
   getRecentlyAddedProperties,
+  getProperties,
   getPropertiesByType,
   getPropertiesByAvailableShares,
   getPropertyByID,
@@ -3100,4 +3244,6 @@ module.exports = {
   getPropertySharesByID,
   calPropertyDurationCompletion,
   handleRaisedRequestPaymentAction,
+  handlePropertyFeatured,
+  featuredExpiry,
 };

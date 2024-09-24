@@ -9,6 +9,7 @@ const startCronJobs = () => {
   cron.schedule("0 0 * * *", PropertyController.openInspections);
   cron.schedule("0 0 * * *", PropertyController.calPropertyDurationCompletion);
   cron.schedule("0 * * * *", PaymentController.handlePendingOfferPayments);
+  cron.schedule("0 0 * * *", PropertyController.featuredExpiry);
 };
 
 module.exports = startCronJobs;
