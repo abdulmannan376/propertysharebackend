@@ -2852,7 +2852,7 @@ const handlePropertyFeatured = async (req, res) => {
       const today = new Date();
       const expiryDate = new Date();
 
-      expiryDate.setDate(today.getDate() + 30);
+      expiryDate.setDate(today.getDate() + 7);
       await Properties.updateOne(
         {
           _id: propertyFound._id,

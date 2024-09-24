@@ -10,6 +10,7 @@ const {
 const { sendUpdateNotification } = require("./notificationController");
 const PropertyShare = require("../models/PropertyShareSchema");
 const { handleRaisedRequestPaymentAction } = require("./PropertyController");
+const Withdrawal = require("../models/WithdrawalSchema");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -230,6 +231,81 @@ const getPaymentsByReciever = async (req, res) => {
     res.status(500).json({
       message: error.message || "Internal Server Error",
       error: error,
+      success: false,
+    });
+  }
+};
+
+const getUserTransactionHistory = async (req, res) => {
+  try {
+    const { username } = req.query;
+
+    // Define successful status for both Payments and Withdrawals
+    const successfulStatus = ["Successful"];
+
+    // Find user by username
+    const userFound = await Users.findOne({ username: username });
+
+    if (!userFound) {
+      return res
+        .status(404)
+        .json({ message: "User not found", success: false });
+    }
+
+    // Fetch successful payments initiated by the user
+    const payments = await Payments.find({
+      initiatedBy: userFound._id,
+      status: { $in: successfulStatus },
+    })
+      .populate("userDocID", "name username")
+      .populate("initiatedBy", "name username")
+      .lean(); // Use lean() for better performance if no need to modify data later
+
+    // Add paymentType 'Credit' for payments
+    const formattedPayments = payments.map((payment) => ({
+      ...payment,
+      paymentType: "Credit", // Flag as credit
+      timestamp: payment.createdAt, // Add timestamp field for sorting
+    }));
+
+    // Fetch successful withdrawals where the user is involved
+    const withdrawals = await Withdrawal.find({
+      userDocID: userFound._id,
+      status: "Dispatched",
+    })
+      .populate("userDocID", "name username")
+      .lean();
+
+    // Add paymentType 'Debit' for withdrawals
+    const formattedWithdrawals = withdrawals.map((withdrawal) => ({
+      ...withdrawal,
+      paymentType: "Debit", // Flag as debit
+      timestamp: withdrawal.createdAt, // Add timestamp field for sorting
+    }));
+
+    // Merge payments and withdrawals into a single list
+    const allTransactions = [...formattedPayments, ...formattedWithdrawals];
+
+    // Sort by timestamp (latest first)
+    const sortedTransactions = allTransactions.sort(
+      (a, b) => a.timestamp - b.timestamp
+    );
+
+    // Respond with the merged and sorted transactions
+    res.status(200).json({
+      message: "Fetched",
+      body: sortedTransactions,
+      success: true,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "getUserTransactionHistory",
+      fileLocation: "controllers/PaymentController.js",
+      timestamp: new Date().toISOString(),
+    });
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error,
       success: false,
     });
   }
@@ -500,4 +576,5 @@ module.exports = {
   rentOfferTransaction,
   handlePendingOfferPayments,
   getPaymentsByReciever,
+  getUserTransactionHistory,
 };

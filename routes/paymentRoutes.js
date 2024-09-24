@@ -14,5 +14,6 @@ router.put("/pending-payment-transaction", PaymentController.pendingPaymentTrans
 router.get("/client-token", PaymentController.GetClientToken);
 router.get("/get-payments-by-user", PaymentController.getPaymentsByUser);
 router.get("/get-payments-by-reciever", PaymentController.getPaymentsByReciever)
+router.get("/get-user-history", PaymentController.getUserTransactionHistory)
 
 module.exports = router;
