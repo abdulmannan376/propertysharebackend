@@ -29,9 +29,9 @@ const credentials = {
 };
 
 // Create HTTPS server
-const server = https.createServer(credentials, app);
+// const server = https.createServer(credentials, app);
 
-// const server = http.createServer(app);
+const server = http.createServer(app);
 const io = new Server(server, {
   path: "/socket.io",
   transports: ["websocket"],

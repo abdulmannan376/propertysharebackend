@@ -11,6 +11,10 @@ const UserProfileSchema = new mongoose.Schema({
   dob: { type: String, default: null },
   profilePicURL: { type: String, default: "" },
   religion: { type: String, default: "" },
+  profileCompletePercentage: {
+    type: Number,
+    default: 0,
+  },
   bloodGroup: {
     type: String,
     enum: ["", "O+", "O-", "A+", "A-", "AB+", "AB-", "B+", "B-"],

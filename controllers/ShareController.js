@@ -243,6 +243,7 @@ const getBuySharesDetailByUsername = async (req, res) => {
 const getSharesByProperty = async (req, res) => {
   try {
     const { key, status } = req.params;
+    const { category } = req.query;
 
     const propertySharesFound = await PropertyShares.find({
       propertyDocID: key,
@@ -260,9 +261,15 @@ const getSharesByProperty = async (req, res) => {
         .json({ message: "No shares available.", success: true });
     }
 
-    const propertyShareExpectOwner = propertySharesFound.filter((share) => {
-      return !share.shareID.endsWith("00");
-    });
+    let propertyShareExpectOwner = [];
+
+    if (category && category === "Rent") {
+      propertyShareExpectOwner = propertySharesFound;
+    } else {
+      propertyShareExpectOwner = propertySharesFound.filter((share) => {
+        return !share.shareID.endsWith("00");
+      });
+    }
 
     res.status(200).json({
       message: "Fetch successfull",
@@ -1479,7 +1486,7 @@ const shareRentAction = async (data, session, action) => {
       const paymentsList = await Payments.find({
         shareDocID: shareFound._id,
         status: "Pending",
-        category: "Rent Offer"
+        category: "Rent Offer",
       });
 
       const paymentIDList = paymentsList.filter((payment) => {
@@ -1930,7 +1937,7 @@ const shareSellAction = async (data, session, action) => {
       const paymentsList = await Payments.find({
         shareDocID: shareFound._id,
         status: "Pending",
-        category: "Sell Offer"
+        category: "Sell Offer",
       });
 
       const paymentIDList = paymentsList.filter((payment) => {

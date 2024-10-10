@@ -1052,11 +1052,20 @@ const updateUserProfileDetails = async (req, res) => {
       userProfileFound.nationality = body.nationality;
       userProfileFound.religion = body.religion;
       userProfileFound.bloodGroup = body.bloodGroup;
+      if(userProfileFound.profileCompletePercentage <= 25) {
+        userProfileFound.profileCompletePercentage = 25
+      }
     } else if (action === "Contact Details") {
       userFound.contact = body.contact;
       userProfileFound.permanentAddress = body.permanentAddress;
+      if(userProfileFound.profileCompletePercentage <= 70) {
+        userProfileFound.profileCompletePercentage = 70
+      }
     } else if (action === "Next of Kin") {
       userProfileFound.nextOfKinDetails = body.nextOfKinDetails;
+      if(userProfileFound.profileCompletePercentage <= 100) {
+        userProfileFound.profileCompletePercentage = 100
+      }
     } else if (action === "Payment Details") {
       userProfileFound.paymentDetails = body.paymentDetails;
       userProfileFound.paymentDetails.cardNumber = CryptoJS.AES.encrypt(

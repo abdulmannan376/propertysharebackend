@@ -2702,7 +2702,22 @@ const getPropertiesByType = async (req, res) => {
     const matchQuery = {};
 
     if (propertyType && propertyType.length > 0)
-      matchQuery.propertyType = { $in: propertyType };
+      if (propertyType.includes("ALL")) {
+        matchQuery.propertyType = {
+          $in: [
+            "Mansion",
+            "Villa",
+            "Apartment",
+            "Suite",
+            "Condo",
+            "Townhouse",
+            "Bungalow",
+            "Cabin",
+            "Studio",
+            "Single family home",
+          ],
+        };
+      } else matchQuery.propertyType = { $in: propertyType };
 
     matchQuery.listingStatus = { $in: ["live"] };
     const pipeline = [];
