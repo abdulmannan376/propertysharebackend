@@ -699,9 +699,7 @@ const updateWithdrawal = async (req, res) => {
         .json({ messgae: "Forbidden or No action provided", success: false });
     }
 
-    res
-      .status(200)
-      .json({ messgae: "Withdrawal updated", success: true });
+    res.status(200).json({ messgae: "Withdrawal updated", success: true });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
       function: "updateWithdrawal",
@@ -1026,6 +1024,63 @@ const uploadProfilePic = async (req, res) => {
   }
 };
 
+const uploadIDCardPic = async (req, res) => {
+  try {
+    const body = req.body;
+
+    const userFound = await Users.findOne({ username: body.username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      throw new Error("user not found");
+    }
+
+    const userProfileFound = await UserProfile.findOne({
+      userDocID: userFound._id,
+    });
+
+    const uploadPath = `uploads/IdentityCards/${body.username}/`;
+
+    if (body.cardFace === "Front") {
+      await UserProfile.updateOne(
+        { _id: userProfileFound._id },
+        {
+          $set: {
+            idCardPicsDir: uploadPath,
+            idCardFrontAdded: true,
+          },
+        }
+      );
+    } else if (body.cardFace === "Back") {
+      await UserProfile.updateOne(
+        { _id: userProfileFound._id },
+        {
+          $set: {
+            idCardPicsDir: uploadPath,
+            idCardBackAdded: true,
+          },
+        }
+      );
+    }
+
+    res.status(201).json({
+      message: "Id Card Pic Updated.",
+      success: true,
+      body: uploadPath,
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "\nlocation: ", {
+      function: "uploadIDCardPic",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
 const updateUserProfileDetails = async (req, res) => {
   try {
     const { action, body, username } = req.body;
@@ -1052,19 +1107,19 @@ const updateUserProfileDetails = async (req, res) => {
       userProfileFound.nationality = body.nationality;
       userProfileFound.religion = body.religion;
       userProfileFound.bloodGroup = body.bloodGroup;
-      if(userProfileFound.profileCompletePercentage <= 25) {
-        userProfileFound.profileCompletePercentage = 25
+      if (userProfileFound.profileCompletePercentage <= 25) {
+        userProfileFound.profileCompletePercentage = 25;
       }
     } else if (action === "Contact Details") {
       userFound.contact = body.contact;
       userProfileFound.permanentAddress = body.permanentAddress;
-      if(userProfileFound.profileCompletePercentage <= 70) {
-        userProfileFound.profileCompletePercentage = 70
+      if (userProfileFound.profileCompletePercentage <= 70) {
+        userProfileFound.profileCompletePercentage = 70;
       }
     } else if (action === "Next of Kin") {
       userProfileFound.nextOfKinDetails = body.nextOfKinDetails;
-      if(userProfileFound.profileCompletePercentage <= 100) {
-        userProfileFound.profileCompletePercentage = 100
+      if (userProfileFound.profileCompletePercentage <= 100) {
+        userProfileFound.profileCompletePercentage = 100;
       }
     } else if (action === "Payment Details") {
       userProfileFound.paymentDetails = body.paymentDetails;
@@ -1193,4 +1248,5 @@ module.exports = {
   getUserWithdrawals,
   genWithdrawal,
   updateWithdrawal,
+  uploadIDCardPic,
 };

@@ -3,6 +3,7 @@ const router = express.Router();
 const UsersController = require("../controllers/UsersController");
 const uploadUserProFilePic = require("../middleware/multerUserProfilePic");
 const upload = require("../middleware/multerWithdrawalReciept");
+const uploadIDCard = require("../middleware/multerUserIdentityCards");
 
 //POST
 router.post("/user-signup", UsersController.userSignUp);
@@ -30,6 +31,11 @@ router.put(
   "/upload-profile-pic",
   uploadUserProFilePic.single("imageFile"),
   UsersController.uploadProfilePic
+);
+router.put(
+  "/upload-id-card-pics",
+  uploadIDCard.single("imageFile"),
+  UsersController.uploadIDCardPic
 );
 router.put("/update-user-profile", UsersController.updateUserProfileDetails);
 router.put(

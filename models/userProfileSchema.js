@@ -10,6 +10,15 @@ const UserProfileSchema = new mongoose.Schema({
   dobString: { type: String, default: "" },
   dob: { type: String, default: null },
   profilePicURL: { type: String, default: "" },
+  idCardPicsDir: { type: String, default: "" },
+  idCardFrontAdded: {
+    type: Boolean,
+    default: false,
+  },
+  idCardBackAdded: {
+    type: Boolean,
+    default: false,
+  },
   religion: { type: String, default: "" },
   profileCompletePercentage: {
     type: Number,
