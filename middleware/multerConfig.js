@@ -24,9 +24,9 @@ function reorganizeFiles(directory, deleteIndices = []) {
     console.log("remaining file: ", file)
     if (file) {
       const newFileName = `image-${index + 1}${
-        path.extname(file.originalname) !== ".png"
+        path.extname(file) !== ".png"
           ? ".png"
-          : path.extname(file.originalname)
+          : path.extname(file)
       }`;
       const oldFilePath = path.join(directory, file);
       const newFilePath = path.join(directory, newFileName);
