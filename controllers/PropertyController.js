@@ -2024,21 +2024,6 @@ const addPropertyImages = async (req, res) => {
 
     // Save new files (assuming diskStorage is used and files are automatically saved)
     const imageCount = propertyFound.imageCount;
-    files.forEach((file, index) => {
-      const newFilename = `image-${imageCount + index + 1}${path.extname(
-        file.originalname
-      )}`;
-      const oldPath = file.path;
-      const newPath = path.join(uploadPath, newFilename);
-
-      // Rename file to maintain naming convention
-      fs.renameSync(oldPath, newPath);
-    });
-
-    // Handle deletion of specified images
-    if (body.deleteImageList && body.deleteImageList?.length) {
-      reorganizeFiles(uploadPath, body.deleteImageList.map(Number));
-    }
 
     if (body.pinnedImage) {
       propertyFound.pinnedImageIndex = parseInt(body.pinnedImage);
@@ -2050,7 +2035,7 @@ const addPropertyImages = async (req, res) => {
       .readdirSync(uploadPath)
       .filter((file) => file.startsWith("image-")).length;
     propertyFound.listingStatus =
-      body.userRole === "admin" ? "live" : "pending approval";
+      body.userRole === "admin" || propertyFound.listingStatus === "live" ? "live" : "pending approval";
 
     await propertyFound.save();
 
