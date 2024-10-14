@@ -11,7 +11,7 @@ function reorganizeFiles(directory, deleteIndices = []) {
   // Delete files as per indices provided
   deleteIndices.sort((a, b) => b - a); // Sort indices in descending order for deletion
   deleteIndices.forEach((index) => {
-    const filePath = path.join(directory, files[index]);
+    const filePath = path.join(directory, files[parseInt(index) - 1]);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
