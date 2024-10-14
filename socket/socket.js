@@ -14,24 +14,24 @@ app.use(express.json());
 //new update
 
 //Read SSL certificate files
-// const privateKey = fs.readFileSync(
-//   "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
-//   "utf8"
-// );
-// const certificate = fs.readFileSync(
-//   "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
-//   "utf8"
-// );
+const privateKey = fs.readFileSync(
+  "/etc/letsencrypt/live/beachbunnyhouse.com/privkey.pem",
+  "utf8"
+);
+const certificate = fs.readFileSync(
+  "/etc/letsencrypt/live/beachbunnyhouse.com/fullchain.pem",
+  "utf8"
+);
 
-// const credentials = {
-//   key: privateKey,
-//   cert: certificate,
-// };
+const credentials = {
+  key: privateKey,
+  cert: certificate,
+};
 
 // Create HTTPS server
-// const server = https.createServer(credentials, app);
+const server = https.createServer(credentials, app);
 
-const server = http.createServer(app);
+// const server = http.createServer(app);
 const io = new Server(server, {
   path: "/socket.io",
   transports: ["websocket"],
