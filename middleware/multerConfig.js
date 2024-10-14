@@ -21,6 +21,7 @@ function reorganizeFiles(directory, deleteIndices = []) {
     .readdirSync(directory)
     .filter((file) => file.startsWith("image-"));
   remainingFiles.forEach((file, index) => {
+    console.log("remaining file: ", file)
     if (file) {
       const newFileName = `image-${index + 1}${
         path.extname(file.originalname) !== ".png"
