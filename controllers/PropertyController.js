@@ -1919,11 +1919,17 @@ const handleRaiseRequestActionPropertyOwner = async (req, res) => {
 
     const userFound = await Users.findOne({ username: username });
 
+    const companyFeePercentage =
+      parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
+    const companyFee =
+      parseInt(raiseRequestFound.estimatedPrice / raiseRequestFound.payingUserCount) * companyFeePercentage;
+
     for (const user of usersFoundList) {
       const newPayment = new Payments({
         category: "Raised Request",
         totalAmount:
           raiseRequestFound.estimatedPrice / raiseRequestFound.payingUserCount,
+        companyFee: companyFee,
         payingAmount:
           raiseRequestFound.estimatedPrice / raiseRequestFound.payingUserCount,
         userDocID: user._id,

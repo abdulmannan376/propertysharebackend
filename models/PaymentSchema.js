@@ -12,6 +12,10 @@ const PaymentSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    companyFee: {
+      type: Number,
+      default: 0,
+    },
     totalAmount: {
       type: Number,
       required: true,

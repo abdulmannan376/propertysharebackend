@@ -1541,6 +1541,12 @@ const handleShareRentOfferAction = async (req, res) => {
       _id: shareOfferFound.shareDocID,
     }).populate("propertyDocID", "title propertyID");
 
+    const companyFeePercentage =
+      parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
+    const companyFee =
+      Math.ceil(parseInt(propertyShareFound.priceByCategory) * companyFeePercentage);
+
+    
     if (action === "accepted") {
       const newPayment = new Payments({
         gatewayTransactionID: "",
@@ -1550,6 +1556,7 @@ const handleShareRentOfferAction = async (req, res) => {
         initiatedBy: shareOwnerFound._id,
         totalAmount: propertyShareFound.priceByCategory,
         payingAmount: propertyShareFound.priceByCategory,
+        companyFee: companyFee,
         status: "Pending",
         shareDocID: propertyShareFound._id,
         shareOfferDocID: shareOfferFound._id,
@@ -1967,10 +1974,7 @@ const handleShareSellOfferAction = async (req, res) => {
   try {
     const { username, offerID, action, isBuybackOffer } = req.body;
 
-    const userFound = await Users.findOne({ username: username }).populate(
-      "userDefaultSettingID",
-      "notifyUpdates"
-    );
+    const userFound = await Users.findOne({ username: username })
     if (!userFound) {
       throw new Error("user not found");
     }
@@ -2010,9 +2014,17 @@ const handleShareSellOfferAction = async (req, res) => {
 
     const buyerFound = await Users.findOne({
       username: shareOfferFound.userDocID.username,
-    });
+    }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
 
     // console.log("shareholderFound: ", shareholderFound.username);
+
+    const companyFeePercentage =
+      parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
+    const companyFee =
+      Math.ceil(parseInt(propertyShareFound.priceByCategory) * companyFeePercentage);
 
     if (action === "accepted") {
       const newPayment = new Payments({
@@ -2023,6 +2035,7 @@ const handleShareSellOfferAction = async (req, res) => {
         initiatedBy: sharePrevOwnerFound._id,
         totalAmount: propertyShareFound.priceByCategory,
         payingAmount: propertyShareFound.priceByCategory,
+        companyFee: companyFee,
         status: "Pending",
         shareDocID: propertyShareFound._id,
         shareOfferDocID: shareOfferFound._id,
@@ -2070,46 +2083,37 @@ const handleShareSellOfferAction = async (req, res) => {
 
     shareOfferFound.save().then(() => {
       if (action === "accepted") {
-        const userNotificationsubject = `Sell Offer from ${sharePrevOwnerFound.username} Accepted`;
+        const userNotificationsubject = `Sell Offer Accepted by ${sharePrevOwnerFound.name}`;
         const userNotificationbody = `Dear ${
-          userFound.name
-        }, \nYou have successfully accepted the offer of rent of ${
+          buyerFound.name
+        }, \nYour share buy offer have successfully accepted of ${
           propertyShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            propertyShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            propertyShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        }\nPrice: $${shareOfferFound.price} \nShare Previous Owner Username: ${
+        } property's share. \nDuration: ${propertyShareFound.availableInDuration.startDate.toDateString()} - ${propertyShareFound.availableInDuration.endDate.toDateString()}\nPrice: $${
+          shareOfferFound.price
+        } \nPrevious Owner Username: ${
           sharePrevOwnerFound.username
         } \nRegards, \nBeach Bunny House`;
 
         const ownerNotificationSubject = `Property Share Sell Offer Accepted`;
-        const ownerNotificationBody = `Dear ${sharePrevOwnerFound.name}, \nYour share rent offer has been accepted by user: ${userFound.username} at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
+        const ownerNotificationBody = `Dear ${sharePrevOwnerFound.name}, \nYou have accepted share sell offer by user: ${buyerFound.username} at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
 
         sendUpdateNotification(
           userNotificationsubject,
           userNotificationbody,
-          userFound.userDefaultSettingID.notifyUpdates,
-          username
+          buyerFound.userDefaultSettingID.notifyUpdates,
+          buyerFound.username
         );
 
         sendUpdateNotification(
           ownerNotificationSubject,
           ownerNotificationBody,
-          sharePrevOwnerFound.userDefaultSettingID.notifyUpdates,
-          sharePrevOwnerFound.username
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
         );
       } else if (action === "rejected") {
         const userNotificationsubject = `Rent Offer from ${sharePrevOwnerFound.username} Rejected`;
         const userNotificationbody = `Dear ${
-          userFound.name
+          buyerFound.name
         }, \nYou have successfully rejected the offer of rent of ${
           propertyShareFound.propertyDocID.title
         } property's share. \nDuration: ${
@@ -2133,8 +2137,8 @@ const handleShareSellOfferAction = async (req, res) => {
         sendUpdateNotification(
           userNotificationsubject,
           userNotificationbody,
-          userFound.userDefaultSettingID.notifyUpdates,
-          username
+          buyerFound.userDefaultSettingID.notifyUpdates,
+          buyerFound.username
         );
 
         sendUpdateNotification(

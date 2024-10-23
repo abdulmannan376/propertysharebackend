@@ -65,6 +65,10 @@ const testCheckout = async (body, session) => {
           _id: paymentFound.initiatedBy,
         });
 
+        const companyFeePercentage =
+          parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
+        const companyFee = Math.ceil(parseInt(paymentFound.payingAmount) * companyFeePercentage);
+
         await Payments.updateOne(
           { _id: paymentFound._id },
           {
@@ -85,7 +89,7 @@ const testCheckout = async (body, session) => {
           },
           {
             $set: {
-              availBalnc: userFound.availBalnc + paymentFound.payingAmount,
+              availBalnc: userFound.availBalnc + paymentFound.payingAmount - companyFee,
             },
           }
         );
@@ -108,6 +112,11 @@ const testCheckout = async (body, session) => {
           username: shareFound.propertyDocID.publishedBy,
         }).session(session);
         // console.log(userFound);
+
+        const companyFeePercentage =
+          parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
+        const companyFee = Math.ceil(parseInt(amount) * companyFeePercentage);
+
         const newPayment = new Payments({
           gatewayTransactionID: id,
           purpose: purpose,
@@ -115,6 +124,7 @@ const testCheckout = async (body, session) => {
           userDocID: userFound._id,
           initiatedBy: ownerFound._id,
           totalAmount: amount,
+          companyFee: companyFee,
           payingAmount: amount,
         });
 
