@@ -11,6 +11,8 @@ const { sendUpdateNotification } = require("./notificationController");
 const PropertyShare = require("../models/PropertyShareSchema");
 const { handleRaisedRequestPaymentAction } = require("./PropertyController");
 const Withdrawal = require("../models/WithdrawalSchema");
+const paypal = require("@paypal/paypal-server-sdk");
+const { createPayPalClient } = require("../middleware/paypalConfig");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -35,6 +37,119 @@ const GetClientToken = async (req, res) => {
       error: error,
       success: false,
     });
+  }
+};
+
+const baseUrl = {
+  sandbox: "https://api-m.sandbox.paypal.com",
+};
+
+async function generateAccessToken() {
+  try {
+    const auth = Buffer.from(
+      `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
+    ).toString("base64");
+    const response = await fetch(`${baseUrl.sandbox}/v1/oauth2/token`, {
+      method: "POST",
+      body: "grant_type=client_credentials",
+      headers: {
+        Authorization: `Basic ${auth}`, // Change 'Bearer' to 'Basic'
+        "Content-Type": "application/x-www-form-urlencoded", // Required for form data
+      },
+    });
+
+    const data = await response.json();
+    return data.access_token;
+  } catch (error) {
+    console.error("Failed to generate Access Token:", error);
+  }
+}
+
+// create an order
+async function createOrder(paymentSource, amount) {
+  try {
+    const accessToken = await generateAccessToken();
+    const url = `${baseUrl.sandbox}/v2/checkout/orders`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        intent: "CAPTURE",
+        purchase_units: [
+          {
+            amount: {
+              currency_code: "USD",
+              value: amount,
+            },
+          },
+        ],
+        payment_source: {
+          [paymentSource]: {}, // Dynamic payment source
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorDetails = await response.json();
+      throw new Error(
+        `PayPal API error: ${response.status} ${
+          response.statusText
+        } - ${JSON.stringify(errorDetails)}`
+      );
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error creating PayPal order:", error.message);
+    throw error;
+  }
+}
+
+// capture payment for an order
+async function capturePayment(orderId) {
+  const accessToken = await generateAccessToken();
+  const url = `${baseUrl.sandbox}/v2/checkout/orders/${orderId}/capture`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  const data = await response.json();
+  return data;
+}
+
+const capturePaypalOrderPayment = async (req, res) => {
+  try {
+    const { orderID } = req.params;
+
+    const captureData = await capturePayment(orderID);
+    res.json(captureData);
+  } catch (err) {
+    console.error("Error in capturePaypalOrder controller:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const createPaypalOrder = async (req, res) => {
+  try {
+    const { paymentSource, amount } = req.body;
+
+    if (!paymentSource) {
+      return res.status(400).json({ error: "Payment source is required." });
+    }
+
+    const order = await createOrder(paymentSource, amount);
+    res.json(order);
+  } catch (err) {
+    console.error("Error in createPaypalOrder controller:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -67,7 +182,9 @@ const testCheckout = async (body, session) => {
 
         const companyFeePercentage =
           parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
-        const companyFee = Math.ceil(parseInt(paymentFound.payingAmount) * companyFeePercentage);
+        const companyFee = Math.ceil(
+          parseInt(paymentFound.payingAmount) * companyFeePercentage
+        );
 
         await Payments.updateOne(
           { _id: paymentFound._id },
@@ -89,7 +206,8 @@ const testCheckout = async (body, session) => {
           },
           {
             $set: {
-              availBalnc: userFound.availBalnc + paymentFound.payingAmount - companyFee,
+              availBalnc:
+                userFound.availBalnc + paymentFound.payingAmount - companyFee,
             },
           }
         );
@@ -587,4 +705,6 @@ module.exports = {
   handlePendingOfferPayments,
   getPaymentsByReciever,
   getUserTransactionHistory,
+  createPaypalOrder,
+  capturePaypalOrderPayment
 };

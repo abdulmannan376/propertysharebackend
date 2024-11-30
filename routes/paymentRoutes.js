@@ -6,6 +6,9 @@ const PaymentController = require("../controllers/PaymentController");
 router.post("/test-checkout", PaymentController.testCheckout);
 router.post("/generate-payment", PaymentController.genPayment);
 router.post("/buy-share-transaction", PaymentController.buyShareTransaction);
+router.post("/orders", PaymentController.createPaypalOrder)
+router.post("/orders/:orderID/capture", PaymentController.capturePaypalOrderPayment)
+
 
 //PUT
 router.put("/pending-payment-transaction", PaymentController.pendingPaymentTransaction)
