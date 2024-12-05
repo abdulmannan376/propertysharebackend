@@ -112,6 +112,8 @@ async function createOrder(paymentSource, amount) {
 
 // capture payment for an order
 async function capturePayment(orderId) {
+
+  console.log("orderID: ", orderId)
   const accessToken = await generateAccessToken();
   const url = `${baseUrl.sandbox}/v2/checkout/orders/${orderId}/capture`;
   const response = await fetch(url, {
@@ -154,25 +156,25 @@ const createPaypalOrder = async (req, res) => {
 };
 
 const testCheckout = async (body, session) => {
-  const { nonce, amount, username, purpose, paymentID } = body;
+  const { amount, username, purpose, paymentID, orderID } = body;
 
   console.log(body);
   try {
     const paymentFound = await Payments.findOne({ paymentID: paymentID });
 
-    const result = await gateway.transaction.sale({
-      amount: amount,
-      paymentMethodNonce: nonce,
-      options: {
-        submitForSettlement: true,
-      },
-    });
-    // console.log(result);
-    if (result.success) {
-      const { processorResponseType, id, paymentInstrumentType } =
-        result.transaction;
+    const result = await capturePayment(orderID);
+    // const result = await gateway.transaction.sale({
+    //   amount: amount,
+    //   paymentMethodNonce: nonce,
+    //   options: {
+    //     submitForSettlement: true,
+    //   },
+    // });
 
-      console.log(processorResponseType);
+    console.log(result);
+    if (result?.purchase_units[0]?.payments?.captures[0].status === "COMPLETED") {
+      const { id } = result?.purchase_units[0]?.payments?.captures[0];
+
       if (paymentFound) {
         console.log("in if");
 
@@ -192,7 +194,7 @@ const testCheckout = async (body, session) => {
             $set: {
               status: "Successful",
               gatewayTransactionID: id,
-              paymentType: paymentInstrumentType,
+              paymentType: result.payment_source.card? "card": "paypal",
             },
           },
           {
@@ -238,7 +240,7 @@ const testCheckout = async (body, session) => {
         const newPayment = new Payments({
           gatewayTransactionID: id,
           purpose: purpose,
-          paymentType: paymentInstrumentType,
+          paymentType: result.payment_source.card? "card": "paypal",
           userDocID: userFound._id,
           initiatedBy: ownerFound._id,
           totalAmount: amount,
@@ -264,8 +266,8 @@ const testCheckout = async (body, session) => {
 
       return true;
     } else {
-      console.log(result.message);
-      throw new Error(result.message);
+      console.log(result.status);
+      throw new Error(result.status);
     }
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
@@ -706,5 +708,5 @@ module.exports = {
   getPaymentsByReciever,
   getUserTransactionHistory,
   createPaypalOrder,
-  capturePaypalOrderPayment
+  capturePaypalOrderPayment,
 };

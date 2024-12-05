@@ -1823,9 +1823,11 @@ const handleRaisedRequestPaymentAction = async (data, session) => {
       throw new Error("raised request not found.");
     }
 
+    // console.log("Request Found: ", requestFound)
+
     const paidByUsers = requestFound.paidByUsersCount + 1;
 
-    if (requestFound.payingUserCount < paidByUsers) {
+    if (requestFound.paidByUsersCount < paidByUsers) {
       if (requestFound.payingUserCount === paidByUsers) {
         await RaiseRequest.updateOne(
           {
