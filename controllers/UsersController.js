@@ -206,6 +206,7 @@ const userLogin = async (req, res) => {
           email: userFound.email,
           role: userFound.role,
           username: userFound.username,
+          isProfileCompleted: userFound.isProfileCompleted,
         },
         success: true,
       });

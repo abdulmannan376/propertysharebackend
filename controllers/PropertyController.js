@@ -2034,9 +2034,8 @@ const addPropertyImages = async (req, res) => {
     const imageCount = propertyFound.imageCount;
     files.forEach((file, index) => {
       console.log("in addpropertyimages file: ",file)
-      const newFilename = `image-${imageCount + index + 1}${path.extname(
-        file
-      )}`;
+      const newFilename = `image-${imageCount + index + 1}${path.extname(file.originalname)}`;
+
       const oldPath = file.path;
       const newPath = path.join(uploadPath, newFilename);
 
