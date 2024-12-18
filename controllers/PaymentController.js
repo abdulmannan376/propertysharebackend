@@ -158,7 +158,7 @@ const createPaypalOrder = async (req, res) => {
 const testCheckout = async (body, session) => {
   const { amount, username, purpose, paymentID, orderID } = body;
 
-  console.log(body);
+  console.log("body==>",body);
   try {
     const paymentFound = await Payments.findOne({ paymentID: paymentID });
 
@@ -171,7 +171,7 @@ const testCheckout = async (body, session) => {
     //   },
     // });
 
-    console.log(result);
+    console.log("capturePayment Result-->",result);
     if (result?.purchase_units[0]?.payments?.captures[0].status === "COMPLETED") {
       const { id } = result?.purchase_units[0]?.payments?.captures[0];
 
@@ -184,6 +184,13 @@ const testCheckout = async (body, session) => {
 
         const companyFeePercentage =
           parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
+        
+        if (isNaN(companyFeePercentage)) {
+            throw new Error("Invalid COMPANY_FEE_PERCENTAGE environment variable");
+          }
+          if (isNaN(paymentFound.payingAmount)) {
+            throw new Error("Invalid amount provided in the paymentFound.payingAmount");
+          }
         const companyFee = Math.ceil(
           parseInt(paymentFound.payingAmount) * companyFeePercentage
         );
@@ -233,8 +240,13 @@ const testCheckout = async (body, session) => {
         }).session(session);
         // console.log(userFound);
 
-        const companyFeePercentage =
-          parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
+        const companyFeePercentage = parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
+        if (isNaN(companyFeePercentage)) {
+          throw new Error("Invalid company Fee Percentage in else");
+        }
+        if (isNaN(amount)) {
+          throw new Error("Invalid amount provided in the request body");
+        }
         const companyFee = Math.ceil(parseInt(amount) * companyFeePercentage);
 
         const newPayment = new Payments({
