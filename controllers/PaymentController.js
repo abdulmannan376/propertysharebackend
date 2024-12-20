@@ -112,8 +112,7 @@ async function createOrder(paymentSource, amount) {
 
 // capture payment for an order
 async function capturePayment(orderId) {
-
-  console.log("orderID: ", orderId)
+  // console.log("orderID: ", orderId);
   const accessToken = await generateAccessToken();
   const url = `${baseUrl.sandbox}/v2/checkout/orders/${orderId}/capture`;
   const response = await fetch(url, {
@@ -158,21 +157,16 @@ const createPaypalOrder = async (req, res) => {
 const testCheckout = async (body, session) => {
   const { amount, username, purpose, paymentID, orderID } = body;
 
-  console.log("body==>",body);
+  // console.log(body);
   try {
     const paymentFound = await Payments.findOne({ paymentID: paymentID });
 
     const result = await capturePayment(orderID);
-    // const result = await gateway.transaction.sale({
-    //   amount: amount,
-    //   paymentMethodNonce: nonce,
-    //   options: {
-    //     submitForSettlement: true,
-    //   },
-    // });
 
-    console.log("capturePayment Result-->",result);
-    if (result?.purchase_units[0]?.payments?.captures[0].status === "COMPLETED") {
+    console.log(result);
+    if (
+      result?.purchase_units[0]?.payments?.captures[0].status === "COMPLETED"
+    ) {
       const { id } = result?.purchase_units[0]?.payments?.captures[0];
 
       if (paymentFound) {
@@ -184,13 +178,6 @@ const testCheckout = async (body, session) => {
 
         const companyFeePercentage =
           parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
-        
-        if (isNaN(companyFeePercentage)) {
-            throw new Error("Invalid COMPANY_FEE_PERCENTAGE environment variable");
-          }
-          if (isNaN(paymentFound.payingAmount)) {
-            throw new Error("Invalid amount provided in the paymentFound.payingAmount");
-          }
         const companyFee = Math.ceil(
           parseInt(paymentFound.payingAmount) * companyFeePercentage
         );
@@ -201,7 +188,7 @@ const testCheckout = async (body, session) => {
             $set: {
               status: "Successful",
               gatewayTransactionID: id,
-              paymentType: result.payment_source.card? "card": "paypal",
+              paymentType: result.payment_source.card ? "card" : "paypal",
             },
           },
           {
@@ -240,19 +227,14 @@ const testCheckout = async (body, session) => {
         }).session(session);
         // console.log(userFound);
 
-        const companyFeePercentage = parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
-        if (isNaN(companyFeePercentage)) {
-          throw new Error("Invalid company Fee Percentage in else");
-        }
-        if (isNaN(amount)) {
-          throw new Error("Invalid amount provided in the request body");
-        }
+        const companyFeePercentage =
+          parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
         const companyFee = Math.ceil(parseInt(amount) * companyFeePercentage);
 
         const newPayment = new Payments({
           gatewayTransactionID: id,
           purpose: purpose,
-          paymentType: result.payment_source.card? "card": "paypal",
+          paymentType: result.payment_source.card ? "card" : "paypal",
           userDocID: userFound._id,
           initiatedBy: ownerFound._id,
           totalAmount: amount,

@@ -1143,8 +1143,7 @@ const updateUserProfileDetails = async (req, res) => {
         userProfileFound.dob &&
         userProfileFound.nicNumber &&
         userProfileFound.nationality &&
-        userProfileFound.religion &&
-        userProfileFound.bloodGroup
+        userProfileFound.religion
     );
 
     const isContactDetailsComplete = Boolean(
@@ -1166,12 +1165,13 @@ const updateUserProfileDetails = async (req, res) => {
       isPrimaryDetailsComplete &&
       isContactDetailsComplete &&
       isNextOfKinComplete;
-
-    await userFound.save();
+      
+      await userFound.save();
     userProfileFound.save().then(() => {
       const subject = `Profile Settings Updated`;
       const notificationBody = `Dear ${userFound.name}, \nYour profile settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.\nRegards, \nBeach Bunny House.`;
 
+      
       sendUpdateNotification(
         subject,
         notificationBody,
