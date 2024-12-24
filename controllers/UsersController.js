@@ -18,7 +18,7 @@ function sendVerficationEmail(user, res) {
     from: "balaj.ali707@gmail.com",
     to: user.email, // The recipient's email address
     subject: `Email Verification Code: ${user.emailVerificationCode}`,
-    text: `Hello, welcome to our service! Please add this code ${user.emailVerificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\nRapids AI Team`,
+    text: `Hello, welcome to our service! Please add this code ${user.emailVerificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\n Bunny Beach House.`,
   };
 
   transporter.sendMail(mailOptions, (error, info) => {
@@ -54,7 +54,7 @@ const genNewVerificationCode = async (req, res) => {
       userFound.emailVerificationCode = verificationCode;
       await userFound.save().then(() => {
         const subject = `Email Verification Code: ${userFound.emailVerificationCode}`;
-        const emailBody = `Hello, welcome to our service! Please add this code ${userFound.emailVerificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\nRapids AI Team`;
+        const emailBody = `Hello, welcome to our service! Please add this code ${userFound.emailVerificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\n Bunny Beach House.`;
         sendUpdateNotification(
           subject,
           emailBody,
@@ -82,7 +82,10 @@ const verifyEmailVerficationCode = async (req, res) => {
   try {
     const { email, code } = req.body;
     console.log("body: ", req.body);
-    const userFound = await Users.findOne({ email: email });
+    const userFound = await Users.findOne({ email: email }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
     if (!userFound) {
       return res
         .status(400)
@@ -93,10 +96,41 @@ const verifyEmailVerficationCode = async (req, res) => {
       if (code == userFound.emailVerificationCode) {
         userFound.emailVerified = true;
         userFound.emailVerificationCode = 0;
+        let tokenExpiry = "1d";
+        const token = jwt.sign(
+          {
+            username: userFound.username,
+            name: userFound.name,
+            role: userFound.role,
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: tokenExpiry }
+        );
+
         await userFound.save();
-        return res
-          .status(200)
-          .json({ message: "Email verified.", success: true });
+        const subject = `Email verified successfully!`;
+        const emailBody = `Dear ${userFound.name},\nYour email has been successfully verified.`;
+        sendUpdateNotification(
+          subject,
+          emailBody,
+          userFound.userDefaultSettingID.notifyUpdates,
+          userFound.username
+        );
+
+        // Respond with token and user details
+        return res.status(200).json({
+          message: "Email verified.",
+          token: token,
+          body: {
+            name: userFound.name,
+            email: userFound.email,
+            role: userFound.role,
+            username: userFound.username,
+            isProfileCompleted: userFound.isProfileCompleted,
+          },
+          success: true,
+        });
+
       } else {
         return res.status(400).json({
           message: "You have entered a expired or wrong code.",
@@ -264,7 +298,7 @@ const userSignUp = async (req, res) => {
     await newUserProfile.save();
     newUser.save().then(() => {
       const subject = `Email Verification Code: ${verificationCode}`;
-      const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\nRapids AI Team`;
+      const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\n Bunny Beach House.`;
       sendUpdateNotification(
         subject,
         emailBody,
@@ -1171,7 +1205,7 @@ const updateUserProfileDetails = async (req, res) => {
       const subject = `Profile Settings Updated`;
       const notificationBody = `Dear ${userFound.name}, \nYour profile settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.\nRegards, \nBeach Bunny House.`;
 
-      
+
       sendUpdateNotification(
         subject,
         notificationBody,
