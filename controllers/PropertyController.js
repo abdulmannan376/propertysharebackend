@@ -817,6 +817,8 @@ function reorganizeFiles(directory, deleteIndices = []) {
 
 async function openInspections() {
   try {
+    console.log("openInspections cron runing");
+    
     const today = new Date(); // Get the current date and time
     const twoDaysLater = new Date(today); // Copy today's date to a new variable
     twoDaysLater.setDate(twoDaysLater.getDate() + 30); // Add two days
@@ -1334,12 +1336,17 @@ async function notifyPropertyShareOwnerByPropertyID(
   });
 
   shareList.map((share) => {
+    // Skip if userID is null
+    if (share?.currentOwnerDocID?.userID === null) {
+      console.log("Skipping share with null userID:", share);
+      return; // Continue to the next item
+    }
     const subject =
       emailSubject || `Property ${propertyFound.title} ${category} requested`;
     const body =
       emailBody ||
-      `Dear ${share.currentOwnerDocID.userID.name}, It is to inform you a new ${category} is requested for property ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
-
+      `Dear ${share?.currentOwnerDocID?.userID?.name}, It is to inform you a new ${category} is requested for property ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
+  
     sendUpdateNotification(
       subject,
       body,
@@ -1347,8 +1354,9 @@ async function notifyPropertyShareOwnerByPropertyID(
       share.currentOwnerDocID.username
     );
   });
-
+  
   return shareList;
+  
 }
 
 const getInspectionDetail = async (req, res) => {

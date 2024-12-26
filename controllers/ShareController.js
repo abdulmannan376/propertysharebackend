@@ -1699,8 +1699,19 @@ const fetchUserShareRentals = async (req, res) => {
     );
 
     // Assuming sharesByUsername is an array of share objects
-    const rentalsPerProperty = shareFoundList.reduce((acc, share) => {
+    const rentalsPerProperty = shareFoundList.reduce((acc, share,index) => {
+     
+      if (!share?.propertyDocID) {
+        console.log(`Skipping share with null propertyDocID at index ${index}:`, share);
+        return acc; // Skip null or invalid entries
+      }
+
       const propertyID = share.propertyDocID.propertyID;
+      if (!propertyID) {
+         console.log(`propertyDocID has null propertyID at index ${index}:`, share.propertyDocID);
+        return acc; // Skip invalid entries with missing propertyID
+      }
+      
       // Check if the propertyID already has an entry in the accumulator
       if (acc[propertyID]) {
         // If yes, increment the count
