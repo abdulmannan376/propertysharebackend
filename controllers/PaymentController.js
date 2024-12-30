@@ -7,12 +7,13 @@ const {
   shareRentAction,
   shareSellAction,
 } = require("./ShareController");
+const axios = require("axios");
 const { sendUpdateNotification } = require("./notificationController");
 const PropertyShare = require("../models/PropertyShareSchema");
 const { handleRaisedRequestPaymentAction } = require("./PropertyController");
 const Withdrawal = require("../models/WithdrawalSchema");
 const paypal = require("@paypal/paypal-server-sdk");
-const { createPayPalClient } = require("../middleware/paypalConfig");
+// const { createPayPalClient } = require("../middleware/paypalConfig");
 
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
@@ -43,7 +44,18 @@ const GetClientToken = async (req, res) => {
 const baseUrl = {
   sandbox: "https://api-m.sandbox.paypal.com",
 };
-
+const createPayPalClient = () => {
+  return axios.create({
+    // baseURL: process.env.PAYPAL_MODE === "sandbox"
+    //   ?
+    baseURL: "https://api-m.sandbox.paypal.com",
+    // : "https://api-m.paypal.com",
+    auth: {
+      username: process.env.PAYPAL_CLIENT_ID,
+      password: process.env.PAYPAL_CLIENT_SECRET,
+    },
+  });
+};
 async function generateAccessToken() {
   try {
     const auth = Buffer.from(
@@ -689,6 +701,83 @@ const rentOfferTransaction = async (req, res) => {
     session.endSession();
   }
 };
+const processAdminApprovedWithdrawal = async (session, body) => {
+  const { amount, paypalEmail, requestId, withdrawalID } = body;
+
+  const withdrawal = await Withdrawal.findOne({
+    withdrawalID: withdrawalID,
+  })
+    .populate({
+      path: "userDocID",
+      model: "users",
+      select: "userDefaultSettingID username name availBalnc",
+      populate: {
+        path: "userDefaultSettingID",
+        model: "user_default_settings",
+        select: "notifyUpdates",
+      },
+    })
+    .session(session);
+
+  if (!withdrawal || withdrawal.status !== "Pending") {
+    throw new Error("Invalid or already processed withdrawal request.");
+  }
+
+  const payoutRequest = {
+    sender_batch_header: {
+      sender_batch_id: `batch_${Date.now()}`,
+      email_subject: "You have received a payment",
+      email_message: `You have received ${amount} USD.`,
+    },
+    items: [
+      {
+        recipient_type: "EMAIL",
+        amount: {
+          value: amount.toFixed(2),
+          currency: "USD",
+        },
+        receiver: paypalEmail,
+        note: "Withdrawal payment",
+      },
+    ],
+  };
+
+  const paypalClient = createPayPalClient();
+  const { data: payoutResponse } = await paypalClient.post(
+    "/v1/payments/payouts",
+    payoutRequest
+  );
+
+  if (
+    !payoutResponse.batch_header ||
+    !payoutResponse.batch_header.payout_batch_id
+  ) {
+    throw new Error(
+      `Failed to process payout: ${JSON.stringify(payoutResponse)}`
+    );
+  }
+
+  await Withdrawal.updateOne(
+    { _id: withdrawal._id },
+    { $set: { status: "Dispatched" } }
+  ).session(session);
+
+  const emailSubject = `Withdrawal (${withdrawal.withdrawalID}) Dispatched`;
+  const emailBody = `Dear ${withdrawal.userDocID.name},\nYour withdrawal request (${withdrawal.withdrawalID}) for $${withdrawal.amount} has been dispatched successfully.\n\nRegards,\nBeach Bunny House.`;
+
+  sendUpdateNotification(
+    emailSubject,
+    emailBody,
+    withdrawal.userDocID.userDefaultSettingID.notifyUpdates,
+    withdrawal.userDocID.username
+  );
+
+  return {
+    payoutBatchId: payoutResponse.batch_header.payout_batch_id,
+    success: true,
+  };
+};
+
 
 module.exports = {
   GetClientToken,
@@ -703,4 +792,5 @@ module.exports = {
   getUserTransactionHistory,
   createPaypalOrder,
   capturePaypalOrderPayment,
+  processAdminApprovedWithdrawal,
 };

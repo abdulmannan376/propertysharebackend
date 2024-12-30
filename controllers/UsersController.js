@@ -8,8 +8,9 @@ const { sendUpdateNotification } = require("./notificationController");
 const { verifyJWT } = require("../helpers/jwtController");
 const Properties = require("../models/PropertySchema");
 const { removeRecieverID } = require("../socket/socket");
+const { default: mongoose } = require("mongoose");
 const Withdrawal = require("../models/WithdrawalSchema");
-
+const { processAdminApprovedWithdrawal } = require("./PaymentController");
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
 
@@ -130,7 +131,6 @@ const verifyEmailVerficationCode = async (req, res) => {
           },
           success: true,
         });
-
       } else {
         return res.status(400).json({
           message: "You have entered a expired or wrong code.",
@@ -617,7 +617,7 @@ const getUserWithdrawals = async (req, res) => {
 
 const genWithdrawal = async (req, res) => {
   try {
-    const { username, amount } = req.query;
+    const { username, amount, email } = req.query;
 
     const userFound = await Users.findOne({ username: username });
     if (!userFound) {
@@ -633,6 +633,7 @@ const genWithdrawal = async (req, res) => {
     const newWithdrawalRequest = new Withdrawal({
       amount: amount,
       userDocID: userFound,
+      payPalEmail: email,
     });
 
     await newWithdrawalRequest.save();
@@ -664,60 +665,59 @@ const genWithdrawal = async (req, res) => {
 };
 
 const updateWithdrawal = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
+    session.startTransaction();
+
     const { withdrawalID, action } = req.body;
 
     const withdrawalFound = await Withdrawal.findOne({
       withdrawalID: withdrawalID,
-    }).populate({
-      path: "userDocID",
-      model: "users",
-      select: "userDefaultSettingID username name availBalnc",
-      populate: {
-        path: "userDefaultSettingID",
-        model: "user_default_settings",
-        select: "notifyUpdates",
-      },
-    });
+    })
+      .populate({
+        path: "userDocID",
+        model: "users",
+        select: "userDefaultSettingID username name availBalnc",
+        populate: {
+          path: "userDefaultSettingID",
+          model: "user_default_settings",
+          select: "notifyUpdates",
+        },
+      })
+      .session(session);
+
     if (!withdrawalFound) {
-      throw new Error("withdrawal not found.");
+      throw new Error("Withdrawal not found.");
     }
 
     if (action === "dispatched") {
-      const uploadPath = `uploads/withdrawal-reciepts/${req.body.withdrawalID}/`;
+      const requestBody = {
+        amount: withdrawalFound.amount,
+        paypalEmail: withdrawalFound.payPalEmail,
+        requestId: withdrawalFound._id,
+        withdrawalID: withdrawalID,
+      };
 
-      await Withdrawal.updateOne(
-        {
-          _id: withdrawalFound._id,
-        },
-        {
-          $set: {
-            status: "Dispatched",
-            imageDir: uploadPath,
-          },
-        }
+      const response = await processAdminApprovedWithdrawal(
+        session,
+        requestBody
       );
-
-      const emailSubject = `Withdrawal (${withdrawalID}) dispatched`;
-      const emailBody = `Dear ${withdrawalFound.userDocID.name}, \nYou requested withdrawal (${withdrawalID}) of amount $${withdrawalFound.amount} is dispatched. \nRegards, \nBeach Bunny House.`;
-
-      sendUpdateNotification(
-        emailSubject,
-        emailBody,
-        withdrawalFound.userDocID.userDefaultSettingID.notifyUpdates,
-        withdrawalFound.userDocID.username
-      );
+      if (response.success) {
+        await session.commitTransaction();
+        return res.status(200).json({
+          message: "Withdrawal dispatched and processed successfully.",
+          success: true,
+        });
+      } else {
+        throw new Error(
+          `Failed to process PayPal withdrawal: ${response.message}`
+        );
+      }
     } else if (action === "cancel") {
       await Withdrawal.updateOne(
-        {
-          _id: withdrawalFound._id,
-        },
-        {
-          $set: {
-            status: "Cancelled",
-          },
-        }
-      );
+        { _id: withdrawalFound._id },
+        { $set: { status: "Cancelled" } }
+      ).session(session);
 
       await Users.updateOne(
         { _id: withdrawalFound.userDocID._id },
@@ -727,25 +727,23 @@ const updateWithdrawal = async (req, res) => {
               withdrawalFound.userDocID.availBalnc + withdrawalFound.amount,
           },
         }
-      );
+      ).session(session);
+
+      await session.commitTransaction();
     } else {
-      return res
-        .status(403)
-        .json({ messgae: "Forbidden or No action provided", success: false });
+      throw new Error("Forbidden or No action provided.");
     }
 
-    res.status(200).json({ messgae: "Withdrawal updated", success: true });
+    res.status(200).json({ message: "Withdrawal updated", success: true });
   } catch (error) {
-    console.log(`Error: ${error}`, "location: ", {
-      function: "updateWithdrawal",
-      fileLocation: "controllers/UserController.js",
-      timestamp: currentDateString,
-    });
+    await session.abortTransaction();
+    console.error("Error in updateWithdrawal:", error);
     res.status(500).json({
       message: error.message || "Internal Server Error",
-      error: error,
       success: false,
     });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -1199,12 +1197,11 @@ const updateUserProfileDetails = async (req, res) => {
       isPrimaryDetailsComplete &&
       isContactDetailsComplete &&
       isNextOfKinComplete;
-      
-      await userFound.save();
+
+    await userFound.save();
     userProfileFound.save().then(() => {
       const subject = `Profile Settings Updated`;
       const notificationBody = `Dear ${userFound.name}, \nYour profile settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.\nRegards, \nBeach Bunny House.`;
-
 
       sendUpdateNotification(
         subject,

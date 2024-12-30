@@ -17,7 +17,11 @@ const WithdrawalSchema = new mongoose.Schema(
     imageDir: {
         type: String,
         default: ""
-    }
+    },
+    payPalEmail: {
+      type: String,
+      default: ""
+  }
   },
   { timestamps: true }
 );
