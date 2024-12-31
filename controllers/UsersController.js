@@ -188,7 +188,7 @@ const userLogout = async (req, res) => {
 
 const userLogin = async (req, res) => {
   try {
-    const { username, password, rememberMe } = req.body;
+    const { username, password, rememberMe,ipAddress,country,city } = req.body;
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
@@ -225,7 +225,22 @@ const userLogin = async (req, res) => {
 
     await userFound.save().then(() => {
       const subject = `Login activity.`;
-      const emailBody = `Dear ${userFound.name},\nYou have successfully logged in your account`;
+      const emailBody = `
+      Did you Login from a new Device or Location?
+      
+      We noticed your Beachbunnyhouse account "${userFound.username || userFound.email}" 
+      was accessed from a new IP address.
+      
+      When: ${new Date().toISOString()} (UTC)
+      IP Address: ${ipAddress} Country: ${country} City: ${city}
+      
+      [Visit your Account](https://www.beachbunnyhouse.com/user/${userFound.username})
+      
+      Don't recognize this activity? Please [reset your password](https://www.beachbunnyhouse.com/reset-password) and [contact customer support](https://www.beachbunnyhouse.com/contactus) immediately.
+      
+      This is an automated message, please do not reply.
+      `;
+      
       sendUpdateNotification(
         subject,
         emailBody,
