@@ -759,8 +759,14 @@ const processAdminApprovedWithdrawal = async (session, body) => {
 
   await Withdrawal.updateOne(
     { _id: withdrawal._id },
-    { $set: { status: "Dispatched" } }
+    { 
+      $set: { 
+        status: "Dispatched",
+        payoutBatchId: payoutResponse.batch_header.payout_batch_id
+      } 
+    }
   ).session(session);
+  
 
   const emailSubject = `Withdrawal (${withdrawal.withdrawalID}) Dispatched`;
   const emailBody = `Dear ${withdrawal.userDocID.name},\nYour withdrawal request (${withdrawal.withdrawalID}) for $${withdrawal.amount} has been dispatched successfully.\n\nRegards,\nBeach Bunny House.`;
@@ -778,6 +784,48 @@ const processAdminApprovedWithdrawal = async (session, body) => {
   };
 };
 
+const payoutBatch = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    const { payoutBatchId } = req.body;
+
+    if (!payoutBatchId) {
+      return res.status(400).json({
+        message: "payoutBatchId is required.",
+        success: false,
+      });
+    }
+
+     const paypalClient = createPayPalClient(); // Initialize the PayPal client
+
+    // // Fetch payout details from PayPal
+    const { data: payoutDetails } = await paypalClient.get(
+      `/v1/payments/payouts/${payoutBatchId}`
+    );
+    res.status(200).json({
+      message: "Payout details and receipt image fetched successfully.",
+      data: {
+        payoutDetails
+      },
+      success: true,
+    });
+  } catch (error) {
+    console.error(`Error: ${error}`, "\nLocation: ", {
+      function: "payoutBatch",
+      fileLocation: "controllers/PaymentController.js",
+      timestamp: new Date().toISOString(),
+    });
+
+    res.status(500).json({
+      message: error.message || "Internal Server Error",
+      error: error,
+      success: false,
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
 
 module.exports = {
   GetClientToken,
@@ -793,4 +841,5 @@ module.exports = {
   createPaypalOrder,
   capturePaypalOrderPayment,
   processAdminApprovedWithdrawal,
+  payoutBatch
 };

@@ -15,13 +15,18 @@ const WithdrawalSchema = new mongoose.Schema(
       required: true,
     },
     imageDir: {
-        type: String,
-        default: ""
+      type: String,
+      default: "",
     },
     payPalEmail: {
       type: String,
-      default: ""
-  }
+      default: "",
+    },
+    agree: {
+      type: Boolean,
+      default: false,
+    },
+    payoutBatchId: { type: String, default: "" },
   },
   { timestamps: true }
 );

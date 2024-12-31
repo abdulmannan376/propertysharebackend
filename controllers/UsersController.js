@@ -617,7 +617,7 @@ const getUserWithdrawals = async (req, res) => {
 
 const genWithdrawal = async (req, res) => {
   try {
-    const { username, amount, email } = req.query;
+    const { username, amount, email,agree } = req.query;
 
     const userFound = await Users.findOne({ username: username });
     if (!userFound) {
@@ -634,6 +634,7 @@ const genWithdrawal = async (req, res) => {
       amount: amount,
       userDocID: userFound,
       payPalEmail: email,
+      agree:agree
     });
 
     await newWithdrawalRequest.save();
