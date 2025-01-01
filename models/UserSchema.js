@@ -14,6 +14,8 @@ const UserSchema = new mongoose.Schema({
   },
   contact: { type: Number, default: "" },
   emailVerificationCode: { type: Number },
+  resetPasswordVerificationCode: { type: Number, default: 0 },
+  resetPasswordVerified: { type: Boolean, required: true, default: false },
   emailVerified: { type: Boolean, required: true },
   userDefaultSettingID: {
     type: mongoose.Types.ObjectId,

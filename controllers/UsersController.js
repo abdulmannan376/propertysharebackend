@@ -188,7 +188,8 @@ const userLogout = async (req, res) => {
 
 const userLogin = async (req, res) => {
   try {
-    const { username, password, rememberMe,ipAddress,country,city } = req.body;
+    const { username, password, rememberMe, ipAddress, country, city } =
+      req.body;
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
@@ -228,19 +229,23 @@ const userLogin = async (req, res) => {
       const emailBody = `
       Did you Login from a new Device or Location?
       
-      We noticed your Beachbunnyhouse account "${userFound.username || userFound.email}" 
+      We noticed your Beachbunnyhouse account "${
+        userFound.username || userFound.email
+      }" 
       was accessed from a new IP address.
       
       When: ${new Date().toISOString()} (UTC)
       IP Address: ${ipAddress} Country: ${country} City: ${city}
       
-      [Visit your Account](https://www.beachbunnyhouse.com/user/${userFound.username})
+      [Visit your Account](https://www.beachbunnyhouse.com/user/${
+        userFound.username
+      })
       
       Don't recognize this activity? Please [reset your password](https://www.beachbunnyhouse.com/reset-password) and [contact customer support](https://www.beachbunnyhouse.com/contactus) immediately.
       
       This is an automated message, please do not reply.
       `;
-      
+
       sendUpdateNotification(
         subject,
         emailBody,
@@ -338,6 +343,270 @@ const userSignUp = async (req, res) => {
       .json({ message: "Internal Server Error", error: error, success: false });
   }
 };
+
+///////////reset pass//////////
+const resetPasswordGenCode = async (req, res) => {
+  try {
+    const body = req.body;
+    console.log("body: ", body);
+
+    const userFound = await Users.findOne({ email: body.email }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+
+    if (!userFound) {
+      return res
+        .status(400)
+        .json({ message: "User dont exsist", success: false });
+    }
+    if(userFound.role === "admin" || userFound.role === "super admin"){
+      return res
+      .status(400)
+      .json({ message: "User dont exsist", success: false });
+
+    }
+
+    const verificationCode = Math.round(Math.random() * 1000000);
+
+    userFound.resetPasswordVerificationCode = verificationCode;
+    userFound.resetPasswordVerified = false;
+    //  userFound.save();
+
+    await userFound.save().then(() => {
+      const subject = `Reset Password Verification Code: ${verificationCode}`;
+      const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.`;
+      sendUpdateNotification(
+        subject,
+        emailBody,
+        userFound.userDefaultSettingID.notifyUpdates,
+        userFound.username
+      );
+      res.status(201).json({
+        message: `A verification code sent to email.`,
+        success: true,
+      });
+    });
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "resetPasswordGenCode",
+      fileLocation: "controllers/UserController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+const verifyResetPasswordCode = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    console.log("body: ", req.body);
+    const userFound = await Users.findOne({ email: email }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      return res
+        .status(400)
+        .json({ message: "User Not Registered", success: false });
+    }
+
+    if (!userFound.resetPasswordVerified) {
+      if (code == userFound.resetPasswordVerificationCode) {
+        userFound.resetPasswordVerified = true;
+        userFound.resetPasswordVerificationCode = 0;
+        // let tokenExpiry = "1d";
+        // const token = jwt.sign(
+        //   {
+        //     username: userFound.username,
+        //     name: userFound.name,
+        //     role: userFound.role,
+        //   },
+        //   process.env.JWT_SECRET,
+        //   { expiresIn: tokenExpiry }
+        // );
+
+        await userFound.save();
+        // const subject = `Email verified successfully!`;
+        // const emailBody = `Dear ${userFound.name},\nYour email has been successfully verified.`;
+        // sendUpdateNotification(
+        //   subject,
+        //   emailBody,
+        //   userFound.userDefaultSettingID.notifyUpdates,
+        //   userFound.username
+        // );
+
+        // Respond with token and user details
+        return res.status(200).json({
+          message: "Reset Password Code verified.",
+          body: {
+            resetPasswordVerified: userFound.resetPasswordVerified,
+          },
+          success: true,
+        });
+      } else {
+        return res.status(400).json({
+          message: "You have entered a expired or wrong code.",
+          success: false,
+        });
+      }
+    } else {
+      return res.status(400).json({
+        message: "Request for a new Verification code ",
+        success: false,
+      });
+    }
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "verifyEmailVerficationCode",
+      fileLocation: "controllers/UsersController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+const genNewResetPasswordCode = async (req, res) => {
+  try {
+    const { email } = req.body;
+    console.log("email: ", req.body.email);
+    // const verificationCode = Math.round(Math.random() * 1000000);
+    const userFound = await Users.findOne({ email: email }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      return res
+        .status(400)
+        .json({ message: "Error occured. Try again", success: false });
+    }
+    const verificationCode = Math.round(Math.random() * 1000000);
+
+    userFound.resetPasswordVerificationCode = verificationCode;
+    userFound.resetPasswordVerified = false;
+    await userFound.save().then(() => {
+      const subject = `Reset Password Verification Code: ${verificationCode}`;
+      const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.`;
+      sendUpdateNotification(
+        subject,
+        emailBody,
+        userFound.userDefaultSettingID.notifyUpdates,
+        userFound.username
+      );
+      res.status(201).json({
+        message: `A verification code sent to email.`,
+        success: true,
+      });
+    });
+
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+const newResetPasswordSubmission = async (req, res) => {
+  try {
+    const { email, password: newPassword } = req.body;
+
+    // Find the user and populate related settings
+    const userFound = await Users.findOne({ email }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates lastPassword"
+    );
+
+    if (!userFound) {
+      return res.status(400).json({ message: "User not registered", success: false });
+    }
+    if(userFound.role === "admin" || userFound.role === "super admin"){
+      return res
+      .status(400)
+      .json({ message: "User dont exsist", success: false });
+
+    }
+    if (!userFound.resetPasswordVerified) {
+      return res.status(400).json({
+        message: "Request for a new reset password code",
+        success: false,
+      });
+    }
+
+    const userDefaultSetting = userFound.userDefaultSettingID;
+
+    // Decrypt existing passwords from lastPassword array
+    const decryptedPasswords = userDefaultSetting.lastPassword.map((encryptedPass) => {
+      const bytes = CryptoJS.AES.decrypt(encryptedPass, process.env.PASSWORD_SECRET);
+      return bytes.toString(CryptoJS.enc.Utf8);
+    });
+
+    // Check if the new password has been used before
+    if (decryptedPasswords.includes(newPassword)) {
+      return res
+        .status(400)
+        .json({ message: "Password already used", success: false });
+    }
+
+    // Encrypt the new password
+    const encryptedNewPassword = CryptoJS.AES.encrypt(newPassword, process.env.PASSWORD_SECRET).toString();
+
+    // Update user's password and reset verification status
+    userFound.password = encryptedNewPassword;
+    userFound.resetPasswordVerified = false;
+
+    // Push the new password to the history
+    userDefaultSetting.lastPassword.push(encryptedNewPassword);
+
+    // Save changes
+    await userDefaultSetting.save();
+    await userFound.save();
+
+    // Send confirmation email or notification
+    const subject = `Login Password Changed.`;
+    const emailBody = `
+    Your Password Has Been Changed
+    
+    Hello ${userFound.name},
+    
+    We’re writing to confirm that the password for your Beachbunnyhouse account "${
+      userFound.username || userFound.email
+    }" has been successfully updated.
+    
+    If you made this change, no further action is required. This email is simply a confirmation of the update.
+    
+    **Don't recognize this activity?**
+    - [Reset Your Password](https://www.beachbunnyhouse.com/reset-password)
+    - [Contact Customer Support](https://www.beachbunnyhouse.com/contactus)
+    
+    Your account security is our top priority. If you notice any unusual activity, please act immediately using the links above.
+    
+    Thank you for being a valued member of the Beachbunnyhouse community,  
+    The Beachbunnyhouse Team
+    
+    _This is an automated message. Please do not reply._`;
+
+    sendUpdateNotification(
+      subject,
+      emailBody,
+      userDefaultSetting.notifyUpdates,
+      userFound.username
+    );
+
+    res.status(200).json({
+      message: "Password updated successfully",
+      success: true,
+    });
+  } catch (error) {
+    console.error("Error in newResetPasswordSubmission:", error);
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+// /////////////reset pass///////////
 
 const getUserDefaultSetting = async (req, res) => {
   try {
@@ -498,7 +767,27 @@ const changeUserLoginPassword = async (req, res) => {
     await userDefaultSetting.save();
     userFound.save().then(() => {
       const subject = `Login Password Changed.`;
-      const emailBody = `Dear ${userFound.name}, \nYour login password have been changed. If you have done, this is the confirmation email if not then please contact our support for further assistance. \nThankyou.`;
+      const emailBody = `
+      Your Password Has Been Changed
+      
+      Hello ${userFound.name},
+      
+      We’re writing to confirm that the password for your Beachbunnyhouse account "${
+        userFound.username || userFound.email
+      }" has been successfully updated.
+      
+      If you made this change, no further action is required. This email is simply a confirmation of the update.
+      
+      **Don't recognize this activity?**
+      - [Reset Your Password](https://www.beachbunnyhouse.com/reset-password)
+      - [Contact Customer Support](https://www.beachbunnyhouse.com/contactus)
+      
+      Your account security is our top priority. If you notice any unusual activity, please act immediately using the links above.
+      
+      Thank you for being a valued member of the Beachbunnyhouse community,  
+      The Beachbunnyhouse Team
+      
+      _This is an automated message. Please do not reply._`;
       sendUpdateNotification(
         subject,
         emailBody,
@@ -632,7 +921,7 @@ const getUserWithdrawals = async (req, res) => {
 
 const genWithdrawal = async (req, res) => {
   try {
-    const { username, amount, email,agree } = req.query;
+    const { username, amount, email, agree } = req.query;
 
     const userFound = await Users.findOne({ username: username });
     if (!userFound) {
@@ -649,7 +938,7 @@ const genWithdrawal = async (req, res) => {
       amount: amount,
       userDocID: userFound,
       payPalEmail: email,
-      agree:agree
+      agree: agree,
     });
 
     await newWithdrawalRequest.save();
@@ -1297,4 +1586,8 @@ module.exports = {
   genWithdrawal,
   updateWithdrawal,
   uploadIDCardPic,
+  resetPasswordGenCode,
+  verifyResetPasswordCode,
+  genNewResetPasswordCode,
+  newResetPasswordSubmission,
 };

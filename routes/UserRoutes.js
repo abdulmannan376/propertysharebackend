@@ -8,9 +8,16 @@ const uploadIDCard = require("../middleware/multerUserIdentityCards");
 //POST
 router.post("/user-signup", UsersController.userSignUp);
 router.post("/user-login", UsersController.userLogin);
+router.post("/user-resetPasswordGenCode", UsersController.resetPasswordGenCode);
+router.post("/user-newResetPasswordSubmission", UsersController.newResetPasswordSubmission);
 router.post("/gen-withdrawal", UsersController.genWithdrawal);
 
 //PUT
+router.put("/verify-resetPasswordCode", UsersController.verifyResetPasswordCode);
+router.put(
+  "/gen-new-reset-password-code",
+  UsersController.genNewResetPasswordCode
+);
 router.put("/verify-email", UsersController.verifyEmailVerficationCode);
 router.put(
   "/gen-new-verification-code",
