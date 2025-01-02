@@ -206,11 +206,43 @@ const userLogin = async (req, res) => {
       process.env.PASSWORD_SECRET
     );
     const userPassword = bytes.toString(CryptoJS.enc.Utf8);
-    console.log("userPassword: ", userPassword);
     if (userPassword !== password) {
       return res
         .status(400)
         .json({ message: "Wrong password", success: false });
+    }
+    if (!userFound.emailVerified) {
+      const verificationCode = Math.round(Math.random() * 1000000);
+      userFound.emailVerificationCode = verificationCode;
+
+      try {
+        await userFound.save(); // Save the user data
+
+        const subject = `Reset Password Verification Code: ${verificationCode}`;
+        const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.`;
+
+        // Send email notification
+        sendUpdateNotification(
+          subject,
+          emailBody,
+          userFound.userDefaultSettingID.notifyUpdates,
+          userFound.username
+        );
+
+        // Return response and stop further execution
+        return res.status(400).json({
+          message: `Email Not Verified for ${userFound.email}`,
+          success: false,
+          email: userFound.email,
+        });
+      } catch (error) {
+        // Handle any errors during the save or email process
+        console.error("Error sending email:", error);
+        return res.status(500).json({
+          message: "An error occurred while processing your request.",
+          success: false,
+        });
+      }
     }
     let tokenExpiry = "1d";
     if (rememberMe) {
@@ -242,8 +274,6 @@ const userLogin = async (req, res) => {
       })
       
       Don't recognize this activity? Please [reset your password](https://www.beachbunnyhouse.com/reset-password) and [contact customer support](https://www.beachbunnyhouse.com/contactus) immediately.
-      
-      This is an automated message, please do not reply.
       `;
 
       sendUpdateNotification(
@@ -360,11 +390,10 @@ const resetPasswordGenCode = async (req, res) => {
         .status(400)
         .json({ message: "User dont exsist", success: false });
     }
-    if(userFound.role === "admin" || userFound.role === "super admin"){
+    if (userFound.role === "admin" || userFound.role === "super admin") {
       return res
-      .status(400)
-      .json({ message: "User dont exsist", success: false });
-
+        .status(400)
+        .json({ message: "User dont exsist", success: false });
     }
 
     const verificationCode = Math.round(Math.random() * 1000000);
@@ -415,6 +444,7 @@ const verifyResetPasswordCode = async (req, res) => {
     if (!userFound.resetPasswordVerified) {
       if (code == userFound.resetPasswordVerificationCode) {
         userFound.resetPasswordVerified = true;
+        userFound.emailVerified = true;
         userFound.resetPasswordVerificationCode = 0;
         // let tokenExpiry = "1d";
         // const token = jwt.sign(
@@ -500,7 +530,6 @@ const genNewResetPasswordCode = async (req, res) => {
         success: true,
       });
     });
-
   } catch (error) {
     res
       .status(500)
@@ -518,13 +547,14 @@ const newResetPasswordSubmission = async (req, res) => {
     );
 
     if (!userFound) {
-      return res.status(400).json({ message: "User not registered", success: false });
-    }
-    if(userFound.role === "admin" || userFound.role === "super admin"){
       return res
-      .status(400)
-      .json({ message: "User dont exsist", success: false });
-
+        .status(400)
+        .json({ message: "User not registered", success: false });
+    }
+    if (userFound.role === "admin" || userFound.role === "super admin") {
+      return res
+        .status(400)
+        .json({ message: "User dont exsist", success: false });
     }
     if (!userFound.resetPasswordVerified) {
       return res.status(400).json({
@@ -536,10 +566,15 @@ const newResetPasswordSubmission = async (req, res) => {
     const userDefaultSetting = userFound.userDefaultSettingID;
 
     // Decrypt existing passwords from lastPassword array
-    const decryptedPasswords = userDefaultSetting.lastPassword.map((encryptedPass) => {
-      const bytes = CryptoJS.AES.decrypt(encryptedPass, process.env.PASSWORD_SECRET);
-      return bytes.toString(CryptoJS.enc.Utf8);
-    });
+    const decryptedPasswords = userDefaultSetting.lastPassword.map(
+      (encryptedPass) => {
+        const bytes = CryptoJS.AES.decrypt(
+          encryptedPass,
+          process.env.PASSWORD_SECRET
+        );
+        return bytes.toString(CryptoJS.enc.Utf8);
+      }
+    );
 
     // Check if the new password has been used before
     if (decryptedPasswords.includes(newPassword)) {
@@ -549,7 +584,10 @@ const newResetPasswordSubmission = async (req, res) => {
     }
 
     // Encrypt the new password
-    const encryptedNewPassword = CryptoJS.AES.encrypt(newPassword, process.env.PASSWORD_SECRET).toString();
+    const encryptedNewPassword = CryptoJS.AES.encrypt(
+      newPassword,
+      process.env.PASSWORD_SECRET
+    ).toString();
 
     // Update user's password and reset verification status
     userFound.password = encryptedNewPassword;
@@ -573,7 +611,7 @@ const newResetPasswordSubmission = async (req, res) => {
       userFound.username || userFound.email
     }" has been successfully updated.
     
-    If you made this change, no further action is required. This email is simply a confirmation of the update.
+    If you made this change, no further action is required. This message is simply a confirmation of the update.
     
     **Don't recognize this activity?**
     - [Reset Your Password](https://www.beachbunnyhouse.com/reset-password)
@@ -583,8 +621,7 @@ const newResetPasswordSubmission = async (req, res) => {
     
     Thank you for being a valued member of the Beachbunnyhouse community,  
     The Beachbunnyhouse Team
-    
-    _This is an automated message. Please do not reply._`;
+    `;
 
     sendUpdateNotification(
       subject,
@@ -776,7 +813,7 @@ const changeUserLoginPassword = async (req, res) => {
         userFound.username || userFound.email
       }" has been successfully updated.
       
-      If you made this change, no further action is required. This email is simply a confirmation of the update.
+      If you made this change, no further action is required. This message is simply a confirmation of the update.
       
       **Don't recognize this activity?**
       - [Reset Your Password](https://www.beachbunnyhouse.com/reset-password)
@@ -786,8 +823,7 @@ const changeUserLoginPassword = async (req, res) => {
       
       Thank you for being a valued member of the Beachbunnyhouse community,  
       The Beachbunnyhouse Team
-      
-      _This is an automated message. Please do not reply._`;
+      `;
       sendUpdateNotification(
         subject,
         emailBody,
@@ -1445,8 +1481,8 @@ const updateUserProfileDetails = async (req, res) => {
       userProfileFound.nationality = body.nationality;
       userProfileFound.religion = body.religion;
       userProfileFound.bloodGroup = body.bloodGroup;
-      if (userProfileFound.profileCompletePercentage <= 25) {
-        userProfileFound.profileCompletePercentage = 25;
+      if (userProfileFound.profileCompletePercentage <= 35) {
+        userProfileFound.profileCompletePercentage = 35;
       }
     } else if (action === "Contact Details") {
       userFound.contact = body.contact;
@@ -1505,15 +1541,21 @@ const updateUserProfileDetails = async (req, res) => {
 
     await userFound.save();
     userProfileFound.save().then(() => {
-      const subject = `Profile Settings Updated`;
-      const notificationBody = `Dear ${userFound.name}, \nYour profile settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.\nRegards, \nBeach Bunny House.`;
+      if (
+        action === "Next of Kin" ||
+        action === "Payment Details" ||
+        action === "Withdrawal Details"
+      ) {
+        const subject = `Profile Settings Updated`;
+        const notificationBody = `Dear ${userFound.name}, \nYour profile settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.\nRegards, \nBeach Bunny House.`;
 
-      sendUpdateNotification(
-        subject,
-        notificationBody,
-        userFound.userDefaultSettingID.notifyUpdates,
-        username
-      );
+        sendUpdateNotification(
+          subject,
+          notificationBody,
+          userFound.userDefaultSettingID.notifyUpdates,
+          username
+        );
+      }
     });
 
     res.status(200).json({ message: "Changes updated.", success: true });
