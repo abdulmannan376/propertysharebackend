@@ -6,7 +6,7 @@ const WithdrawalSchema = new mongoose.Schema(
     amount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ["Pending", "Dispatched", "Cancelled", "Expired"],
+      enum: ["Pending", "Dispatched", "Cancelled", "Expired","OnHold"],
       default: "Pending",
     },
     userDocID: {

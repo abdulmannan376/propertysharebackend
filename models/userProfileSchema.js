@@ -61,6 +61,18 @@ const UserProfileSchema = new mongoose.Schema({
     },
     default: null,
   },
+  payPalEmail: {
+    type: String,
+    default: "",
+  },
+  agreeCondition: {
+    type: Boolean,
+    default: false,
+  },
+  withdrawalMethodAdded: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const UserProfile = mongoose.model("user_profiles", UserProfileSchema);

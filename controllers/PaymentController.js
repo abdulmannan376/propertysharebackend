@@ -207,18 +207,26 @@ const testCheckout = async (body, session) => {
             session: session,
           }
         );
+        const withdrawalAmount = paymentFound.payingAmount - companyFee;
+        const newWithdrawalRequest = new Withdrawal({
+          amount: withdrawalAmount,
+          userDocID: paymentFound.initiatedBy,
+          payPalEmail: "sb-qznsj34320026@personal.example.com", // Assuming userFound contains the email
+          agree: true, // Assuming agreement is true in this context
+        });
 
-        await Users.updateOne(
-          {
-            _id: paymentFound.initiatedBy,
-          },
-          {
-            $set: {
-              availBalnc:
-                userFound.availBalnc + paymentFound.payingAmount - companyFee,
-            },
-          }
-        );
+        await newWithdrawalRequest.save({ session });
+        // await Users.updateOne(
+        //   {
+        //     _id: paymentFound.initiatedBy,
+        //   },
+        //   {
+        //     $set: {
+        //       availBalnc:
+        //         userFound.availBalnc + paymentFound.payingAmount - companyFee,
+        //     },
+        //   }
+        // );
       } else {
         console.log("in else");
         const { shareID } = body;
@@ -257,17 +265,26 @@ const testCheckout = async (body, session) => {
         // console.log(newPayment);
         await newPayment.save({ session });
 
-        await Users.updateOne(
-          {
-            _id: ownerFound._id,
-          },
-          {
-            $set: {
-              availBalnc: ownerFound.availBalnc + amount,
-            },
-          },
-          { session }
-        );
+        const newWithdrawalRequest = new Withdrawal({
+          amount: amount,
+          userDocID: ownerFound._id,
+          payPalEmail: "sb-qznsj34320026@personal.example.com", // Assuming userFound contains the email
+          agree: true, // Assuming agreement is true in this context
+        });
+
+        await newWithdrawalRequest.save({ session });
+        //come here
+        // await Users.updateOne(
+        //   {
+        //     _id: ownerFound._id,
+        //   },
+        //   {
+        //     $set: {
+        //       availBalnc: ownerFound.availBalnc + amount,
+        //     },
+        //   },
+        //   { session }
+        // );
       }
 
       return true;
@@ -573,7 +590,7 @@ const buyShareTransaction = async (req, res) => {
   const session = await mongoose.startSession();
   try {
     const { payment, data } = req.body;
-    console.log(req.body);
+    console.log("payment-->", payment, "data-->", data);
 
     session.startTransaction();
 
@@ -702,7 +719,7 @@ const rentOfferTransaction = async (req, res) => {
   }
 };
 const processAdminApprovedWithdrawal = async (session, body) => {
-  const { amount, paypalEmail, requestId, withdrawalID } = body;
+  const { amount, paypalEmail, withdrawalID } = body;
 
   const withdrawal = await Withdrawal.findOne({
     withdrawalID: withdrawalID,
@@ -759,14 +776,13 @@ const processAdminApprovedWithdrawal = async (session, body) => {
 
   await Withdrawal.updateOne(
     { _id: withdrawal._id },
-    { 
-      $set: { 
+    {
+      $set: {
         status: "Dispatched",
-        payoutBatchId: payoutResponse.batch_header.payout_batch_id
-      } 
+        payoutBatchId: payoutResponse.batch_header.payout_batch_id,
+      },
     }
   ).session(session);
-  
 
   const emailSubject = `Withdrawal (${withdrawal.withdrawalID}) Dispatched`;
   const emailBody = `Dear ${withdrawal.userDocID.name},\nYour withdrawal request (${withdrawal.withdrawalID}) for $${withdrawal.amount} has been dispatched successfully.\n\nRegards,\nBeach Bunny House.`;
@@ -796,7 +812,7 @@ const payoutBatch = async (req, res) => {
       });
     }
 
-     const paypalClient = createPayPalClient(); // Initialize the PayPal client
+    const paypalClient = createPayPalClient(); // Initialize the PayPal client
 
     // // Fetch payout details from PayPal
     const { data: payoutDetails } = await paypalClient.get(
@@ -805,7 +821,7 @@ const payoutBatch = async (req, res) => {
     res.status(200).json({
       message: "Payout details and receipt image fetched successfully.",
       data: {
-        payoutDetails
+        payoutDetails,
       },
       success: true,
     });
@@ -825,7 +841,58 @@ const payoutBatch = async (req, res) => {
     session.endSession();
   }
 };
+const processPendingWithdrawals = async () => {
+  console.log("Starting processPendingWithdrawals job at", new Date().toISOString());
 
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+    const pendingWithdrawals = await Withdrawal.find({
+      status: "Pending",
+      createdAt: { $lte: oneHourAgo },
+    });
+
+    console.log(`Found ${pendingWithdrawals.length} pending withdrawals to process.`);
+
+    for (const withdrawal of pendingWithdrawals) {
+      const { amount, payPalEmail, withdrawalID } = withdrawal;
+
+      // Validate required fields
+      if (!amount || !payPalEmail  || !withdrawalID) {
+        console.warn(
+          `Skipping withdrawal ID: ${withdrawal.withdrawalID}. Missing required fields:`,
+          { amount, payPalEmail, withdrawalID }
+        );
+        continue;
+      }
+
+      try {
+        console.log(`Processing withdrawal ID: ${withdrawal.withdrawalID}`);
+
+        await processAdminApprovedWithdrawal(session, {
+          amount,
+          paypalEmail:payPalEmail,
+          withdrawalID,
+        });
+
+        console.log(`Successfully processed withdrawal ID: ${withdrawal.withdrawalID}`);
+      } catch (error) {
+        console.error(`Error processing withdrawal ID: ${withdrawal.withdrawalID}`, error);
+      }
+    }
+
+    await session.commitTransaction();
+    console.log("Completed processPendingWithdrawals job.");
+  } catch (error) {
+    console.error("Error in processPendingWithdrawals job:", error);
+    await session.abortTransaction();
+  } finally {
+    session.endSession();
+  }
+};
 
 module.exports = {
   GetClientToken,
@@ -841,5 +908,6 @@ module.exports = {
   createPaypalOrder,
   capturePaypalOrderPayment,
   processAdminApprovedWithdrawal,
-  payoutBatch
+  payoutBatch,
+  processPendingWithdrawals
 };

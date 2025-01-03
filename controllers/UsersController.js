@@ -918,8 +918,11 @@ const getUserWithdrawals = async (req, res) => {
 
     let statusList = [];
     if (filter === "all") {
-      statusList = ["Dispatched", "Cancelled", "Expired"];
-    } else {
+      statusList = ["Dispatched", "Cancelled", "Expired","OnHold"];
+    }else if (filter === "Pending"){
+      statusList = ["Pending","OnHold"];
+    }
+     else {
       statusList = [filter];
     }
 
@@ -1071,7 +1074,42 @@ const updateWithdrawal = async (req, res) => {
       ).session(session);
 
       await session.commitTransaction();
-    } else {
+    }else if (action === "hold") {
+      await Withdrawal.updateOne(
+        { _id: withdrawalFound._id },
+        { $set: { status: "OnHold" } }
+      ).session(session);
+
+      // await Users.updateOne(
+      //   { _id: withdrawalFound.userDocID._id },
+      //   {
+      //     $set: {
+      //       availBalnc:
+      //         withdrawalFound.userDocID.availBalnc + withdrawalFound.amount,
+      //     },
+      //   }
+      // ).session(session);
+
+      await session.commitTransaction();
+    }else if (action === "release") {
+      await Withdrawal.updateOne(
+        { _id: withdrawalFound._id },
+        { $set: { status: "Pending" } }
+      ).session(session);
+
+      // await Users.updateOne(
+      //   { _id: withdrawalFound.userDocID._id },
+      //   {
+      //     $set: {
+      //       availBalnc:
+      //         withdrawalFound.userDocID.availBalnc + withdrawalFound.amount,
+      //     },
+      //   }
+      // ).session(session);
+
+      await session.commitTransaction();
+    } 
+    else {
       throw new Error("Forbidden or No action provided.");
     }
 
@@ -1481,19 +1519,19 @@ const updateUserProfileDetails = async (req, res) => {
       userProfileFound.nationality = body.nationality;
       userProfileFound.religion = body.religion;
       userProfileFound.bloodGroup = body.bloodGroup;
-      if (userProfileFound.profileCompletePercentage <= 35) {
-        userProfileFound.profileCompletePercentage = 35;
+      if (userProfileFound.profileCompletePercentage <= 25) {
+        userProfileFound.profileCompletePercentage = 25;
       }
     } else if (action === "Contact Details") {
       userFound.contact = body.contact;
       userProfileFound.permanentAddress = body.permanentAddress;
-      if (userProfileFound.profileCompletePercentage <= 70) {
-        userProfileFound.profileCompletePercentage = 70;
+      if (userProfileFound.profileCompletePercentage <= 50) {
+        userProfileFound.profileCompletePercentage = 50;
       }
     } else if (action === "Next of Kin") {
       userProfileFound.nextOfKinDetails = body.nextOfKinDetails;
-      if (userProfileFound.profileCompletePercentage <= 100) {
-        userProfileFound.profileCompletePercentage = 100;
+      if (userProfileFound.profileCompletePercentage <= 75) {
+        userProfileFound.profileCompletePercentage = 75;
       }
     } else if (action === "Payment Details") {
       userProfileFound.paymentDetails = body.paymentDetails;
@@ -1502,11 +1540,24 @@ const updateUserProfileDetails = async (req, res) => {
         process.env.USER_CARD_SECRET
       );
     } else if (action === "Withdrawal Details") {
+      if(body.payPalEmail && body.agreeCondition){
+        userProfileFound.payPalEmail = body.payPalEmail;
+        userProfileFound.agreeCondition = body.agreeCondition;
+        userProfileFound.withdrawalMethodAdded = body.agreeCondition
+        if (userProfileFound.profileCompletePercentage <= 100) {
+          userProfileFound.profileCompletePercentage = 100;
+        }
+      }else{
       userProfileFound.withdrawalDetails = body.withdrawalDetails;
       userProfileFound.withdrawalDetails.ibanNumber = CryptoJS.AES.encrypt(
         body.withdrawalDetails.ibanNumber,
         process.env.USER_IBAN_SECRET
       );
+      userProfileFound.withdrawalMethodAdded = true;
+      if (userProfileFound.profileCompletePercentage <= 100) {
+        userProfileFound.profileCompletePercentage = 100;
+      }
+    }
     }
 
     // Check if all necessary fields are completed
@@ -1532,12 +1583,16 @@ const updateUserProfileDetails = async (req, res) => {
         userProfileFound.nextOfKinDetails.nicNumber &&
         userProfileFound.nextOfKinDetails.dobString
     );
+    const iswithdrawalDetailsComplete = Boolean(
+      userProfileFound.withdrawalMethodAdded
+    );
 
     // Determine if the profile is completed
     userFound.isProfileCompleted =
       isPrimaryDetailsComplete &&
       isContactDetailsComplete &&
-      isNextOfKinComplete;
+      isNextOfKinComplete &&
+      iswithdrawalDetailsComplete;
 
     await userFound.save();
     userProfileFound.save().then(() => {
