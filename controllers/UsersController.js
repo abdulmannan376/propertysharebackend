@@ -918,11 +918,10 @@ const getUserWithdrawals = async (req, res) => {
 
     let statusList = [];
     if (filter === "all") {
-      statusList = ["Dispatched", "Cancelled", "Expired","OnHold"];
-    }else if (filter === "Pending"){
-      statusList = ["Pending","OnHold"];
-    }
-     else {
+      statusList = ["Dispatched", "Cancelled", "Expired", "OnHold"];
+    } else if (filter === "Pending") {
+      statusList = ["Pending", "OnHold"];
+    } else {
       statusList = [filter];
     }
 
@@ -1074,7 +1073,7 @@ const updateWithdrawal = async (req, res) => {
       ).session(session);
 
       await session.commitTransaction();
-    }else if (action === "hold") {
+    } else if (action === "hold") {
       await Withdrawal.updateOne(
         { _id: withdrawalFound._id },
         { $set: { status: "OnHold" } }
@@ -1091,7 +1090,7 @@ const updateWithdrawal = async (req, res) => {
       // ).session(session);
 
       await session.commitTransaction();
-    }else if (action === "release") {
+    } else if (action === "release") {
       await Withdrawal.updateOne(
         { _id: withdrawalFound._id },
         { $set: { status: "Pending" } }
@@ -1108,8 +1107,7 @@ const updateWithdrawal = async (req, res) => {
       // ).session(session);
 
       await session.commitTransaction();
-    } 
-    else {
+    } else {
       throw new Error("Forbidden or No action provided.");
     }
 
@@ -1540,24 +1538,24 @@ const updateUserProfileDetails = async (req, res) => {
         process.env.USER_CARD_SECRET
       );
     } else if (action === "Withdrawal Details") {
-      if(body.payPalEmail && body.agreeCondition){
+      if (body.payPalEmail && body.agreeCondition) {
         userProfileFound.payPalEmail = body.payPalEmail;
         userProfileFound.agreeCondition = body.agreeCondition;
-        userProfileFound.withdrawalMethodAdded = body.agreeCondition
+        userProfileFound.withdrawalMethodAdded = body.agreeCondition;
         if (userProfileFound.profileCompletePercentage <= 100) {
           userProfileFound.profileCompletePercentage = 100;
         }
-      }else{
-      userProfileFound.withdrawalDetails = body.withdrawalDetails;
-      userProfileFound.withdrawalDetails.ibanNumber = CryptoJS.AES.encrypt(
-        body.withdrawalDetails.ibanNumber,
-        process.env.USER_IBAN_SECRET
-      );
-      userProfileFound.withdrawalMethodAdded = true;
-      if (userProfileFound.profileCompletePercentage <= 100) {
-        userProfileFound.profileCompletePercentage = 100;
+      } else {
+        userProfileFound.withdrawalDetails = body.withdrawalDetails;
+        userProfileFound.withdrawalDetails.ibanNumber = CryptoJS.AES.encrypt(
+          body.withdrawalDetails.ibanNumber,
+          process.env.USER_IBAN_SECRET
+        );
+        userProfileFound.withdrawalMethodAdded = true;
+        if (userProfileFound.profileCompletePercentage <= 100) {
+          userProfileFound.profileCompletePercentage = 100;
+        }
       }
-    }
     }
 
     // Check if all necessary fields are completed
@@ -1603,13 +1601,16 @@ const updateUserProfileDetails = async (req, res) => {
       ) {
         const subject = `Profile Settings Updated`;
         const notificationBody = `Dear ${userFound.name}, \nYour profile settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.\nRegards, \nBeach Bunny House.`;
-
+        const adminEmailBody = `Dear Admin, \n ${userFound.username} have Updated there Paypal Email to ${userProfileFound.payPalEmail}`
         sendUpdateNotification(
           subject,
           notificationBody,
           userFound.userDefaultSettingID.notifyUpdates,
           username
         );
+        if (action === "Withdrawal Details") {
+          sendEmail(process.env.ADMIN_EMAIL, subject, adminEmailBody);
+        }
       }
     });
 

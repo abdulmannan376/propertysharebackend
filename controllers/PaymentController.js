@@ -186,7 +186,7 @@ const testCheckout = async (body, session) => {
 
         const userFound = await Users.findOne({
           _id: paymentFound.initiatedBy,
-        });
+        }).populate("userProfile");
 
         const companyFeePercentage =
           parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
@@ -211,7 +211,8 @@ const testCheckout = async (body, session) => {
         const newWithdrawalRequest = new Withdrawal({
           amount: withdrawalAmount,
           userDocID: paymentFound.initiatedBy,
-          payPalEmail: "sb-qznsj34320026@personal.example.com", // Assuming userFound contains the email
+          payPalEmail: userFound.userProfile.payPalEmail, // Assuming userFound contains the email
+          // payPalEmail: "sb-qznsj34320026@personal.example.com"
           agree: true, // Assuming agreement is true in this context
         });
 
@@ -268,7 +269,8 @@ const testCheckout = async (body, session) => {
         const newWithdrawalRequest = new Withdrawal({
           amount: amount,
           userDocID: ownerFound._id,
-          payPalEmail: "sb-qznsj34320026@personal.example.com", // Assuming userFound contains the email
+          payPalEmail: ownerFound.userProfile.payPalEmail,
+          // payPalEmail: "sb-qznsj34320026@personal.example.com", // Assuming userFound contains the email
           agree: true, // Assuming agreement is true in this context
         });
 
