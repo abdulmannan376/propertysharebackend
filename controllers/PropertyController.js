@@ -798,7 +798,7 @@ function reorganizeFiles(directory, deleteIndices = []) {
   // Delete files as per indices provided
   deleteIndices.sort((a, b) => b - a); // Sort indices in descending order for deletion
   deleteIndices.forEach((index) => {
-    const filePath = path.join(directory, files[parseInt(index) - 1]);  
+    const filePath = path.join(directory, files[parseInt(index) - 1]);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
@@ -818,7 +818,7 @@ function reorganizeFiles(directory, deleteIndices = []) {
 async function openInspections() {
   try {
     console.log("openInspections cron runing");
-    
+
     const today = new Date(); // Get the current date and time
     const twoDaysLater = new Date(today); // Copy today's date to a new variable
     twoDaysLater.setDate(twoDaysLater.getDate() + 30); // Add two days
@@ -1346,7 +1346,7 @@ async function notifyPropertyShareOwnerByPropertyID(
     const body =
       emailBody ||
       `Dear ${share?.currentOwnerDocID?.userID?.name}, It is to inform you a new ${category} is requested for property ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
-  
+
     sendUpdateNotification(
       subject,
       body,
@@ -1354,9 +1354,8 @@ async function notifyPropertyShareOwnerByPropertyID(
       share.currentOwnerDocID.username
     );
   });
-  
+
   return shareList;
-  
 }
 
 const getInspectionDetail = async (req, res) => {
@@ -1932,7 +1931,9 @@ const handleRaiseRequestActionPropertyOwner = async (req, res) => {
     const companyFeePercentage =
       parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
     const companyFee =
-      parseInt(raiseRequestFound.estimatedPrice / raiseRequestFound.payingUserCount) * companyFeePercentage;
+      parseInt(
+        raiseRequestFound.estimatedPrice / raiseRequestFound.payingUserCount
+      ) * companyFeePercentage;
 
     for (const user of usersFoundList) {
       const newPayment = new Payments({
@@ -2041,8 +2042,10 @@ const addPropertyImages = async (req, res) => {
     // Save new files (assuming diskStorage is used and files are automatically saved)
     const imageCount = propertyFound.imageCount;
     files.forEach((file, index) => {
-      console.log("in addpropertyimages file: ",file)
-      const newFilename = `image-${imageCount + index + 1}${path.extname(file.originalname)}`;
+      console.log("in addpropertyimages file: ", file);
+      const newFilename = `image-${imageCount + index + 1}${path.extname(
+        file.originalname
+      )}`;
 
       const oldPath = file.path;
       const newPath = path.join(uploadPath, newFilename);
@@ -2344,7 +2347,24 @@ const getFeaturedProperty = async (req, res) => {
     }
 
     pipeline.push({ $match: matchQuery });
+    if (category && category === "rent") {
+    // Lookup to join with the PropertyShares collection
+    pipeline.push({
+      $lookup: {
+        from: "property_shares", // Collection name for shares
+        localField: "_id", // `_id` in the `properties` collection
+        foreignField: "propertyDocID", // Link field in `property_shares`
+        as: "shares", // Output field containing the matching shares
+      },
+    });
 
+    // Add a $match stage to filter for properties with shares on rent
+    pipeline.push({
+      $match: {
+        "shares.onRent": true,
+      },
+    });
+  }
     // Lookup to join with the PropertyAmenities collection
     pipeline.push({
       $lookup: {
@@ -2489,7 +2509,24 @@ const getMostViewedProperties = async (req, res) => {
     }
 
     pipeline.push({ $match: matchQuery });
+    // Lookup to join with the PropertyShares collection
+    if (category && category === "rent") {
+    pipeline.push({
+      $lookup: {
+        from: "property_shares", // Collection name for shares
+        localField: "_id", // `_id` in the `properties` collection
+        foreignField: "propertyDocID", // Link field in `property_shares`
+        as: "shares", // Output field containing the matching shares
+      },
+    });
 
+    // Add a $match stage to filter for properties with shares on rent
+    pipeline.push({
+      $match: {
+        "shares.onRent": true,
+      },
+    });
+  }
     // Lookup to join with the PropertyAmenities collection
     pipeline.push({
       $lookup: {
@@ -2638,7 +2675,24 @@ const getRecentlyAddedProperties = async (req, res) => {
     }
 
     pipeline.push({ $match: matchQuery });
+    // Lookup to join with the PropertyShares collection
+    if (category && category === "rent") {
+    pipeline.push({
+      $lookup: {
+        from: "property_shares", // Collection name for shares
+        localField: "_id", // `_id` in the `properties` collection
+        foreignField: "propertyDocID", // Link field in `property_shares`
+        as: "shares", // Output field containing the matching shares
+      },
+    });
 
+    // Add a $match stage to filter for properties with shares on rent
+    pipeline.push({
+      $match: {
+        "shares.onRent": true,
+      },
+    });
+  }
     // Lookup to join with the PropertyAmenities collection
     pipeline.push({
       $lookup: {

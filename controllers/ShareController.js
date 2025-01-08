@@ -666,7 +666,16 @@ const getSharesByCategory = async (req, res) => {
       sharesList = await PropertyShares.find({
         propertyDocID: propertyFound._id,
         onRent: true,
-      }).populate("currentOwnerDocID", "username");
+      })
+      .populate("currentOwnerDocID", "username")
+      .populate({
+        path: "shareOffersList",
+        populate: {
+          path: "userDocID",
+          select: "username", // Include only the username field
+        },
+      });
+      
     } else if (category === "Sell") {
       sharesList = await PropertyShares.find({
         propertyDocID: propertyFound._id,
@@ -835,7 +844,7 @@ const genNewShareOffer = async (req, res) => {
   try {
     const { shareID, username, price, category } = req.body;
 
-    console.log(req.body);
+    // console.log(req.body);
 
     let shareFound = null;
     if (category === "Rent") {
