@@ -894,6 +894,7 @@ const genNewShareOffer = async (req, res) => {
         select: "notifyUpdates",
       },
     });
+console.log("ownerFound",ownerFound);
 
     const offerFound = await ShareOffers.findOne({
       shareDocID: shareFound._id,
@@ -930,13 +931,13 @@ const genNewShareOffer = async (req, res) => {
       );
 
       const ownerNotificationSubject = `Property share ${category} offer recieved`;
-      const ownerNotificationBody = `Dear ${ownerFound.name}, \n${
+      const ownerNotificationBody = `Dear ${ownerFound.username}, \n${
         userFound.name
       } has given an offer for your share in property: ${
         shareFound.propertyDocID.title
       } to ${category === "Sell" ? "Buy" : category}, with your price: $${
         shareFound.priceByCategory
-      }. \nRegards, \nBeach Bunny House.`;
+      }. click Link to Approve: https://www.beachbunnyhouse.com/user/${ownerFound.username} \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         ownerNotificationSubject,
@@ -1541,6 +1542,7 @@ const handleShareRentOfferAction = async (req, res) => {
     if (!shareOfferFound) {
       throw new Error("share offer not found");
     }
+console.log("shareOfferFound.userDocID.username",shareOfferFound.userDocID.username);
 
     const shareOwnerFound = await Users.findOne({
       username: shareOfferFound.shareholderDocID.username,
@@ -1583,9 +1585,14 @@ const handleShareRentOfferAction = async (req, res) => {
     } else if (action === "cancelled") {
       shareOfferFound.status = "cancelled";
     }
+    const secondShareholder = await Users.findOne({ username: shareOfferFound.userDocID.username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
 
     shareOfferFound.save().then(() => {
       if (action === "accepted") {
+        
         const userNotificationsubject = `Rent Offer from ${shareOwnerFound.username} Accepted`;
         const userNotificationbody = `Dear ${
           userFound.name
@@ -1606,8 +1613,9 @@ const handleShareRentOfferAction = async (req, res) => {
           shareOwnerFound.username
         }\nSoon you will get the payment confirmation as the tenant pays it. \nRegards, \nBeach Bunny House`;
 
+        ////it is going wrong///////////
         const ownerNotificationSubject = `Property Share Rent Offer Accepted`;
-        const ownerNotificationBody = `Dear ${shareOwnerFound.name}, \nYour share rent offer has been accepted by user: ${userFound.username} at price: $${shareOfferFound.price}. Payment Pending. \nRegards, \nBeach Bunny House.`;
+        const ownerNotificationBody = `Dear ${secondShareholder.name}, \nYour share rent offer has been accepted by user: ${userFound.username} at price: $${shareOfferFound.price}. Payment Pending. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment.\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${secondShareholder.username} \nRegards, \nBeach Bunny House.`;
 
         sendUpdateNotification(
           userNotificationsubject,
@@ -1619,8 +1627,8 @@ const handleShareRentOfferAction = async (req, res) => {
         sendUpdateNotification(
           ownerNotificationSubject,
           ownerNotificationBody,
-          userFound.userDefaultSettingID.notifyUpdates,
-          username
+          secondShareholder.userDefaultSettingID.notifyUpdates,
+          secondShareholder?.username
         );
       } else if (action === "rejected") {
         const userNotificationsubject = `Rent Offer from ${shareOwnerFound.username} Rejected`;
@@ -2112,7 +2120,7 @@ const handleShareSellOfferAction = async (req, res) => {
           shareOfferFound.price
         } \nPrevious Owner Username: ${
           sharePrevOwnerFound.username
-        } \nRegards, \nBeach Bunny House`;
+        } Payment Pending. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment.\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${secondShareholder.username} \nRegards, \nBeach Bunny House`;
 
         const ownerNotificationSubject = `Property Share Sell Offer Accepted`;
         const ownerNotificationBody = `Dear ${sharePrevOwnerFound.name}, \nYou have accepted share sell offer by user: ${buyerFound.username} at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
@@ -2233,7 +2241,7 @@ const handleShareSwapOfferAction = async (req, res) => {
       },
     });
 
-    console.log(shareOfferFound);
+    // console.log(shareOfferFound);
 
     const firstShareFound = await PropertyShares.findOne({
       _id: shareOfferFound.shareDocID,

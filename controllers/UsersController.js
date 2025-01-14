@@ -82,7 +82,7 @@ const genNewVerificationCode = async (req, res) => {
 const verifyEmailVerficationCode = async (req, res) => {
   try {
     const { email, code } = req.body;
-    console.log("body: ", req.body);
+    // console.log("body: ", req.body);
     const userFound = await Users.findOne({ email: email }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
@@ -194,7 +194,7 @@ const userLogin = async (req, res) => {
       "userDefaultSettingID",
       "notifyUpdates"
     );
-    console.log("body: ", req.body);
+    // console.log("body: ", req.body);
     if (!userFound) {
       return res
         .status(400)
@@ -307,7 +307,7 @@ const userLogin = async (req, res) => {
 const userSignUp = async (req, res) => {
   try {
     const body = req.body;
-    console.log("body: ", body);
+    // console.log("body: ", body);
     const userFoundByUsername = await Users.findOne({
       username: body.username,
     });
@@ -378,7 +378,7 @@ const userSignUp = async (req, res) => {
 const resetPasswordGenCode = async (req, res) => {
   try {
     const body = req.body;
-    console.log("body: ", body);
+    // console.log("body: ", body);
 
     const userFound = await Users.findOne({ email: body.email }).populate(
       "userDefaultSettingID",
@@ -430,7 +430,7 @@ const resetPasswordGenCode = async (req, res) => {
 const verifyResetPasswordCode = async (req, res) => {
   try {
     const { email, code } = req.body;
-    console.log("body: ", req.body);
+    // console.log("body: ", req.body);
     const userFound = await Users.findOne({ email: email }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
