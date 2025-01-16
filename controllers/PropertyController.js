@@ -955,7 +955,7 @@ const fetchShareInspectionByUsername = async (req, res) => {
           const shareDetail = PropertyShare.findOne(share.shareDocID)
             .populate("propertyDocID", "propertyID")
             .exec();
-          console.log("shareDetail: ", shareDetail);
+          // console.log("shareDetail: ", shareDetail);
           return shareDetail;
         });
 
@@ -1540,7 +1540,7 @@ const fetchRaisedRequestByUsername = async (req, res) => {
             "propertyDocID",
             "propertyID"
           );
-          console.log("shareDetail: ", shareDetail);
+          // console.log("shareDetail: ", shareDetail);
           return shareDetail;
         });
 

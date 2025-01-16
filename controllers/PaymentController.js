@@ -1,6 +1,7 @@
 const { gateway } = require("../middleware/paymentConfig");
 const Users = require("../models/UserSchema");
 const Payments = require("../models/PaymentSchema");
+const ShareOffers = require("../models/PropertyShareOfferSchema");
 const { default: mongoose } = require("mongoose");
 const {
   buyShare,
@@ -560,22 +561,66 @@ const genPayment = async (req, res) => {
 };
 
 const handlePendingOfferPayments = async () => {
+  console.log(
+    "Starting handlePendingOfferPayments job at",
+    new Date().toISOString()
+  );
+  const session = await mongoose.startSession();
   try {
+    // Start transaction before fetching payments
+    session.startTransaction();
+
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+
+
     const paymentsList = await Payments.find({
       status: "Pending",
       category: { $in: ["Rent Offer", "Sell Offer"] },
-    }).populate("shareDocID", "shareID");
+      createdAt: { $lt: sixHoursAgo }, // Only include records created more than 1 minute ago
+    })
+      .populate("shareDocID", "shareID")
+      .session(session);
 
+    // Process each payment
     for (const payment of paymentsList) {
-      if (payment.category === "Rent Offer" && payment.shareDocID) {
-        const data = { shareID: payment.shareDocID.shareID };
-        shareRentAction(data, {}, "expired");
-      } else if (payment.category === "Sell Offer" && payment.shareDocID) {
-        const data = { shareID: payment.shareDocID.shareID };
-        shareSellAction(data, {}, "expired");
+      try {
+        if (!payment.shareDocID) {
+          continue;
+        }
+        // console.log("payment.shareDocID.shareID", payment);
+        // const shareOfferFound = await ShareOffers.findOne({
+        //   _id: payment.shareOfferDocID.toString(),
+        // }).session(session);
+        // console.log("shareOfferFound",shareOfferFound);
+
+        const data = {
+          shareID: payment.shareDocID.shareID,
+          shareOfferID: payment.shareOfferDocID.toString(),
+        };
+
+        if (payment.category === "Rent Offer") {
+          console.log(`Processing Rent Offer payment ID: ${payment._id}`);
+          await shareRentAction(data, session, "expired");
+        } else if (payment.category === "Sell Offer") {
+          console.log(
+            `Processing Sell Offer payment ID: ${payment._id}, shareID: ${data.shareID}`
+          );
+          await shareSellAction(data, session, "expired");
+        }
+      } catch (paymentError) {
+        console.error({
+          message: `Error processing payment`,
+          paymentId: payment._id,
+          category: payment.category,
+          error: paymentError.message,
+          timestamp: new Date().toISOString(),
+        });
+        // Continue processing other payments even if one fails
       }
     }
-
+    // Commit transaction
+    console.log("Committing transaction...");
+    await session.commitTransaction();
     console.log(`${paymentsList.length} number of payments expired`);
     return true;
   } catch (error) {
@@ -584,6 +629,11 @@ const handlePendingOfferPayments = async () => {
       fileLocation: "controllers/PaymentController.js",
       timestamp: currentDateString,
     });
+    await session.abortTransaction();
+  } finally {
+    // Clean up session
+    await session.endSession();
+    console.log("handlePendingOfferPayments job completed.");
   }
 };
 
@@ -844,7 +894,10 @@ const payoutBatch = async (req, res) => {
   }
 };
 const processPendingWithdrawals = async () => {
-  console.log("Starting processPendingWithdrawals job at", new Date().toISOString());
+  console.log(
+    "Starting processPendingWithdrawals job at",
+    new Date().toISOString()
+  );
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -854,16 +907,18 @@ const processPendingWithdrawals = async () => {
 
     const pendingWithdrawals = await Withdrawal.find({
       status: "Pending",
-      createdAt: { $lte: oneHourAgo },
+      // createdAt: { $lte: oneHourAgo },
     });
 
-    console.log(`Found ${pendingWithdrawals.length} pending withdrawals to process.`);
+    console.log(
+      `Found ${pendingWithdrawals.length} pending withdrawals to process.`
+    );
 
     for (const withdrawal of pendingWithdrawals) {
       const { amount, payPalEmail, withdrawalID } = withdrawal;
 
       // Validate required fields
-      if (!amount || !payPalEmail  || !withdrawalID) {
+      if (!amount || !payPalEmail || !withdrawalID) {
         console.warn(
           `Skipping withdrawal ID: ${withdrawal.withdrawalID}. Missing required fields:`,
           { amount, payPalEmail, withdrawalID }
@@ -876,13 +931,18 @@ const processPendingWithdrawals = async () => {
 
         await processAdminApprovedWithdrawal(session, {
           amount,
-          paypalEmail:payPalEmail,
+          paypalEmail: payPalEmail,
           withdrawalID,
         });
 
-        console.log(`Successfully processed withdrawal ID: ${withdrawal.withdrawalID}`);
+        console.log(
+          `Successfully processed withdrawal ID: ${withdrawal.withdrawalID}`
+        );
       } catch (error) {
-        console.error(`Error processing withdrawal ID: ${withdrawal.withdrawalID}`, error);
+        console.error(
+          `Error processing withdrawal ID: ${withdrawal.withdrawalID}`,
+          error
+        );
       }
     }
 
@@ -911,5 +971,5 @@ module.exports = {
   capturePaypalOrderPayment,
   processAdminApprovedWithdrawal,
   payoutBatch,
-  processPendingWithdrawals
+  processPendingWithdrawals,
 };

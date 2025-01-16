@@ -89,7 +89,7 @@ const buyShare = async (data, session) => {
 
       const recipient = userFound.email;
       const subject = "Successful Purchase of Share.";
-      const body = `Dear ${userFound.name}, \nThis email is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
+      const body = `Dear ${userFound.name}, \nThis message is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
@@ -180,7 +180,7 @@ const getBuySharesDetailByUsername = async (req, res) => {
             "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
           )
           .exec();
-        console.log("shareDetail: ", shareDetail);
+        // console.log("shareDetail: ", shareDetail);
         return shareDetail;
       }
     );
@@ -667,15 +667,14 @@ const getSharesByCategory = async (req, res) => {
         propertyDocID: propertyFound._id,
         onRent: true,
       })
-      .populate("currentOwnerDocID", "username")
-      .populate({
-        path: "shareOffersList",
-        populate: {
-          path: "userDocID",
-          select: "username", // Include only the username field
-        },
-      });
-      
+        .populate("currentOwnerDocID", "username")
+        .populate({
+          path: "shareOffersList",
+          populate: {
+            path: "userDocID",
+            select: "username", // Include only the username field
+          },
+        });
     } else if (category === "Sell") {
       sharesList = await PropertyShares.find({
         propertyDocID: propertyFound._id,
@@ -894,7 +893,7 @@ const genNewShareOffer = async (req, res) => {
         select: "notifyUpdates",
       },
     });
-console.log("ownerFound",ownerFound);
+    console.log("ownerFound", ownerFound);
 
     const offerFound = await ShareOffers.findOne({
       shareDocID: shareFound._id,
@@ -937,7 +936,9 @@ console.log("ownerFound",ownerFound);
         shareFound.propertyDocID.title
       } to ${category === "Sell" ? "Buy" : category}, with your price: $${
         shareFound.priceByCategory
-      }. click Link to Approve: https://www.beachbunnyhouse.com/user/${ownerFound.username} \nRegards, \nBeach Bunny House.`;
+      }. click Link to Approve: https://www.beachbunnyhouse.com/user/${
+        ownerFound.username
+      } \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         ownerNotificationSubject,
@@ -1431,11 +1432,16 @@ const shareRentAction = async (data, session, action) => {
 
       const propertyShareFound = await PropertyShares.findOne({
         shareID: shareID,
-      }).session(session);
+      })
+        .populate("propertyDocID", "title propertyID")
+        .session(session);
 
       const shareOfferFound = await ShareOffers.findOne({
         shareOfferID: shareOfferID,
-      }).session(session);
+      })
+        .populate("shareholderDocID", "username")
+        .populate("userDocID", "username")
+        .session(session);
 
       const recipientFound = await Users.findOne({
         username: recipient,
@@ -1477,18 +1483,80 @@ const shareRentAction = async (data, session, action) => {
         },
         { session }
       );
+      const sellerFound = await Users.findOne({ username: username })
+        .populate("userDefaultSettingID", "notifyUpdates")
+        .session(session);
+      // console.log("sellerFound++>", sellerFound);
+
+      const buyerFound = await Users.findOne({
+        username: shareOfferFound.userDocID.username,
+      })
+        .populate("userDefaultSettingID", "notifyUpdates")
+        .session(session);
+
+      // console.log("buyerFound++>", buyerFound);
+      const subject = "Successful Purchase of Rent Share.";
+      const body = `Dear ${
+        buyerFound.name
+      }, \nThis message is to confirm your successful agreement for a rental share in property with Title: ${
+        propertyShareFound.propertyDocID?.title
+      }.property's rent share. \nDuration: ${propertyShareFound.availableInDuration.startDate.toDateString()} - ${propertyShareFound.availableInDuration.endDate.toDateString()}\nPrice: $${
+        shareOfferFound.price
+      }\nRegards, \nBeach Bunny House.`;
+
+      const sellerSubject = "Successful Sale of Rent Share.";
+      const sellerBody = `Dear ${
+        sellerFound.name
+      }, \nThis message is to confirm successful sale of a rental share in property with Title: ${
+        propertyShareFound.propertyDocID?.title
+      }.property's rent share. \nDuration: ${propertyShareFound.availableInDuration.startDate.toDateString()} - ${propertyShareFound.availableInDuration.endDate.toDateString()}\nPrice: $${
+        shareOfferFound.price
+      } \nThe buyer,${
+        buyerFound.name
+      }, has completed the payment. The amount will be deposited into your account shortly. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        subject,
+        body,
+        buyerFound.userDefaultSettingID.notifyUpdates,
+        shareOfferFound.userDocID.username
+      );
+
+      sendUpdateNotification(
+        sellerSubject,
+        sellerBody,
+        sellerFound.userDefaultSettingID.notifyUpdates,
+        username
+      );
     } else if (action === "expired") {
-      const { shareID } = data;
+      const { shareID ,shareOfferID} = data;
       const shareFound = await PropertyShares.findOne({
-        shareID: shareID,
-      });
+        shareID: shareID, // Replace with the actual share ID
+      })
+        .populate("propertyDocID", "title propertyID")
+        .populate({
+          path: "currentOwnerDocID",
+          model: "shareholders",
+          select: "username userID", // Select specific fields from Shareholders
+          populate: {
+            path: "userID",
+            model: "users",
+            select: "name userDefaultSettingID", // Include userDefaultSettingID
+            populate: {
+              path: "userDefaultSettingID",
+              model: "user_default_settings",
+              select: "notifyUpdates", // Select specific fields from UserDefaultSettings
+            },
+          },
+        })
+        .session(session); // If you're using transactions
 
       await PropertyShares.updateOne(
         {
           _id: shareFound._id,
         },
         {
-          onSale: true,
+          onRent: true,
           utilisedStatus: "Purchased",
         }
       );
@@ -1508,6 +1576,57 @@ const shareRentAction = async (data, session, action) => {
           _id: { $in: paymentIDList },
         },
         { status: "Expired" }
+      );
+      const sellerSubject = "Property Rent Share is Available Again";
+
+      const sellerBody = `Dear ${
+        shareFound.currentOwnerDocID.userID.name
+      },\n\nWe gave the buyer a period of 6 hours to complete the payment for the rental share of your property with Title: ${
+        shareFound.propertyDocID?.title
+      }. Unfortunately, the buyer did not make the payment within the given time.\n\nAs a result, your property is now available for rent again.\n\nDuration: ${shareFound.availableInDuration.startDate.toDateString()} - ${shareFound.availableInDuration.endDate.toDateString()}\nPrice: $${
+        shareFound.priceByCategory
+      }\n\nThank you for your understanding.\n\nRegards,\nBeach Bunny House`;
+
+      sendUpdateNotification(
+        sellerSubject,
+        sellerBody,
+        shareFound.currentOwnerDocID.userID.userDefaultSettingID.notifyUpdates,
+        shareFound.currentOwnerDocID.username
+      );
+      const shareOfferFound = await ShareOffers.findOne({
+        _id: shareOfferID,
+      })
+        .populate("shareholderDocID", "username")
+        .populate("userDocID", "username")
+        .session(session);
+
+      const buyerFound = await Users.findOne({
+        username: shareOfferFound.userDocID.username,
+      })
+        .populate("userDefaultSettingID", "notifyUpdates")
+        .session(session);
+
+      const subject = "Payment Expired for Rental Share";
+      const body = `Dear ${buyerFound.name}, 
+      
+      We regret to inform you that your payment for rental share in the property titled "${
+       shareFound.propertyDocID?.title
+      }" has expired. the allowed payment window of 6 hours has now passed. 
+      The payment was initiated on ${shareOfferFound.createdAt.toDateString()} at ${shareOfferFound.createdAt.toLocaleTimeString()}, and the allowed payment window of 6 hours has now passed.
+      As a result, your rental request has been canceled.
+      
+      If you wish to re-initiate the process, please visit the property page again and submit a new rent share request.
+      
+      Thank you for understanding. 
+      
+      Regards, 
+      Beach Bunny House`;
+
+      sendUpdateNotification(
+        subject,
+        body,
+        buyerFound.userDefaultSettingID.notifyUpdates,
+        shareOfferFound.userDocID.username
       );
     }
 
@@ -1542,7 +1661,6 @@ const handleShareRentOfferAction = async (req, res) => {
     if (!shareOfferFound) {
       throw new Error("share offer not found");
     }
-console.log("shareOfferFound.userDocID.username",shareOfferFound.userDocID.username);
 
     const shareOwnerFound = await Users.findOne({
       username: shareOfferFound.shareholderDocID.username,
@@ -1554,10 +1672,10 @@ console.log("shareOfferFound.userDocID.username",shareOfferFound.userDocID.usern
 
     const companyFeePercentage =
       parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
-    const companyFee =
-      Math.ceil(parseInt(propertyShareFound.priceByCategory) * companyFeePercentage);
+    const companyFee = Math.ceil(
+      parseInt(propertyShareFound.priceByCategory) * companyFeePercentage
+    );
 
-    
     if (action === "accepted") {
       const newPayment = new Payments({
         gatewayTransactionID: "",
@@ -1585,37 +1703,31 @@ console.log("shareOfferFound.userDocID.username",shareOfferFound.userDocID.usern
     } else if (action === "cancelled") {
       shareOfferFound.status = "cancelled";
     }
-    const secondShareholder = await Users.findOne({ username: shareOfferFound.userDocID.username }).populate(
-      "userDefaultSettingID",
-      "notifyUpdates"
+    console.log(
+      "shareOfferFound.userDocID.username",
+      shareOfferFound.userDocID.username
     );
+
+    const secondShareholder = await Users.findOne({
+      username: shareOfferFound.userDocID.username,
+    }).populate("userDefaultSettingID", "notifyUpdates");
 
     shareOfferFound.save().then(() => {
       if (action === "accepted") {
-        
         const userNotificationsubject = `Rent Offer from ${shareOwnerFound.username} Accepted`;
         const userNotificationbody = `Dear ${
           userFound.name
         }, \nYou have successfully accepted the offer of rent of ${
           propertyShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            propertyShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            propertyShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        }\nPrice: $${shareOfferFound.price} \nShare Owner Username: ${
+        } property's share. \nDuration: ${propertyShareFound.availableInDuration.startDate.toDateString()} - ${propertyShareFound.availableInDuration.endDate.toDateString()}\nPrice: $${
+          shareOfferFound.price
+        } \nShare Owner Username: ${
           shareOwnerFound.username
         }\nSoon you will get the payment confirmation as the tenant pays it. \nRegards, \nBeach Bunny House`;
 
         ////it is going wrong///////////
         const ownerNotificationSubject = `Property Share Rent Offer Accepted`;
-        const ownerNotificationBody = `Dear ${secondShareholder.name}, \nYour share rent offer has been accepted by user: ${userFound.username} at price: $${shareOfferFound.price}. Payment Pending. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment.\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${secondShareholder.username} \nRegards, \nBeach Bunny House.`;
+        const ownerNotificationBody = `Dear ${secondShareholder.name}, \nYour share rent offer has been accepted by user: ${userFound.username} at price: $${shareOfferFound.price}. Payment Pending. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment. It will expire in 6 hours\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${secondShareholder.username} \nRegards, \nBeach Bunny House.`;
 
         sendUpdateNotification(
           userNotificationsubject,
@@ -1636,18 +1748,9 @@ console.log("shareOfferFound.userDocID.username",shareOfferFound.userDocID.usern
           userFound.name
         }, \nYou have successfully rejected the offer of rent of ${
           propertyShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            propertyShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            propertyShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        }\nPrice: $${shareOfferFound.price} \nShare Owner Username: ${
+        } property's share. \nDuration: ${propertyShareFound.availableInDuration.startDate.toDateString()} - ${propertyShareFound.availableInDuration.endDate.toDateString()}\nPrice: $${
+          shareOfferFound.price
+        } \nShare Owner Username: ${
           shareOwnerFound.username
         } \nRegards, \nBeach Bunny House`;
 
@@ -1716,19 +1819,24 @@ const fetchUserShareRentals = async (req, res) => {
     );
 
     // Assuming sharesByUsername is an array of share objects
-    const rentalsPerProperty = shareFoundList.reduce((acc, share,index) => {
-     
+    const rentalsPerProperty = shareFoundList.reduce((acc, share, index) => {
       if (!share?.propertyDocID) {
-        console.log(`Skipping share with null propertyDocID at index ${index}:`, share);
+        console.log(
+          `Skipping share with null propertyDocID at index ${index}:`,
+          share
+        );
         return acc; // Skip null or invalid entries
       }
 
       const propertyID = share.propertyDocID.propertyID;
       if (!propertyID) {
-         console.log(`propertyDocID has null propertyID at index ${index}:`, share.propertyDocID);
+        console.log(
+          `propertyDocID has null propertyID at index ${index}:`,
+          share.propertyDocID
+        );
         return acc; // Skip invalid entries with missing propertyID
       }
-      
+
       // Check if the propertyID already has an entry in the accumulator
       if (acc[propertyID]) {
         // If yes, increment the count
@@ -1768,54 +1876,54 @@ const fetchUserShareRentals = async (req, res) => {
 
 const shareSellAction = async (data, session, action) => {
   try {
-    const { username, shareOfferID, isBuybackOffer, shareID } = data;
-
-    // console.log(data)
-    // throw new Error("testing")
-    // const userFound = await Users.findOne({ username: username })
-    //   .populate("userDefaultSettingID", "notifyUpdates")
-    //   .session(session);
-    // if (!userFound) {
-    //   throw new Error("user not found");
-    // }
-
-    // if (!userFound.isProfileCompleted) {
-    //   throw new Error("user profile not completed.");
-    // }
-
-    const shareOfferFound = await ShareOffers.findOne({
-      shareOfferID: shareOfferID,
-    })
-      .populate("shareholderDocID", "username")
-      .populate("userDocID", "username")
-      .session(session);
-    if (!shareOfferFound) {
-      throw new Error("share offer not found");
-    }
-
-    const sharePrevOwnerFound = await Users.findOne({
-      username: shareOfferFound.shareholderDocID.username,
-    })
-      .populate("userDefaultSettingID", "notifyUpdates")
-      .session(session);
-
-    const propertyShareFound = await PropertyShares.findOne({
-      _id: shareOfferFound.shareDocID,
-    })
-      .populate("propertyDocID", "title propertyID")
-      .session(session);
-
-    const prevShareholder = await Shareholders.findOne({
-      username: shareOfferFound.shareholderDocID.username,
-    }).session(session);
-
-    console.log("prevShareHolder:", prevShareholder.username);
-
-    const shareholderFound = await Shareholders.findOne({
-      username: shareOfferFound.userDocID.username,
-    }).session(session);
-
     if (action === "payment proceed") {
+      const { username, shareOfferID, isBuybackOffer } = data;
+
+      // console.log("data==>",data)
+      // throw new Error("testing")
+      // const userFound = await Users.findOne({ username: username })
+      //   .populate("userDefaultSettingID", "notifyUpdates")
+      //   .session(session);
+      // if (!userFound) {
+      //   throw new Error("user not found");
+      // }
+
+      // if (!userFound.isProfileCompleted) {
+      //   throw new Error("user profile not completed.");
+      // }
+
+      const shareOfferFound = await ShareOffers.findOne({
+        shareOfferID: shareOfferID,
+      })
+        .populate("shareholderDocID", "username")
+        .populate("userDocID", "username")
+        .session(session);
+
+      if (!shareOfferFound && action) {
+        throw new Error("share offer not found");
+      }
+
+      const sharePrevOwnerFound = await Users.findOne({
+        username: shareOfferFound.shareholderDocID.username,
+      })
+        .populate("userDefaultSettingID", "notifyUpdates")
+        .session(session);
+
+      const propertyShareFound = await PropertyShares.findOne({
+        _id: shareOfferFound.shareDocID,
+      })
+        .populate("propertyDocID", "title propertyID")
+        .session(session);
+
+      const prevShareholder = await Shareholders.findOne({
+        username: shareOfferFound.shareholderDocID.username,
+      }).session(session);
+
+      console.log("prevShareHolder:", prevShareholder.username);
+
+      const shareholderFound = await Shareholders.findOne({
+        username: shareOfferFound.userDocID.username,
+      }).session(session);
       await Shareholders.updateOne(
         { _id: prevShareholder._id },
         {
@@ -1954,10 +2062,72 @@ const shareSellAction = async (data, session, action) => {
         },
         { $set: { status: "accepted" } }
       );
+
+      const sellerFound = await Users.findOne({ username: username })
+        .populate("userDefaultSettingID", "notifyUpdates")
+        .session(session);
+
+      const buyerFound = await Users.findOne({
+        username: shareOfferFound.userDocID.username,
+      })
+        .populate("userDefaultSettingID", "notifyUpdates")
+        .session(session);
+
+      const subject = "Successful Purchase of Share.";
+      const body = `Dear ${
+        buyerFound.name
+      }, \nThis message is to confirm your purchase of a share in property with Title: ${
+        propertyShareFound.propertyDocID?.title
+      }.property's share. \nDuration: ${propertyShareFound.availableInDuration.startDate.toDateString()} - ${propertyShareFound.availableInDuration.endDate.toDateString()}\nPrice: $${
+        shareOfferFound.price
+      }\nRegards, \nBeach Bunny House.`;
+
+      const sellerSubject = "Successful Sell of Share.";
+      const sellerBody = `Dear ${
+        sellerFound.name
+      }, \nThis message is to confirm your Sell of a share in property with Title: ${
+        propertyShareFound.propertyDocID?.title
+      }.property's share. \nDuration: ${propertyShareFound.availableInDuration.startDate.toDateString()} - ${propertyShareFound.availableInDuration.endDate.toDateString()}\nPrice: $${
+        shareOfferFound.price
+      } \n The buyer,${
+        buyerFound.name
+      }, has completed the payment. The amount will be deposited into your account shortly. \nRegards, \nBeach Bunny House.`;
+
+      sendUpdateNotification(
+        subject,
+        body,
+        buyerFound.userDefaultSettingID.notifyUpdates,
+        shareOfferFound.userDocID.username
+      );
+
+      sendUpdateNotification(
+        sellerSubject,
+        sellerBody,
+        sellerFound.userDefaultSettingID.notifyUpdates,
+        username
+      );
+      //come here
     } else if (action === "expired") {
+      const { shareID, shareOfferID } = data;
       const shareFound = await PropertyShares.findOne({
         shareID: shareID,
-      });
+      })
+        .populate("propertyDocID", "title propertyID") // Populate propertyDocID
+        .populate({
+          path: "currentOwnerDocID",
+          model: "shareholders",
+          select: "username userID", // Select specific fields from Shareholders
+          populate: {
+            path: "userID",
+            model: "users",
+            select: "name userDefaultSettingID", // Include userDefaultSettingID
+            populate: {
+              path: "userDefaultSettingID",
+              model: "user_default_settings",
+              select: "notifyUpdates", // Select specific fields from UserDefaultSettings
+            },
+          },
+        });
 
       await PropertyShares.updateOne(
         {
@@ -1985,6 +2155,58 @@ const shareSellAction = async (data, session, action) => {
         },
         { status: "Expired" }
       );
+
+      const sellerSubject = "Property Sell Share is Available Again";
+
+      const sellerBody = `Dear ${
+        shareFound.currentOwnerDocID.userID.name
+      },\n\nWe gave the buyer a period of 6 hours to complete the payment for the buy share of your property with Title: ${
+        shareFound.propertyDocID?.title
+      }. Unfortunately, the buyer did not make the payment within the given time.\n\nAs a result, your property is now available for buy again.\n\nDuration: ${shareFound.availableInDuration.startDate.toDateString()} - ${shareFound.availableInDuration.endDate.toDateString()}\nPrice: $${
+        shareFound.priceByCategory
+      }\n\nThank you for your understanding.\n\nRegards,\nBeach Bunny House`;
+
+      sendUpdateNotification(
+        sellerSubject,
+        sellerBody,
+        shareFound.currentOwnerDocID.userID.userDefaultSettingID.notifyUpdates,
+        shareFound.currentOwnerDocID.username
+      );
+      const shareOfferFound = await ShareOffers.findOne({
+        _id: shareOfferID,
+      })
+        .populate("shareholderDocID", "username")
+        .populate("userDocID", "username")
+        .session(session);
+
+      const buyerFound = await Users.findOne({
+        username: shareOfferFound.userDocID.username,
+      })
+        .populate("userDefaultSettingID", "notifyUpdates")
+        .session(session);
+
+      const subject = "Payment Expired for Share Purchase";
+      const body = `Dear ${buyerFound.name}, 
+      
+      We regret to inform you that your payment for purchasing a share in the property titled "${
+       shareFound.propertyDocID?.title
+      }" has expired. the allowed payment window of 6 hours has now passed. 
+      The payment was initiated on ${shareOfferFound.createdAt.toDateString()} at ${shareOfferFound.createdAt.toLocaleTimeString()}, and the allowed payment window of 6 hours has now passed.
+      As a result, your purchase request has been canceled.
+      
+      If you wish to re-initiate the process, please visit the property page again and submit a new purchase request.
+      
+      Thank you for understanding. 
+      
+      Regards, 
+      Beach Bunny House`;
+
+      sendUpdateNotification(
+        subject,
+        body,
+        buyerFound.userDefaultSettingID.notifyUpdates,
+        shareOfferFound.userDocID.username
+      );
     }
 
     return true;
@@ -2002,7 +2224,10 @@ const handleShareSellOfferAction = async (req, res) => {
   try {
     const { username, offerID, action, isBuybackOffer } = req.body;
 
-    const userFound = await Users.findOne({ username: username })
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
     if (!userFound) {
       throw new Error("user not found");
     }
@@ -2042,17 +2267,15 @@ const handleShareSellOfferAction = async (req, res) => {
 
     const buyerFound = await Users.findOne({
       username: shareOfferFound.userDocID.username,
-    }).populate(
-      "userDefaultSettingID",
-      "notifyUpdates"
-    );
+    }).populate("userDefaultSettingID", "notifyUpdates");
 
     // console.log("shareholderFound: ", shareholderFound.username);
 
     const companyFeePercentage =
       parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
-    const companyFee =
-      Math.ceil(parseInt(propertyShareFound.priceByCategory) * companyFeePercentage);
+    const companyFee = Math.ceil(
+      parseInt(propertyShareFound.priceByCategory) * companyFeePercentage
+    );
 
     if (action === "accepted") {
       const newPayment = new Payments({
@@ -2120,7 +2343,9 @@ const handleShareSellOfferAction = async (req, res) => {
           shareOfferFound.price
         } \nPrevious Owner Username: ${
           sharePrevOwnerFound.username
-        } Payment Pending. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment.\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${secondShareholder.username} \nRegards, \nBeach Bunny House`;
+        } Payment Pending. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment. It will expire in\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${
+          buyerFound.username
+        } \nRegards, \nBeach Bunny House`;
 
         const ownerNotificationSubject = `Property Share Sell Offer Accepted`;
         const ownerNotificationBody = `Dear ${sharePrevOwnerFound.name}, \nYou have accepted share sell offer by user: ${buyerFound.username} at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
@@ -2144,18 +2369,8 @@ const handleShareSellOfferAction = async (req, res) => {
           buyerFound.name
         }, \nYou have successfully rejected the offer of rent of ${
           propertyShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            propertyShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            propertyShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        }\nPrice: $${shareOfferFound.price} \nShare Owner Username: ${
+        } property's share. \nDuration: ${propertyShareFound.availableInDuration.startDate.toDateString()} - ${propertyShareFound.availableInDuration.endDate.toDateString()}
+        \nPrice: $${shareOfferFound.price} \nShare Owner Username: ${
           sharePrevOwnerFound.username
         } \nRegards, \nBeach Bunny House`;
 
@@ -2336,62 +2551,23 @@ const handleShareSwapOfferAction = async (req, res) => {
           firstShareholder.userID.name
         }, \nYou have successfully accepted the offer to swap your share of ${
           firstShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            firstShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            firstShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        }\nWith Share of ${
+        } property's share. \nDuration: ${firstShareFound.availableInDuration.startDate.toDateString()} - ${firstShareFound.availableInDuration.endDate.toDateString()}
+        \nWith Share of ${
           secondShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            secondShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            secondShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        } \nRegards, \nBeach Bunny House`;
+        } property's share. \nDuration:${secondShareFound.availableInDuration.startDate.toDateString()} - ${secondShareFound.availableInDuration.endDate.toDateString()}
+        
+        \nRegards, \nBeach Bunny House`;
 
         const userNotificationSubject = `Property Share Swap Offer Accepted`;
         const userNotificationBody = `Dear ${
           secondShareholder.userID.name
         }, \nYou have successfully accepted the offer to swap your share of ${
           secondShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            secondShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            secondShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        }\nWith Share of ${
+        } property's share. \nDuration: ${secondShareFound.availableInDuration.startDate.toDateString()} - ${secondShareFound.availableInDuration.endDate.toDateString()}
+        \nWith Share of ${
           firstShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            firstShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            firstShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        } \nRegards, \nBeach Bunny House`;
+        } property's share. \nDuration:${firstShareFound.availableInDuration.startDate.toDateString()} - ${firstShareFound.availableInDuration.endDate.toDateString()}
+          \nRegards, \nBeach Bunny House`;
 
         sendUpdateNotification(
           userNotificationSubject,
@@ -2412,62 +2588,20 @@ const handleShareSwapOfferAction = async (req, res) => {
           firstShareholder.userID.name
         }, \nYou have successfully rejected the offer to swap your share of ${
           firstShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            firstShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            firstShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        }\nWith Share of ${
+        } property's share. \nDuration: ${firstShareFound.availableInDuration.startDate.toDateString()} - ${firstShareFound.availableInDuration.endDate.toDateString()}
+        \nWith Share of ${
           secondShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            secondShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            secondShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        } \nRegards, \nBeach Bunny House`;
+        } property's share. \nDuration: ${secondShareFound.availableInDuration.startDate.toDateString()} - ${secondShareFound.availableInDuration.endDate.toDateString()}
+         \nRegards, \nBeach Bunny House`;
 
         const userNotificationSubject = `Property Share Swap Offer Rejected`;
         const userNotificationBody = `Dear ${
           secondShareholder.userID.name
         }, \nYou have successfully rejected the offer to swap your share of ${
           secondShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            secondShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            secondShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        }\nWith Share of ${
+        } property's share. \nDuration: ${secondShareFound.availableInDuration.startDate.toDateString()} - ${secondShareFound.availableInDuration.endDate.toDateString()}\nWith Share of ${
           firstShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            firstShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            firstShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        } \nRegards, \nBeach Bunny House`;
+        } property's share. \nDuration: ${firstShareFound.availableInDuration.startDate.toDateString()} - ${firstShareFound.availableInDuration.endDate.toDateString()} \nRegards, \nBeach Bunny House`;
 
         sendUpdateNotification(
           userNotificationSubject,
@@ -2488,31 +2622,9 @@ const handleShareSwapOfferAction = async (req, res) => {
           firstShareholder.userID.name
         }, \nYou have successfully rejected the offer to swap your share of ${
           firstShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            firstShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            firstShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        }\nWith Share of ${
+        } property's share. \nDuration: ${firstShareFound.availableInDuration.startDate.toDateString()} - ${firstShareFound.availableInDuration.endDate.toDateString()}\nWith Share of ${
           secondShareFound.propertyDocID.title
-        } property's share. \nDuration: ${
-          processDate(
-            secondShareFound.availableInDuration.startDate
-              .toISOString()
-              .split("T")[0]
-          ) -
-          processDate(
-            secondShareFound.availableInDuration.endDate
-              .toISOString()
-              .split("T")[0]
-          )
-        } \nRegards, \nBeach Bunny House`;
+        } property's share. \nDuration: ${secondShareFound.availableInDuration.startDate.toDateString()} - ${secondShareFound.availableInDuration.endDate.toDateString()} \nRegards, \nBeach Bunny House`;
 
         sendUpdateNotification(
           ownerNotificationSubject,
