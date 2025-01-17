@@ -307,17 +307,27 @@ const getSharesByUsername = async (req, res) => {
     const sharesByUsername = await PropertyShares.find({
       propertyDocID: propertyFound._id,
       currentOwnerDocID: shareholderFound._id,
+      utilisedStatus: "Purchased",
+      
     })
       .populate(
         "propertyDocID",
         "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
       )
       .exec();
-
+      // const propertySharesFound = await PropertyShares.find({
+      //   propertyDocID: key,
+      //   utilisedStatus: status,
+      //   onRent: false,
+      //   onSale: false,
+      //   onSwap: false,
+      // })
+      //   .populate("currentOwnerDocID", "username")
+      //   .exec();
     const sharesListWithoutOwner = sharesByUsername.filter((share) => {
       return !share.shareID.endsWith("00");
     });
-    console.log(sharesByUsername);
+    console.log("sharesListWithoutOwner==>",sharesListWithoutOwner);
     res.status(200).json({
       message: "Fetched",
       success: true,
@@ -1817,46 +1827,44 @@ const fetchUserShareRentals = async (req, res) => {
       "propertyDocID",
       "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
     );
+console.log("shareFoundList++.",shareFoundList);
 
     // Assuming sharesByUsername is an array of share objects
-    const rentalsPerProperty = shareFoundList.reduce((acc, share, index) => {
-      if (!share?.propertyDocID) {
-        console.log(
-          `Skipping share with null propertyDocID at index ${index}:`,
-          share
-        );
-        return acc; // Skip null or invalid entries
-      }
+  // Group shares by propertyID and include multiple availableInDuration entries
+  const rentalsByProperty = shareFoundList.reduce((acc, share) => {
+    if (!share?.propertyDocID) return acc; // Skip invalid entries
 
-      const propertyID = share.propertyDocID.propertyID;
-      if (!propertyID) {
-        console.log(
-          `propertyDocID has null propertyID at index ${index}:`,
-          share.propertyDocID
-        );
-        return acc; // Skip invalid entries with missing propertyID
-      }
+    const propertyID = share.propertyDocID.propertyID;
+    if (!propertyID) return acc; // Skip invalid propertyIDs
 
-      // Check if the propertyID already has an entry in the accumulator
-      if (acc[propertyID]) {
-        // If yes, increment the count
-        acc[propertyID].count++;
-      } else {
-        // If no, create a new entry
-        acc[propertyID] = {
-          propertyID: propertyID,
-          propertyDetails: share.propertyDocID,
-          count: 1,
-        };
-      }
-      return acc;
-    }, {});
+    if (!acc[propertyID]) {
+      // Initialize the property entry if it doesn't exist
+      acc[propertyID] = {
+        propertyID,
+        propertyDetails: share.propertyDocID,
+        count: 0,
+        rentalDetails: {
+          availableInDuration: [],
+        },
+      };
+    }
+
+    // Increment the count and add the availableInDuration
+    acc[propertyID].count++;
+    if (share.availableInDuration) {
+      acc[propertyID].rentalDetails.availableInDuration.push(
+        share.availableInDuration
+      );
+    }
+
+    return acc;
+  }, {});
 
     // To convert the object back into an array if needed:
-    const rentalsPerPropertyArray = Object.values(rentalsPerProperty);
+    const rentalsPerPropertyArray = Object.values(rentalsByProperty);
 
     res.status(200).json({
-      message: " Fetched rentals",
+      message: "Fetched rentals",
       success: true,
       body: rentalsPerPropertyArray,
     });
