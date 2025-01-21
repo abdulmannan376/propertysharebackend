@@ -916,7 +916,7 @@ const fetchShareInspectionByUsername = async (req, res) => {
 
     const shareholderFound = await Shareholders.findOne({ username: username });
     if (!shareholderFound) {
-      throw new Error("shareholder not found.");
+      throw new Error("No record found.");
     }
 
     if (action === "my") {
@@ -1225,7 +1225,7 @@ const handleInspectionActionPropertyOwner = async (req, res) => {
       },
     });
     if (!shareholderFound) {
-      throw new Error("shareholder not found");
+      throw new Error("No record found.");
     }
 
     const inspectionFound = await PropertyInspection.findOne({
@@ -1430,7 +1430,7 @@ const genRaiseRequest = async (req, res) => {
     });
 
     if (!shareholderFound) {
-      throw new Error("shareholder not found.");
+      throw new Error("No record found.");
     }
 
     const propertyFound = await Properties.findOne({
@@ -1501,7 +1501,7 @@ const fetchRaisedRequestByUsername = async (req, res) => {
     console.log(req.params);
     const shareholderFound = await Shareholders.findOne({ username: username });
     if (!shareholderFound) {
-      throw new Error("shareholder not found");
+      throw new Error("No record found.");
     }
 
     if (action === "my") {
@@ -1894,7 +1894,7 @@ const handleRaiseRequestActionPropertyOwner = async (req, res) => {
       },
     });
     if (!shareholderFound) {
-      throw new Error("shareholder not found");
+      throw new Error("No record found.");
     }
 
     const raiseRequestFound = await RaiseRequest.findOne({

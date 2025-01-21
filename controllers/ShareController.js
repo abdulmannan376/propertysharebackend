@@ -1158,7 +1158,7 @@ const fetchShareOffersOfUserByCategory = async (req, res) => {
         username: username,
       });
       if (!shareholderFound) {
-        throw new Error("shareholder not found.");
+        throw new Error("No record found.");
       }
       const buybackRequests = await ShareOffers.find({
         shareholderDocID: shareholderFound._id,
@@ -1223,7 +1223,7 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
         username: username,
       });
       if (!shareholderFound) {
-        throw new Error("shareholder not found.");
+        throw new Error("No record found.");
       }
 
       shareOffersList = await ShareOffers.find({
@@ -1259,7 +1259,7 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
         username: username,
       });
       if (!shareholderFound) {
-        throw new Error("shareholder not found.");
+        throw new Error("No record found.");
       }
 
       shareOffersList = await ShareOffers.find({

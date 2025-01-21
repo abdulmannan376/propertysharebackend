@@ -405,12 +405,13 @@ const resetPasswordGenCode = async (req, res) => {
     await userFound.save().then(() => {
       const subject = `Reset Password Verification Code: ${verificationCode}`;
       const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.`;
-      sendUpdateNotification(
-        subject,
-        emailBody,
-        userFound.userDefaultSettingID.notifyUpdates,
-        userFound.username
-      );
+      // sendUpdateNotification(
+      //   subject,
+      //   emailBody,
+      //   userFound.userDefaultSettingID.notifyUpdates,
+      //   userFound.username
+      // );
+      sendEmail(userFound.email, subject, emailBody);
       res.status(201).json({
         message: `A verification code sent to email.`,
         success: true,
@@ -1284,25 +1285,39 @@ const fetchUserFavouriteList = async (req, res) => {
   try {
     const { username } = req.params;
 
+    // Find the user and populate the favouriteList
     const userFound = await Users.findOne({ username: username }).populate(
       "userProfile",
       "favouriteList"
     );
+
     if (!userFound) {
-      throw new Error("user not found");
+      throw new Error("User not found");
     }
 
-    const propertyListPromises = userFound.userProfile.favouriteList.map(
-      (data) => {
-        return Properties.findOne({ propertyID: data }, "-shareDocIDList");
-      }
-    );
+    const favouriteList = userFound.userProfile.favouriteList;
 
-    const propertyList = await Promise.all(propertyListPromises);
+    // Check for valid properties and update the favorite list
+    const validPropertyPromises = favouriteList.map((propertyID) =>
+      Properties.findOne({ propertyID: propertyID }, "-shareDocIDList")
+    );
+    const propertyList = await Promise.all(validPropertyPromises);
+
+    // Filter out invalid properties
+    const validProperties = propertyList.filter((property) => property !== null);
+    const validPropertyIDs = validProperties.map((property) => property.propertyID);
+
+    // Update user's favorite list if necessary
+    if (validPropertyIDs.length !== favouriteList.length) {
+      const userProfile = userFound.userProfile;
+      userProfile.favouriteList = validPropertyIDs;
+      await userProfile.save();
+    }
+
 
     res
       .status(200)
-      .json({ message: "Fetched", success: true, body: propertyList });
+      .json({ message: "Fetched", success: true, body: validProperties });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "fetchUserFavouriteList",
