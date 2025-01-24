@@ -29,10 +29,26 @@ const buyShare = async (data, session) => {
     const propertyShareFound = await PropertyShares.findOne({
       shareID: shareID,
     })
-      .populate("propertyDocID")
+      // .populate("propertyDocID")
+      .populate("propertyDocID", "title propertyID") // Populate propertyDocID
+      .populate({
+        path: "currentOwnerDocID",
+        model: "shareholders",
+        select: "username userID", // Select specific fields from Shareholders
+        populate: {
+          path: "userID",
+          model: "users",
+          select: "name userDefaultSettingID", // Include userDefaultSettingID
+          populate: {
+            path: "userDefaultSettingID",
+            model: "user_default_settings",
+            select: "notifyUpdates", // Select specific fields from UserDefaultSettings
+          },
+        },
+      })
       .session(session)
       .exec();
-    // console.log("propertyShareFound: ", propertyShareFound);
+    console.log("propertyShareFound: ", propertyShareFound);
     const propertyFound = await Properties.findOne({
       _id: propertyShareFound.propertyDocID._id,
     }).session(session);
@@ -141,7 +157,15 @@ const buyShare = async (data, session) => {
 
     const recipient = shareholderFound.userID.email;
     const subject = "Successfull Purchase of Share.";
-    const body = `Dear ${shareholderFound.userID.name}, \nThis email is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
+    // const body = `Dear ${shareholderFound.userID.name}, \nThis email is to confirm your purchase of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. \nRegards, \nBeach Bunny House.`;
+    const body = `Dear ${shareholderFound.userID.name},
+We are pleased to confirm your purchase of a share in the property titled "${
+      propertyShareFound.propertyDocID?.title
+    }."
+Purchase Details:
+- Amount Purchased: $${price}
+- Purchase Duration: ${propertyShareFound.availableInDuration.startDate.toDateString()} - ${propertyShareFound.availableInDuration.endDate.toDateString()}
+Thank you for your purchase. If you have any questions or require further assistance, feel free to contact us.\n\nRegards,\nBeach Bunny House`;
 
     sendUpdateNotification(
       subject,
@@ -196,27 +220,37 @@ const getBuySharesDetailByUsername = async (req, res) => {
     console.log("sharesList: ", sharesListWithoutOwner);
     // Assuming sharesByUsername is an array of share objects
     const sharesPerProperty = sharesListWithoutOwner.reduce((acc, share) => {
-      // console.log("acc: ", acc);
-      // console.log("share: ", share);
+
       const propertyID = share?.propertyDocID.propertyID;
+      if (!propertyID) return acc;
+
       // Check if the propertyID already has an entry in the accumulator
-      if (acc[propertyID]) {
-        // If yes, increment the count
-        acc[propertyID].count++;
-      } else {
-        // If no, create a new entry
+      if (!acc[propertyID]) {
+        // Initialize the property entry if it doesn't exist
         acc[propertyID] = {
           propertyID: propertyID,
           propertyDetails: share.propertyDocID,
-          count: 1,
+          count: 0,
+          sharesDetails: {
+            availableInDuration: [],
+          },
         };
       }
+
+      // Increment the count
+      acc[propertyID].count++;
+
+      // Add `availableInDuration` if it exists
+      if (share.availableInDuration) {
+        acc[propertyID].sharesDetails.availableInDuration.push(
+          share.availableInDuration
+        );
+      }
+
       return acc;
     }, {});
 
-    console.log(sharesPerProperty);
-
-    // To convert the object back into an array if needed:
+    // Convert the object back into an array if needed
     const sharesPerPropertyArray = Object.values(sharesPerProperty);
 
     res.status(200).json({
@@ -308,26 +342,25 @@ const getSharesByUsername = async (req, res) => {
       propertyDocID: propertyFound._id,
       currentOwnerDocID: shareholderFound._id,
       utilisedStatus: "Purchased",
-      
     })
       .populate(
         "propertyDocID",
         "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
       )
       .exec();
-      // const propertySharesFound = await PropertyShares.find({
-      //   propertyDocID: key,
-      //   utilisedStatus: status,
-      //   onRent: false,
-      //   onSale: false,
-      //   onSwap: false,
-      // })
-      //   .populate("currentOwnerDocID", "username")
-      //   .exec();
+    // const propertySharesFound = await PropertyShares.find({
+    //   propertyDocID: key,
+    //   utilisedStatus: status,
+    //   onRent: false,
+    //   onSale: false,
+    //   onSwap: false,
+    // })
+    //   .populate("currentOwnerDocID", "username")
+    //   .exec();
     const sharesListWithoutOwner = sharesByUsername.filter((share) => {
       return !share.shareID.endsWith("00");
     });
-    console.log("sharesListWithoutOwner==>",sharesListWithoutOwner);
+    console.log("sharesListWithoutOwner==>", sharesListWithoutOwner);
     res.status(200).json({
       message: "Fetched",
       success: true,
@@ -985,6 +1018,7 @@ const genShareSwapOffer = async (req, res) => {
       shareID: shareID,
       onSwap: true,
     })
+      .populate("propertyDocID", "title propertyID")
       .populate("currentOwnerDocID", "username")
       .exec();
 
@@ -1036,10 +1070,17 @@ const genShareSwapOffer = async (req, res) => {
 
     shareFound.shareOffersList.push(newShareOffer._id);
     await shareFound.save();
+    console.log("newShareOffer==>", newShareOffer);
 
     newShareOffer.save().then(() => {
       const userNotificationSubject = `Property share swap offer sent`;
-      const userNotificationBody = `Dear ${userFound.name}, \nYour offer for share swap is sent to user: ${ownerFound.username}. \nRegards, \nBeach Bunny House.`;
+      const userNotificationBody = `Dear ${
+        userFound.name
+      }, \nYour offer for share swap is sent to user: ${
+        ownerFound.username
+      }.Property Title: ${
+        shareFound.propertyDocID?.title
+      }.\n your share Duration: ${offeredShareFound.availableInDuration.startDate.toDateString()} - ${offeredShareFound.availableInDuration.endDate.toDateString()} swap with Duration:${shareFound.availableInDuration.startDate.toDateString()} - ${shareFound.availableInDuration.endDate.toDateString()}  \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         userNotificationSubject,
@@ -1049,7 +1090,11 @@ const genShareSwapOffer = async (req, res) => {
       );
 
       const ownerNotificationSubject = `Property share swap offer recieved`;
-      const ownerNotificationBody = `Dear ${ownerFound.name}, \n${userFound.name} has given an offer for this share to swap \nRegards, \nBeach Bunny house.`;
+      const ownerNotificationBody = `Dear ${ownerFound.name}, \n${
+        userFound.name
+      } has given an offer for swap  Property Title: ${
+        shareFound.propertyDocID?.title
+      }.\n your share Duration: ${shareFound.availableInDuration.startDate.toDateString()} - ${shareFound.availableInDuration.endDate.toDateString()} swap with Duration:${offeredShareFound.availableInDuration.startDate.toDateString()} - ${offeredShareFound.availableInDuration.endDate.toDateString()} \n Please go to the "Offers" tab, then "Recived" then "Swap" to Accept Swap.\n Click the link below to Accept Swap:\n https://www.beachbunnyhouse.com/user/${ownerFound.username}\nRegards, \nBeach Bunny house.`;
 
       sendUpdateNotification(
         ownerNotificationSubject,
@@ -1539,7 +1584,7 @@ const shareRentAction = async (data, session, action) => {
         username
       );
     } else if (action === "expired") {
-      const { shareID ,shareOfferID} = data;
+      const { shareID, shareOfferID } = data;
       const shareFound = await PropertyShares.findOne({
         shareID: shareID, // Replace with the actual share ID
       })
@@ -1620,7 +1665,7 @@ const shareRentAction = async (data, session, action) => {
       const body = `Dear ${buyerFound.name}, 
       
       We regret to inform you that your payment for rental share in the property titled "${
-       shareFound.propertyDocID?.title
+        shareFound.propertyDocID?.title
       }" has expired. the allowed payment window of 6 hours has now passed. 
       The payment was initiated on ${shareOfferFound.createdAt.toDateString()} at ${shareOfferFound.createdAt.toLocaleTimeString()}, and the allowed payment window of 6 hours has now passed.
       As a result, your rental request has been canceled.
@@ -1827,38 +1872,38 @@ const fetchUserShareRentals = async (req, res) => {
       "propertyDocID",
       "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
     );
-console.log("shareFoundList++.",shareFoundList);
+    console.log("shareFoundList++.", shareFoundList);
 
     // Assuming sharesByUsername is an array of share objects
-  // Group shares by propertyID and include multiple availableInDuration entries
-  const rentalsByProperty = shareFoundList.reduce((acc, share) => {
-    if (!share?.propertyDocID) return acc; // Skip invalid entries
+    // Group shares by propertyID and include multiple availableInDuration entries
+    const rentalsByProperty = shareFoundList.reduce((acc, share) => {
+      if (!share?.propertyDocID) return acc; // Skip invalid entries
 
-    const propertyID = share.propertyDocID.propertyID;
-    if (!propertyID) return acc; // Skip invalid propertyIDs
+      const propertyID = share.propertyDocID.propertyID;
+      if (!propertyID) return acc; // Skip invalid propertyIDs
 
-    if (!acc[propertyID]) {
-      // Initialize the property entry if it doesn't exist
-      acc[propertyID] = {
-        propertyID,
-        propertyDetails: share.propertyDocID,
-        count: 0,
-        rentalDetails: {
-          availableInDuration: [],
-        },
-      };
-    }
+      if (!acc[propertyID]) {
+        // Initialize the property entry if it doesn't exist
+        acc[propertyID] = {
+          propertyID,
+          propertyDetails: share.propertyDocID,
+          count: 0,
+          rentalDetails: {
+            availableInDuration: [],
+          },
+        };
+      }
 
-    // Increment the count and add the availableInDuration
-    acc[propertyID].count++;
-    if (share.availableInDuration) {
-      acc[propertyID].rentalDetails.availableInDuration.push(
-        share.availableInDuration
-      );
-    }
+      // Increment the count and add the availableInDuration
+      acc[propertyID].count++;
+      if (share.availableInDuration) {
+        acc[propertyID].rentalDetails.availableInDuration.push(
+          share.availableInDuration
+        );
+      }
 
-    return acc;
-  }, {});
+      return acc;
+    }, {});
 
     // To convert the object back into an array if needed:
     const rentalsPerPropertyArray = Object.values(rentalsByProperty);
@@ -2197,7 +2242,7 @@ const shareSellAction = async (data, session, action) => {
       const body = `Dear ${buyerFound.name}, 
       
       We regret to inform you that your payment for purchasing a share in the property titled "${
-       shareFound.propertyDocID?.title
+        shareFound.propertyDocID?.title
       }" has expired. the allowed payment window of 6 hours has now passed. 
       The payment was initiated on ${shareOfferFound.createdAt.toDateString()} at ${shareOfferFound.createdAt.toLocaleTimeString()}, and the allowed payment window of 6 hours has now passed.
       As a result, your purchase request has been canceled.
