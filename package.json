@@ -12,6 +12,7 @@
   "dependencies": {
     "@paypal/checkout-server-sdk": "^1.0.3",
     "@paypal/paypal-server-sdk": "^0.6.1",
+    "@sendgrid/mail": "^8.1.4",
     "braintree": "^3.24.0",
     "cors": "^2.8.5",
     "countrycitystatejson": "^21.3.2702",

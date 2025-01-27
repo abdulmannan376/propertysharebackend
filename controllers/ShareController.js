@@ -217,16 +217,15 @@ const getBuySharesDetailByUsername = async (req, res) => {
       return !share?.shareID.endsWith("00") && share?.propertyDocID;
     });
 
-    console.log("sharesList: ", sharesListWithoutOwner);
+    // console.log("sharesList: ", sharesListWithoutOwner);
     // Assuming sharesByUsername is an array of share objects
-    const sharesPerProperty = sharesListWithoutOwner.reduce((acc, share) => {
-
+    const sharesPerProperty = await sharesListWithoutOwner.reduce(async (accPromise, share) => {
+      const acc = await accPromise;
       const propertyID = share?.propertyDocID.propertyID;
       if (!propertyID) return acc;
-
+    
       // Check if the propertyID already has an entry in the accumulator
       if (!acc[propertyID]) {
-        // Initialize the property entry if it doesn't exist
         acc[propertyID] = {
           propertyID: propertyID,
           propertyDetails: share.propertyDocID,
@@ -236,19 +235,91 @@ const getBuySharesDetailByUsername = async (req, res) => {
           },
         };
       }
-
+    
       // Increment the count
       acc[propertyID].count++;
-
-      // Add `availableInDuration` if it exists
+    
+      // Add cleaned `availableInDuration` with `utilisedStatus` and additional fields
       if (share.availableInDuration) {
-        acc[propertyID].sharesDetails.availableInDuration.push(
-          share.availableInDuration
-        );
+        const currentDate = new Date(); // Current date for comparison
+      
+        let cleanDuration = {
+          startDate: share.availableInDuration.startDate,
+          startDateString: share.availableInDuration.startDateString,
+          endDate: share.availableInDuration.endDate,
+          endDateString: share.availableInDuration.endDateString,
+          utilisedStatus: share.utilisedStatus || null,
+        };
+      
+        let shiftedDuration = null;
+      
+        // Check if endDate is in the past
+        const endDate = new Date(share.availableInDuration.endDate);
+        if (endDate < currentDate) {
+          // Shift both startDate and endDate to the future
+          const startDate = new Date(share.availableInDuration.startDate);
+      
+          const nextYearEndDate = new Date(endDate);
+          nextYearEndDate.setFullYear(nextYearEndDate.getFullYear() + 1);
+      
+          const nextYearStartDate = new Date(startDate);
+          nextYearStartDate.setFullYear(nextYearStartDate.getFullYear() + 1);
+      
+          // Create a new duration object with updated dates
+          shiftedDuration = {
+            startDate: nextYearStartDate,
+            startDateString: nextYearStartDate.toISOString().split('T')[0],
+            endDate: nextYearEndDate,
+            endDateString: nextYearEndDate.toISOString().split('T')[0],
+            utilisedStatus: cleanDuration.utilisedStatus,
+          };
+      
+          // Add tenantUser details if `utilisedStatus` is "On Rent"
+          if (share.utilisedStatus === "On Rent" && share.tenantUserDocID) {
+            const userFound = await Users.findOne({ _id: share.tenantUserDocID }).select("name").exec();
+            if (userFound) {
+              shiftedDuration.tenantName = userFound.name;
+            }
+          }
+        } else {
+          // Add tenantUser details if `utilisedStatus` is "On Rent"
+          if (share.utilisedStatus === "On Rent" && share.tenantUserDocID) {
+            const userFound = await Users.findOne({ _id: share.tenantUserDocID }).select("name").exec();
+            if (userFound) {
+              cleanDuration.tenantName = userFound.name;
+            }
+          }
+      
+          // Push the original duration in sequence
+          acc[propertyID].sharesDetails.availableInDuration.push(cleanDuration);
+        }
+      
+        // If a shifted duration was created, push it at the end
+        if (shiftedDuration) {
+          acc[propertyID].sharesDetails.availableInDuration.push(shiftedDuration);
+        }
+      
+        // Sort availableInDuration by startDate, then endDate
+        acc[propertyID].sharesDetails.availableInDuration.sort((a, b) => {
+          const startDateA = new Date(a.startDate);
+          const startDateB = new Date(b.startDate);
+          const endDateA = new Date(a.endDate);
+          const endDateB = new Date(b.endDate);
+      
+          // Compare start dates first
+          if (startDateA.getMonth() !== startDateB.getMonth()) {
+            return startDateA.getMonth() - startDateB.getMonth();
+          }
+      
+          // If months are the same, compare end dates
+          return endDateA - endDateB;
+        });
       }
 
       return acc;
-    }, {});
+    }, Promise.resolve({}));
+    
+    
 
     // Convert the object back into an array if needed
     const sharesPerPropertyArray = Object.values(sharesPerProperty);
