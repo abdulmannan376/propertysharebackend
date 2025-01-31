@@ -219,107 +219,120 @@ const getBuySharesDetailByUsername = async (req, res) => {
 
     // console.log("sharesList: ", sharesListWithoutOwner);
     // Assuming sharesByUsername is an array of share objects
-    const sharesPerProperty = await sharesListWithoutOwner.reduce(async (accPromise, share) => {
-      const acc = await accPromise;
-      const propertyID = share?.propertyDocID.propertyID;
-      if (!propertyID) return acc;
-    
-      // Check if the propertyID already has an entry in the accumulator
-      if (!acc[propertyID]) {
-        acc[propertyID] = {
-          propertyID: propertyID,
-          propertyDetails: share.propertyDocID,
-          count: 0,
-          sharesDetails: {
-            availableInDuration: [],
-          },
-        };
-      }
-    
-      // Increment the count
-      acc[propertyID].count++;
-    
-      // Add cleaned `availableInDuration` with `utilisedStatus` and additional fields
-      if (share.availableInDuration) {
-        const currentDate = new Date(); // Current date for comparison
-      
-        let cleanDuration = {
-          startDate: share.availableInDuration.startDate,
-          startDateString: share.availableInDuration.startDateString,
-          endDate: share.availableInDuration.endDate,
-          endDateString: share.availableInDuration.endDateString,
-          utilisedStatus: share.utilisedStatus || null,
-        };
-      
-        let shiftedDuration = null;
-      
-        // Check if endDate is in the past
-        const endDate = new Date(share.availableInDuration.endDate);
-        if (endDate < currentDate) {
-          // Shift both startDate and endDate to the future
-          const startDate = new Date(share.availableInDuration.startDate);
-      
-          const nextYearEndDate = new Date(endDate);
-          nextYearEndDate.setFullYear(nextYearEndDate.getFullYear() + 1);
-      
-          const nextYearStartDate = new Date(startDate);
-          nextYearStartDate.setFullYear(nextYearStartDate.getFullYear() + 1);
-      
-          // Create a new duration object with updated dates
-          shiftedDuration = {
-            startDate: nextYearStartDate,
-            startDateString: nextYearStartDate.toISOString().split('T')[0],
-            endDate: nextYearEndDate,
-            endDateString: nextYearEndDate.toISOString().split('T')[0],
-            utilisedStatus: cleanDuration.utilisedStatus,
-          };
-      
-          // Add tenantUser details if `utilisedStatus` is "On Rent"
-          if (share.utilisedStatus === "On Rent" && share.tenantUserDocID) {
-            const userFound = await Users.findOne({ _id: share.tenantUserDocID }).select("name").exec();
-            if (userFound) {
-              shiftedDuration.tenantName = userFound.name;
-            }
-          }
-        } else {
-          // Add tenantUser details if `utilisedStatus` is "On Rent"
-          if (share.utilisedStatus === "On Rent" && share.tenantUserDocID) {
-            const userFound = await Users.findOne({ _id: share.tenantUserDocID }).select("name").exec();
-            if (userFound) {
-              cleanDuration.tenantName = userFound.name;
-            }
-          }
-      
-          // Push the original duration in sequence
-          acc[propertyID].sharesDetails.availableInDuration.push(cleanDuration);
-        }
-      
-        // If a shifted duration was created, push it at the end
-        if (shiftedDuration) {
-          acc[propertyID].sharesDetails.availableInDuration.push(shiftedDuration);
-        }
-      
-        // Sort availableInDuration by startDate, then endDate
-        acc[propertyID].sharesDetails.availableInDuration.sort((a, b) => {
-          const startDateA = new Date(a.startDate);
-          const startDateB = new Date(b.startDate);
-          const endDateA = new Date(a.endDate);
-          const endDateB = new Date(b.endDate);
-      
-          // Compare start dates first
-          if (startDateA.getMonth() !== startDateB.getMonth()) {
-            return startDateA.getMonth() - startDateB.getMonth();
-          }
-      
-          // If months are the same, compare end dates
-          return endDateA - endDateB;
-        });
-      }
+    const sharesPerProperty = await sharesListWithoutOwner.reduce(
+      async (accPromise, share) => {
+        const acc = await accPromise;
+        const propertyID = share?.propertyDocID.propertyID;
+        if (!propertyID) return acc;
 
-      return acc;
-    }, Promise.resolve({}));
-    
-    
+        // Check if the propertyID already has an entry in the accumulator
+        if (!acc[propertyID]) {
+          acc[propertyID] = {
+            propertyID: propertyID,
+            propertyDetails: share.propertyDocID,
+            count: 0,
+            sharesDetails: {
+              availableInDuration: [],
+            },
+          };
+        }
+
+        // Increment the count
+        acc[propertyID].count++;
+
+        // Add cleaned `availableInDuration` with `utilisedStatus` and additional fields
+        if (share.availableInDuration) {
+          const currentDate = new Date(); // Current date for comparison
+
+          let cleanDuration = {
+            startDate: share.availableInDuration.startDate,
+            startDateString: share.availableInDuration.startDateString,
+            endDate: share.availableInDuration.endDate,
+            endDateString: share.availableInDuration.endDateString,
+            utilisedStatus: share.utilisedStatus || null,
+          };
+
+          let shiftedDuration = null;
+
+          // Check if endDate is in the past
+          const endDate = new Date(share.availableInDuration.endDate);
+          if (endDate < currentDate) {
+            // Shift both startDate and endDate to the future
+            const startDate = new Date(share.availableInDuration.startDate);
+
+            const nextYearEndDate = new Date(endDate);
+            nextYearEndDate.setFullYear(nextYearEndDate.getFullYear() + 1);
+
+            const nextYearStartDate = new Date(startDate);
+            nextYearStartDate.setFullYear(nextYearStartDate.getFullYear() + 1);
+
+            // Create a new duration object with updated dates
+            shiftedDuration = {
+              startDate: nextYearStartDate,
+              startDateString: nextYearStartDate.toISOString().split("T")[0],
+              endDate: nextYearEndDate,
+              endDateString: nextYearEndDate.toISOString().split("T")[0],
+              utilisedStatus: cleanDuration.utilisedStatus,
+            };
+
+            // Add tenantUser details if `utilisedStatus` is "On Rent"
+            if (share.utilisedStatus === "On Rent" && share.tenantUserDocID) {
+              const userFound = await Users.findOne({
+                _id: share.tenantUserDocID,
+              })
+                .select("name")
+                .exec();
+              if (userFound) {
+                shiftedDuration.tenantName = userFound.name;
+              }
+            }
+          } else {
+            // Add tenantUser details if `utilisedStatus` is "On Rent"
+            if (share.utilisedStatus === "On Rent" && share.tenantUserDocID) {
+              const userFound = await Users.findOne({
+                _id: share.tenantUserDocID,
+              })
+                .select("name")
+                .exec();
+              if (userFound) {
+                cleanDuration.tenantName = userFound.name;
+              }
+            }
+
+            // Push the original duration in sequence
+            acc[propertyID].sharesDetails.availableInDuration.push(
+              cleanDuration
+            );
+          }
+
+          // If a shifted duration was created, push it at the end
+          if (shiftedDuration) {
+            acc[propertyID].sharesDetails.availableInDuration.push(
+              shiftedDuration
+            );
+          }
+
+          // Sort availableInDuration by startDate, then endDate
+          acc[propertyID].sharesDetails.availableInDuration.sort((a, b) => {
+            const startDateA = new Date(a.startDate);
+            const startDateB = new Date(b.startDate);
+            const endDateA = new Date(a.endDate);
+            const endDateB = new Date(b.endDate);
+
+            // Compare start dates first
+            if (startDateA.getMonth() !== startDateB.getMonth()) {
+              return startDateA.getMonth() - startDateB.getMonth();
+            }
+
+            // If months are the same, compare end dates
+            return endDateA - endDateB;
+          });
+        }
+
+        return acc;
+      },
+      Promise.resolve({})
+    );
 
     // Convert the object back into an array if needed
     const sharesPerPropertyArray = Object.values(sharesPerProperty);
@@ -484,7 +497,7 @@ async function sendSellOfferToPropertyOwner(shareID, category, price) {
           },
         },
       })
-      .populate("propertyDocID", "propertyID")
+      .populate("propertyDocID", "propertyID title")
       .exec();
 
     console.log(shareFound);
@@ -520,7 +533,15 @@ async function sendSellOfferToPropertyOwner(shareID, category, price) {
 
     newShareOffer.save().then(() => {
       const userNotificationSubject = `Property share ${category} offer recieved`;
-      const userNotificationBody = `Dear ${propertyOwnerShareFound.currentOwnerDocID.userID.name}, \n${shareFound.currentOwnerDocID.userID.name} has given an offer for this share to ${category}, of price: $${price}.\nRegards, \nBeach Bunny house.`;
+      const userNotificationBody = `Dear ${
+        propertyOwnerShareFound.currentOwnerDocID.userID.name
+      }, \n${
+        shareFound.currentOwnerDocID.userID.name
+      } has given an offer for share to ${category}, of price: $${price} Property Title:${
+        shareFound.propertyDocID?.title
+      } share Duration: ${shareFound.availableInDuration.startDate.toDateString()} - ${shareFound.availableInDuration.endDate.toDateString()} \n Please go to the "Offers" tab, then "Recived" then "Buy" to Accept Buy Offer.\n Click the link below to Accept Buy:\n https://www.beachbunnyhouse.com/user/${
+        propertyOwnerShareFound.currentOwnerDocID.username
+      }\nRegards, \nBeach Bunny house.`;
 
       sendUpdateNotification(
         userNotificationSubject,
@@ -531,7 +552,13 @@ async function sendSellOfferToPropertyOwner(shareID, category, price) {
       );
 
       const ownerNotificationSubject = `Property share ${category} offer sent`;
-      const ownerNotificationBody = `Dear ${shareFound.currentOwnerDocID.userID.name}, \nYour offer for share ${category} is sent to property owner: ${propertyOwnerShareFound.currentOwnerDocID.username} of price: $${price}. \nRegards, \nBeach Bunny House.`;
+      const ownerNotificationBody = `Dear ${
+        shareFound.currentOwnerDocID.userID.name
+      }, \nYour offer for share ${category} is sent to property owner: ${
+        propertyOwnerShareFound.currentOwnerDocID.username
+      } of price: $${price} Property Title:${
+        shareFound.propertyDocID?.title
+      } share Duration: ${shareFound.availableInDuration.startDate.toDateString()} - ${shareFound.availableInDuration.endDate.toDateString()}. \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         ownerNotificationSubject,
@@ -547,6 +574,86 @@ async function sendSellOfferToPropertyOwner(shareID, category, price) {
       function: "sendSellOfferToPropertyOwner",
       fileLocation: "controllers/ShareController.js",
       timestamp: currentDateString,
+    });
+    return new Error(error);
+  }
+}
+
+async function createNewShareOfferForAdmin(shareID, category, price) {
+  try {
+    console.log("shareID, category, price", shareID, category, price);
+
+    const shareFound = await PropertyShares.findOne({
+      shareID: shareID,
+      onSale: true,
+    })
+      .populate({
+        path: "currentOwnerDocID",
+        model: "shareholders",
+        select: "username userID",
+        populate: {
+          path: "userID",
+          model: "users",
+          select: "role userDefaultSettingID name",
+          populate: {
+            path: "userDefaultSettingID",
+            model: "user_default_settings",
+            select: "notifyUpdates",
+          },
+        },
+      })
+      .populate("propertyDocID", "propertyID title")
+      .exec();
+
+    if (!shareFound) {
+      throw new Error("Share not found or not on sale.");
+    }
+
+    const eligibleUsers = await Users.find({
+      role: { $in: ["super admin", "admin"] },
+    }).populate("userDefaultSettingID", "notifyUpdates");
+    if (!eligibleUsers.length) {
+      throw new Error("No eligible users found.");
+    }
+    console.log("eligibleUsers==>", eligibleUsers);
+
+    for (const user of eligibleUsers) {
+      const newShareOffer = new ShareOffers({
+        shareDocID: shareFound._id,
+        price: price,
+        shareholderDocID: shareFound.currentOwnerDocID,
+        userDocID: user._id,
+        category: category,
+        offerToAdmin: true,
+      });
+
+      shareFound.shareOffersList.push(newShareOffer._id);
+      await newShareOffer.save();
+
+      const userNotificationSubject = `Property share ${category} offer recieved`;
+      const userNotificationBody = `Dear ${
+        user.name
+      }, \nYou have received a new share offer in category ${category} with a price of $${price}.Property Title:${
+        shareFound.propertyDocID?.title
+      } share Duration: ${shareFound.availableInDuration.startDate.toDateString()} - ${shareFound.availableInDuration.endDate.toDateString()} \n Please go to the "Offers" tab, then "Recived" then "Buy" to Accept Buy Offer.\n Click the link below to Accept Buy:\n https://www.beachbunnyhouse.com/user/${
+        user.username
+      }\nRegards, \nBeach Bunny house.`;
+
+      sendUpdateNotification(
+        userNotificationSubject,
+        userNotificationBody,
+        user.userDefaultSettingID.notifyUpdates,
+        user.username
+      );
+    }
+
+    await shareFound.save();
+    return true;
+  } catch (error) {
+    console.error(`Error: ${error}`, "\nlocation: ", {
+      function: "createNewShareOffer",
+      fileLocation: "controllers/ShareController.js",
+      timestamp: new Date().toISOString(),
     });
     return new Error(error);
   }
@@ -736,6 +843,11 @@ const handleShareByCategory = async (req, res) => {
             category,
             price
           );
+        createNewShareOfferForAdmin(
+          propertyShareFound.shareID,
+          category,
+          price
+        );
       }
       const subject = "Property Share status updated.";
       const body = `Dear ${
@@ -1165,7 +1277,9 @@ const genShareSwapOffer = async (req, res) => {
         userFound.name
       } has given an offer for swap  Property Title: ${
         shareFound.propertyDocID?.title
-      }.\n your share Duration: ${shareFound.availableInDuration.startDate.toDateString()} - ${shareFound.availableInDuration.endDate.toDateString()} swap with Duration:${offeredShareFound.availableInDuration.startDate.toDateString()} - ${offeredShareFound.availableInDuration.endDate.toDateString()} \n Please go to the "Offers" tab, then "Recived" then "Swap" to Accept Swap.\n Click the link below to Accept Swap:\n https://www.beachbunnyhouse.com/user/${ownerFound.username}\nRegards, \nBeach Bunny house.`;
+      }.\n your share Duration: ${shareFound.availableInDuration.startDate.toDateString()} - ${shareFound.availableInDuration.endDate.toDateString()} swap with Duration:${offeredShareFound.availableInDuration.startDate.toDateString()} - ${offeredShareFound.availableInDuration.endDate.toDateString()} \n Please go to the "Offers" tab, then "Recived" then "Swap" to Accept Swap.\n Click the link below to Accept Swap:\n https://www.beachbunnyhouse.com/user/${
+        ownerFound.username
+      }\nRegards, \nBeach Bunny house.`;
 
       sendUpdateNotification(
         ownerNotificationSubject,
@@ -1442,7 +1556,40 @@ const fetchShareOffersOfOwnerByCategory = async (req, res) => {
         .populate("offeredShareDocID", "availableInDuration");
       // console.log(userFound.username, "buyback offers: ", buybackOffers.length);
       shareOffersList = shareOffersList.concat(buybackOffers);
+
+      const offerToAdminFind = await ShareOffers.find({
+        userDocID: userFound._id,
+        category: category, // Assuming there is a field to filter by category
+        offerToAdmin: true,
+        status:
+          showHistory === "true"
+            ? { $in: ["accepted", "rejected", "cancelled", "expired"] }
+            : "pending",
+      })
+        .sort({ createdAt: -1 })
+        .populate({
+          path: "shareDocID",
+          select: "availableInDuration",
+          populate: {
+            path: "propertyDocID", // Assumed the field name in shareDocID that refers to the property
+            model: "properties", // Assuming 'Property' is the model name for propertyDocID
+            select:
+              "propertyID pinnedImageIndex title addressOfProperty area imageCount",
+            populate: {
+              path: "amenitiesID",
+              model: "property_amenities",
+              select: "roomDetails",
+            },
+          },
+        })
+        .populate("userDocID", "username")
+        .populate("shareholderDocID", "username")
+        .populate("offeredShareDocID", "availableInDuration");
+      // console.log(userFound.username, "buyback offers: ", buybackOffers.length);
+      shareOffersList = shareOffersList.concat(offerToAdminFind);
+      console.log("offerToAdminFind++>", offerToAdminFind);
     }
+    console.log("shareOffersList==>", shareOffersList);
 
     res.json({
       message: "Share offers fetched successfully",
@@ -1630,7 +1777,7 @@ const shareRentAction = async (data, session, action) => {
         shareOfferFound.price
       }\nRegards, \nBeach Bunny House.`;
 
-      const sellerSubject = "Successful Sale of Rent Share.";
+      const sellerSubject = "Successful Rent Share.";
       const sellerBody = `Dear ${
         sellerFound.name
       }, \nThis message is to confirm successful sale of a rental share in property with Title: ${

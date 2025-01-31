@@ -42,6 +42,10 @@ const ShareOfferSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    offerToAdmin: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
