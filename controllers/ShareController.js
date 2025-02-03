@@ -183,7 +183,7 @@ Thank you for your purchase. If you have any questions or require further assist
     return new Error(error.message || "Internal Server Error");
   }
 };
-
+////come here1//
 const getBuySharesDetailByUsername = async (req, res) => {
   try {
     const { key } = req.params;
@@ -201,7 +201,7 @@ const getBuySharesDetailByUsername = async (req, res) => {
         const shareDetail = PropertyShares.findOne(share.shareDocID)
           .populate(
             "propertyDocID",
-            "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+            "propertyID imageDirURL imageCount title stakesOccupied totalStakes addressOfProperty"
           )
           .exec();
         // console.log("shareDetail: ", shareDetail);
@@ -566,7 +566,11 @@ async function sendSellOfferToPropertyOwner(shareID, category, price) {
         shareFound.currentOwnerDocID.userID.userDefaultSettingID.notifyUpdates,
         shareFound.currentOwnerDocID.username
       );
-
+      createNewShareOfferForAdmin(
+        shareID,
+        category,
+        price
+      );
       return true;
     });
   } catch (error) {
@@ -837,17 +841,19 @@ const handleShareByCategory = async (req, res) => {
 
     propertyShareFound.save().then(() => {
       if (category === "Sell") {
-        if (action === "Buy Back")
+        if (action === "Buy Back") {
           sendSellOfferToPropertyOwner(
             propertyShareFound.shareID,
             category,
             price
           );
-        createNewShareOfferForAdmin(
-          propertyShareFound.shareID,
-          category,
-          price
-        );
+        } else {
+          createNewShareOfferForAdmin(
+            propertyShareFound.shareID,
+            category,
+            price
+          );
+        }
       }
       const subject = "Property Share status updated.";
       const body = `Dear ${
@@ -1780,13 +1786,15 @@ const shareRentAction = async (data, session, action) => {
       const sellerSubject = "Successful Rent Share.";
       const sellerBody = `Dear ${
         sellerFound.name
-      }, \nThis message is to confirm successful sale of a rental share in property with Title: ${
+      }, \nThis message is to confirm successful rental share in property with Title: ${
         propertyShareFound.propertyDocID?.title
       }.property's rent share. \nDuration: ${propertyShareFound.availableInDuration.startDate.toDateString()} - ${propertyShareFound.availableInDuration.endDate.toDateString()}\nPrice: $${
         shareOfferFound.price
       } \nThe buyer,${
         buyerFound.name
-      }, has completed the payment. The amount will be deposited into your account shortly. \nRegards, \nBeach Bunny House.`;
+      }, has completed the payment. The amount will be deposited into your account shortly. for confirmition after one hour check Pending Withdrawals in setting \n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${
+        buyerFound?.username
+      } \n \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
@@ -2071,7 +2079,7 @@ const handleShareRentOfferAction = async (req, res) => {
     });
   }
 };
-
+////come here2//
 const fetchUserShareRentals = async (req, res) => {
   try {
     const { username } = req.params;
@@ -2088,40 +2096,69 @@ const fetchUserShareRentals = async (req, res) => {
       tenantUserDocID: userFound._id,
     }).populate(
       "propertyDocID",
-      "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+      "propertyID imageDirURL imageCount title stakesOccupied totalStakes addressOfProperty"
     );
     console.log("shareFoundList++.", shareFoundList);
 
     // Assuming sharesByUsername is an array of share objects
     // Group shares by propertyID and include multiple availableInDuration entries
-    const rentalsByProperty = shareFoundList.reduce((acc, share) => {
-      if (!share?.propertyDocID) return acc; // Skip invalid entries
+    const rentalsByProperty = await shareFoundList.reduce(
+      async (accPromise, share) => {
+        const acc = await accPromise; // Resolve previous accumulator
 
-      const propertyID = share.propertyDocID.propertyID;
-      if (!propertyID) return acc; // Skip invalid propertyIDs
+        if (!share?.propertyDocID) return acc; // Skip invalid entries
 
-      if (!acc[propertyID]) {
-        // Initialize the property entry if it doesn't exist
-        acc[propertyID] = {
-          propertyID,
-          propertyDetails: share.propertyDocID,
-          count: 0,
-          rentalDetails: {
-            availableInDuration: [],
-          },
-        };
-      }
+        const propertyID = share.propertyDocID.propertyID;
+        if (!propertyID) return acc; // Skip invalid propertyIDs
 
-      // Increment the count and add the availableInDuration
-      acc[propertyID].count++;
-      if (share.availableInDuration) {
-        acc[propertyID].rentalDetails.availableInDuration.push(
-          share.availableInDuration
-        );
-      }
+        if (!acc[propertyID]) {
+          // Initialize the property entry if it doesn't exist
+          acc[propertyID] = {
+            propertyID,
+            propertyDetails: share.propertyDocID,
+            count: 0,
+            rentalDetails: {
+              availableInDuration: [],
+            },
+          };
+        }
 
-      return acc;
-    }, {});
+        // Increment the count
+        acc[propertyID].count++;
+
+        if (share.availableInDuration) {
+          console.log("share==>", share);
+
+          // Create a cleaned duration object
+          let cleanDuration = {
+            startDate: share.availableInDuration.startDate,
+            endDate: share.availableInDuration.endDate,
+            startDateString: share.availableInDuration.startDateString,
+            endDateString: share.availableInDuration.endDateString,
+            utilisedStatus: share.utilisedStatus || null,
+          };
+
+          // Fetch the current owner name if available
+          if (share.currentOwnerDocID) {
+            const currentShareHolder = await Shareholders.findOne({
+              _id: share.currentOwnerDocID,
+            })
+              .select("username")
+              .exec();
+
+            if (currentShareHolder) {
+              cleanDuration.ownerName = currentShareHolder.username;
+            }
+          }
+
+          // Push the cleaned duration into the available durations
+          acc[propertyID].rentalDetails.availableInDuration.push(cleanDuration);
+        }
+
+        return acc;
+      },
+      Promise.resolve({})
+    );
 
     // To convert the object back into an array if needed:
     const rentalsPerPropertyArray = Object.values(rentalsByProperty);

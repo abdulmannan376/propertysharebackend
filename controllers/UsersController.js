@@ -878,21 +878,45 @@ const getUserData = async (req, res) => {
       data = jwt.decode(token);
     }
 
-    const userFound = await Users.findOne(
+    const userFound1 = await Users.findOne(
       { username: data.username },
       "-notificationByIDList -password -emailVerificationCode"
     )
       .populate("userDefaultSettingID")
       .populate("userProfile");
 
-    if (!userFound) {
+    if (!userFound1) {
       return res.status(404).json({
         message: "User error. Login again",
         success: false,
         action: "login",
       });
     }
+    // Fetch pending withdrawals for the user
+    const withdrawalList = await Withdrawal.find(
+      { userDocID: userFound1._id, status: "Pending" },
+      { amount: 1 } // Fetch only the amount field for efficiency
+    );
 
+    // Calculate total pending withdrawals
+    const totalPendingWithdrawals = withdrawalList.reduce(
+      (sum, withdrawal) => sum + withdrawal.amount,
+      0
+    );
+
+    // Update user's available balance
+    await Users.updateOne(
+      { _id: userFound1._id },
+      { $set: { availBalnc: totalPendingWithdrawals } }
+    );
+
+    // Fetch updated user data
+    const userFound = await Users.findOne(
+      { _id: userFound1._id },
+      "-notificationByIDList -password -emailVerificationCode"
+    )
+      .populate("userDefaultSettingID")
+      .populate("userProfile");
     res
       .status(200)
       .json({ message: "User data found.", success: true, body: userFound });
@@ -1304,8 +1328,12 @@ const fetchUserFavouriteList = async (req, res) => {
     const propertyList = await Promise.all(validPropertyPromises);
 
     // Filter out invalid properties
-    const validProperties = propertyList.filter((property) => property !== null);
-    const validPropertyIDs = validProperties.map((property) => property.propertyID);
+    const validProperties = propertyList.filter(
+      (property) => property !== null
+    );
+    const validPropertyIDs = validProperties.map(
+      (property) => property.propertyID
+    );
 
     // Update user's favorite list if necessary
     if (validPropertyIDs.length !== favouriteList.length) {
@@ -1313,7 +1341,6 @@ const fetchUserFavouriteList = async (req, res) => {
       userProfile.favouriteList = validPropertyIDs;
       await userProfile.save();
     }
-
 
     res
       .status(200)
@@ -1616,7 +1643,7 @@ const updateUserProfileDetails = async (req, res) => {
       ) {
         const subject = `Profile Settings Updated`;
         const notificationBody = `Dear ${userFound.name}, \nYour profile settings changes have been updated. If you have done, this is the confirmation emal if not then please change your password for any security issues. \nThankyou.\nRegards, \nBeach Bunny House.`;
-        const adminEmailBody = `Dear Admin, \n ${userFound.username} have Updated there Paypal Email to ${userProfileFound.payPalEmail}`
+        const adminEmailBody = `Dear Admin, \n ${userFound.username} have Updated there Paypal Email to ${userProfileFound.payPalEmail}`;
         sendUpdateNotification(
           subject,
           notificationBody,

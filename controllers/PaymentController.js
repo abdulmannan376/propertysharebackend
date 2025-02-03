@@ -218,6 +218,7 @@ const testCheckout = async (body, session) => {
         });
 
         await newWithdrawalRequest.save({ session });
+        
         // await Users.updateOne(
         //   {
         //     _id: paymentFound.initiatedBy,
@@ -229,6 +230,32 @@ const testCheckout = async (body, session) => {
         //     },
         //   }
         // );
+/////////////////////test tommorow///////////////////////////////
+// const withdrawalList = await Withdrawal.find(
+//   { userDocID: userFound._id, status: { $in: ["Pending"] } },
+//   { amount: 1 } // Fetch only the amount field for efficiency
+// );
+
+// // Calculate total pending withdrawals
+// const totalPendingWithdrawals = withdrawalList.reduce(
+//   (sum, withdrawal) => sum + withdrawal.amount,
+//   0
+// );
+// console.log("Total Pending Withdrawals:", totalPendingWithdrawals);
+
+// await Users.updateOne(
+//   {
+//     _id: ownerFound._id,
+//   },
+//   {
+//     $set: {
+//       availBalnc: totalPendingWithdrawals + amount,
+//     },
+//   },
+//   // { session }
+// );
+/////////////////////test tommorow///////////////////////////////
+
       } else {
         console.log("in else");
         const { shareID } = body;
@@ -907,7 +934,7 @@ const processPendingWithdrawals = async () => {
 
     const pendingWithdrawals = await Withdrawal.find({
       status: "Pending",
-      // createdAt: { $lte: oneHourAgo },
+      createdAt: { $lte: oneHourAgo },
     });
 
     console.log(
