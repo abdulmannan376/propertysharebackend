@@ -906,12 +906,21 @@ const getSharesByCategory = async (req, res) => {
             path: "userDocID",
             select: "username", // Include only the username field
           },
+          select: "status", // Include the status field from property_share_offers
         });
+        
     } else if (category === "Sell") {
       sharesList = await PropertyShares.find({
         propertyDocID: propertyFound._id,
         onSale: true,
-      }).populate("currentOwnerDocID", "username");
+      }).populate("currentOwnerDocID", "username").populate({
+        path: "shareOffersList",
+        populate: {
+          path: "userDocID",
+          select: "username", // Include only the username field
+        },
+        select: "status", // Include the status field from property_share_offers
+      });
     } else if (category === "Swap") {
       sharesList = await PropertyShares.find({
         propertyDocID: propertyFound._id,

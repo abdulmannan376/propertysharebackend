@@ -258,22 +258,7 @@ const userLogin = async (req, res) => {
 
     await userFound.save().then(() => {
       const subject = `Login activity.`;
-      const emailBody = `
-      Did you Login from a new Device or Location?
-      
-      We noticed your Beachbunnyhouse account "${
-        userFound.username || userFound.email
-      }" 
-      was accessed from a new IP address.
-      
-      When: ${new Date().toISOString()} (UTC)
-      IP Address: ${ipAddress} Country: ${country} City: ${city}
-      
-      [Visit your Account](https://www.beachbunnyhouse.com/user/${
-        userFound.username
-      })
-      
-      Don't recognize this activity? Please [reset your password](https://www.beachbunnyhouse.com/reset-password) and [contact customer support](https://www.beachbunnyhouse.com/contactus) immediately.
+      const emailBody = `Did you Login from a new Device or Location? We noticed your Beachbunnyhouse account "${userFound.username || userFound.email}" \nwas accessed from a new IP address.\nWhen: ${new Date().toISOString()} (UTC)\nIP Address: ${ipAddress} Country: ${country} City: ${city}\n[Visit your Account](https://www.beachbunnyhouse.com/user/${userFound.username})\nDon't recognize this activity? Please [reset your password](https://www.beachbunnyhouse.com/reset-password) and [contact customer support](https://www.beachbunnyhouse.com/contactus) immediately. \nRegards,\n Bunny Beach House.
       `;
 
       sendUpdateNotification(
