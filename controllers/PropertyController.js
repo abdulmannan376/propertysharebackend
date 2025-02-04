@@ -3201,9 +3201,88 @@ const getPropertySharesByID = async (req, res) => {
 async function calPropertyDurationCompletion() {
   const currentMidnight = new Date();
   currentMidnight.setHours(23, 59, 59, 999);
+  console.log("cron job running");
 
+  let properties = await Properties.find({
+    "shareDocIDList.availableInDuration.endDate": currentMidnight,
+    listingStatus: "live",
+  }).populate({
+      path: "shareDocIDList",
+      model: "property_shares",
+      select: "availableInDuration shareID _id currentOwnerDocID utilisedStatus originalOwnerDocID",
+      populate: {
+        path: "currentOwnerDocID",
+        model: "shareholders",
+        select: "userID username",
+        populate: {
+          path: "userID",
+          model: "users",
+          select: "name userDefaultSettingID",
+          populate: {
+            path: "userDefaultSettingID",
+            model: "user_default_settings",
+            select: "notifyUpdates",
+          },
+        },
+      },
+    });
+
+  const filteredProperties = properties.filter(property =>
+    property.shareDocIDList.some(share => share.utilisedStatus === "On Swap")
+  );
+
+  for (const property of filteredProperties) {
+    const shareList = property.shareDocIDList;
+
+    for (const share of shareList) {
+      if (share.utilisedStatus === "On Swap") {
+        console.log(`Restoring share ${share.shareID} to original owner`);
+
+        const originalOwnerId = share.originalOwnerDocID;
+        const previousOwnerId = share.currentOwnerDocID;
+
+        // Revert share to original owner
+        share.currentOwnerDocID = originalOwnerId;
+        share.utilisedStatus = "Purchased"; // Or appropriate status
+        share.originalOwnerDocID = null;
+
+        try {
+          await share.save();
+
+          // Update original owner's purchased and sold lists
+          const originalOwner = await Shareholders.findById(originalOwnerId);
+          if (originalOwner) {
+            // Add to purchased if not present
+            const isInPurchased = originalOwner.purchasedShareIDList.some(
+              entry => entry.shareDocID.toString() === share._id.toString()
+            );
+            if (!isInPurchased) {
+              originalOwner.purchasedShareIDList.push({ shareDocID: share._id });
+            }
+            // Remove from sold
+            originalOwner.soldShareIDList = originalOwner.soldShareIDList.filter(
+              entry => entry.shareDocID.toString() !== share._id.toString()
+            );
+            await originalOwner.save();
+          }
+
+          // Update previous owner's purchased list
+          const previousOwner = await Shareholders.findById(previousOwnerId);
+          if (previousOwner) {
+            previousOwner.purchasedShareIDList = previousOwner.purchasedShareIDList.filter(
+              entry => entry.shareDocID.toString() !== share._id.toString()
+            );
+            await previousOwner.save();
+          }
+        } catch (error) {
+          console.error(`Error reverting share ${share._id}:`, error);
+          continue;
+        }
+      }
+    }
+  }
   // Find properties where the last share's end date is at current midnight
-  const properties = await Properties.find({
+   properties = await Properties.find({
     "shareDocIDList.availableInDuration.endDate": currentMidnight,
     listingStatus: "live",
   }).populate({
@@ -3229,6 +3308,7 @@ async function calPropertyDurationCompletion() {
 
   for (const property of properties) {
     const shareList = property.shareDocIDList;
+    console.log("propertyFound ===> ",property?.shareDocIDList);
 
     // Rotate the share list (e.g., move the first element to the last position)
     const rotatedShareList = [...shareList.slice(1), shareList[0]];
@@ -3291,7 +3371,7 @@ async function calPropertyDurationCompletion() {
     }
 
     // Log the updated share list to see the new dates after rotation and rearrangement
-    console.log(rotatedShareList);
+    console.log("rotatedShareList==>",rotatedShareList);
   }
 }
 

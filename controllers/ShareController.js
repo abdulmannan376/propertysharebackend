@@ -566,11 +566,7 @@ async function sendSellOfferToPropertyOwner(shareID, category, price) {
         shareFound.currentOwnerDocID.userID.userDefaultSettingID.notifyUpdates,
         shareFound.currentOwnerDocID.username
       );
-      createNewShareOfferForAdmin(
-        shareID,
-        category,
-        price
-      );
+      createNewShareOfferForAdmin(shareID, category, price);
       return true;
     });
   } catch (error) {
@@ -908,19 +904,20 @@ const getSharesByCategory = async (req, res) => {
           },
           select: "status", // Include the status field from property_share_offers
         });
-        
     } else if (category === "Sell") {
       sharesList = await PropertyShares.find({
         propertyDocID: propertyFound._id,
         onSale: true,
-      }).populate("currentOwnerDocID", "username").populate({
-        path: "shareOffersList",
-        populate: {
-          path: "userDocID",
-          select: "username", // Include only the username field
-        },
-        select: "status", // Include the status field from property_share_offers
-      });
+      })
+        .populate("currentOwnerDocID", "username")
+        .populate({
+          path: "shareOffersList",
+          populate: {
+            path: "userDocID",
+            select: "username", // Include only the username field
+          },
+          select: "status", // Include the status field from property_share_offers
+        });
     } else if (category === "Swap") {
       sharesList = await PropertyShares.find({
         propertyDocID: propertyFound._id,
@@ -2784,6 +2781,11 @@ const handleShareSwapOfferAction = async (req, res) => {
     }).populate("propertyDocID", "title");
 
     if (action === "accepted") {
+      firstShareFound.originalOwnerDocID = firstShareFound.currentOwnerDocID;
+      firstShareFound.utilisedStatus = "On Swap";
+
+      secondShareFound.originalOwnerDocID = secondShareFound.currentOwnerDocID;
+      secondShareFound.utilisedStatus = "On Swap";
       const firstShareholderPurchaseList =
         firstShareholder.purchasedShareIDList;
 

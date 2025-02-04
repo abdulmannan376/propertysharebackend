@@ -121,6 +121,11 @@ const PropertyShareSchema = new mongoose.Schema({
     ref: "property_raised_requests",
     default: [],
   },
+  originalOwnerDocID: {
+    type: mongoose.Types.ObjectId,
+    ref: "shareholders",
+    default: null,
+  },  
 });
 
 const PropertyShare = mongoose.model("property_shares", PropertyShareSchema);
