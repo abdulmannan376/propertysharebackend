@@ -563,7 +563,7 @@ const genPayment = async (req, res) => {
     await newPayment.save();
 
     const recipientEmailSubject = `Payment Action Required`;
-    const recipientEmailBody = `Dear ${recipient.name}, \nA payment is generated against your username following are the details:\nTotal Amount: ${totalAmount} \nDiscount: ${discountAmount} \nSubtotal Amount: ${payingAmount} \nPurpose of payment: ${purpose} \nRegards, \nBeach Bunny House.`;
+    const recipientEmailBody = `Dear ${recipient.name}, \nA payment is generated against your username following are the details:\nTotal Amount: ${totalAmount} \nDiscount: ${discountAmount} \nSubtotal Amount: ${payingAmount} \nPurpose of payment: ${purpose} Payment Pending. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment. It will expire in 6 hours\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${recipient.username} \nRegards, \nBeach Bunny House.`;
 
     sendUpdateNotification(
       recipientEmailSubject,
@@ -864,7 +864,7 @@ const processAdminApprovedWithdrawal = async (session, body) => {
   ).session(session);
 
   const emailSubject = `Withdrawal (${withdrawal.withdrawalID}) Dispatched`;
-  const emailBody = `Dear ${withdrawal.userDocID.name},\nYour withdrawal request (${withdrawal.withdrawalID}) for $${withdrawal.amount} has been dispatched successfully.\n\nRegards,\nBeach Bunny House.`;
+  const emailBody = `Dear ${withdrawal.userDocID.name},\nYour withdrawal request (${withdrawal.withdrawalID}) for $${withdrawal.amount} has been dispatched successfully. \n Please go to the "Withdrawal Management" tab, then to "My Withdrawals" to check the Amount.\n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${withdrawal.userDocID.username} \nRegards, \nBeach Bunny House.`;
 
   sendUpdateNotification(
     emailSubject,

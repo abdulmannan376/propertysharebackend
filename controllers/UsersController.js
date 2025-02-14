@@ -1159,7 +1159,7 @@ const handleUserFavouriteList = async (req, res) => {
       userProfileFound.favouriteList.push(propertyID);
       userProfileFound.save().then(() => {
         const subject = `Property added to favourites`;
-        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} added to your favourites. \nRegards \nBeach Bunny House.`;
+        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} added to your favourites. Please go to the "Favourites" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${username} \nRegards, \nBeach Bunny Houes.`;
 
         sendUpdateNotification(
           subject,
@@ -1180,7 +1180,7 @@ const handleUserFavouriteList = async (req, res) => {
       });
       userProfileFound.save().then(() => {
         const subject = `Property removed to favourites`;
-        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} removed to your favourites. \nRegards \nBeach Bunny House.`;
+        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} removed to your favourites.  Please go to the "Favourites" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${username} \nRegards, \nBeach Bunny Houes.`;
 
         sendUpdateNotification(
           subject,
@@ -1237,7 +1237,7 @@ const handleUserWishList = async (req, res) => {
       userProfileFound.wishList.push(propertyID);
       userProfileFound.save().then(() => {
         const subject = `Property added to wishlist`;
-        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} added to your wishlist. \nRegards \nBeach Bunny House.`;
+        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} added to your wishlist.  Please go to the "wishlist" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${username} \nRegards, \nBeach Bunny Houes.`;
 
         sendUpdateNotification(
           subject,
@@ -1258,7 +1258,7 @@ const handleUserWishList = async (req, res) => {
       });
       userProfileFound.save().then(() => {
         const subject = `Property removed to wishlist`;
-        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} removed to your wishlist. \nRegards \nBeach Bunny House.`;
+        const body = `Dear ${userFound.name}, \nProperty: ${propertyFound.title} removed to your wishlist. Please go to the "wishlist" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${username} \nRegards, \nBeach Bunny Houes. \nRegards \nBeach Bunny House.`;
 
         sendUpdateNotification(
           subject,

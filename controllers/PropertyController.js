@@ -719,7 +719,7 @@ const handlePropertyAction = async (req, res) => {
       );
 
       const publisherSubject = `Property (${propertyFound.title}) listing status`;
-      const publisherBody = `Dear ${publisherFound.name}, \nYour property ${propertyFound.title} has been approved by our team and is live on beachbunnyhouse.com. \nRegards, \nBeach Bunny House.`;
+      const publisherBody = `Dear ${publisherFound.name}, \nYour property ${propertyFound.title} has been approved by our team and is live on beachbunnyhouse.com. \n Click the link below to Check:\n https://www.beachbunnyhouse.com/buy-shares/property/${propertyFound?.propertyID} \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         publisherSubject,
@@ -729,7 +729,7 @@ const handlePropertyAction = async (req, res) => {
       );
 
       const subject = `Property (${propertyFound.title}) listing status`;
-      const body = `Dear ${userFound.name}, \nYou approved property ${propertyFound.title} and is now live on. \nRegards, \nBeach Bunny House.`;
+      const body = `Dear ${userFound.name}, \nYou approved property ${propertyFound.title} and is now live on. \n Click the link below to Check:\n https://www.beachbunnyhouse.com/buy-shares/property/${propertyFound?.propertyID} \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
@@ -3008,7 +3008,7 @@ async function handleDraftProperties() {
         }).populate("userDefaultSettingID", "notifyUpdates");
 
         const subject = `Property (${property.title}) status of listing`;
-        const body = `Dear ${userFound.name}, \nYou property listing ${property.title} is waiting to be live please fill up the necessary fields to make it live. \nRegards, \nBeach Bunny House.`;
+        const body = `Dear ${userFound.name}, \nYou property listing ${property.title} is waiting to be live please fill up the necessary fields to make it live. \n Please go to the "Property Management" tab, then Click Property  ${property.title} to check the Amount.\n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${userFound.username} \nRegards, \nBeach Bunny House.`;
 
         sendUpdateNotification(
           subject,
@@ -3137,7 +3137,7 @@ const handlePropertyStatus = async (req, res) => {
     }
 
     const subject = `Property (${propertyFound.title}) ${action} update`;
-    const body = `Dear ${userFound.name}, \nYour action: ${action} has been updated for property: ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
+    const body = `Dear ${userFound.name}, \nYour action: ${action} has been updated for property: ${propertyFound.title}. \n Click the link below to Check:\n https://www.beachbunnyhouse.com/buy-shares/property/${propertyFound?.propertyID} \nRegards, \nBeach Bunny House.`;
 
     sendUpdateNotification(
       subject,
