@@ -850,7 +850,7 @@ async function openInspections() {
             shareID: share.shareID,
           })
             .populate("currentOwnerDocID", "username")
-            .populate("propertyDocID", "propertyID title");
+            .populate("propertyDocID", "propertyID title availableInDuration");
 
           const ownerShare = await PropertyShare.findOne({
             shareID: `${propertyShare.propertyDocID.propertyID}00`,
@@ -885,7 +885,7 @@ async function openInspections() {
       }).populate("userDefaultSettingID", "notifyUpdates");
 
       const subject = `Share Inspection Status`;
-      const body = `Dear ${user.name}, \nYour Share duration inspection is started, and is pending for submission. \nRegards, \nBeach Bunny House.`;
+      const body = `Dear ${user.name}, \nYour Property Share titled "${share.propertyDocID?.title}" (Share Duration: ${share.propertyDocID.availableInDuration.startDate.toDateString()} - ${share.propertyDocID.availableInDuration.endDate.toDateString()}) has started its inspection process because the end date has been reached and the inspection is pending submission. \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
@@ -1231,7 +1231,7 @@ const handleInspectionActionPropertyOwner = async (req, res) => {
     const inspectionFound = await PropertyInspection.findOne({
       inspectionID: inspectionID,
       propertyOwnerDocID: shareholderFound._id,
-    }).populate("propertyDocID", "title");
+    }).populate("propertyDocID", "title availableInDuration");
     if (!inspectionFound) {
       throw new Error("property inspection not found.");
     }
@@ -1259,7 +1259,7 @@ const handleInspectionActionPropertyOwner = async (req, res) => {
     await inspectionFound.save().then(() => {
       usersFoundList.map((user) => {
         const userSubject = `Property ${inspectionFound.propertyDocID.title} Inspection status`;
-        const userBody = `Dear ${user.name}, \nProperty, ${inspectionFound.propertyDocID.title}, inspection is approved by the property owner. \nRegards, \nBeach Bunny House.`;
+        const userBody = `Dear ${user.name}, \nProperty, ${inspectionFound.propertyDocID.title}, inspection is approved by the property owner.Please go to the "Inspections" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${user.username} \nRegards, \nBeach Bunny House.`;
 
         sendUpdateNotification(
           userSubject,
@@ -1270,7 +1270,7 @@ const handleInspectionActionPropertyOwner = async (req, res) => {
       });
 
       const subject = `Property ${inspectionFound.propertyDocID.title} Inspection status`;
-      const body = `Dear ${shareholderFound.userID.name}, \nProperty, ${inspectionFound.propertyDocID.title}, inspection has been approved. \nRegards, \nBeach Bunny House.`;
+      const body = `Dear ${shareholderFound.userID.name}, \nProperty, ${inspectionFound.propertyDocID.title}, inspection has been approved. Please go to the "Inspections" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${username} \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
@@ -1307,7 +1307,7 @@ async function notifyPropertyShareOwnerByPropertyID(
   ).populate({
     path: "shareDocIDList",
     model: "property_shares",
-    select: "currentOwnerDocID shareID",
+    select: "currentOwnerDocID shareID availableInDuration",
     populate: {
       path: "currentOwnerDocID",
       model: "shareholders",
@@ -1341,11 +1341,14 @@ async function notifyPropertyShareOwnerByPropertyID(
       console.log("Skipping share with null userID:", share);
       return; // Continue to the next item
     }
+
     const subject =
       emailSubject || `Property ${propertyFound.title} ${category} requested`;
     const body =
       emailBody ||
-      `Dear ${share?.currentOwnerDocID?.userID?.name}, It is to inform you a new ${category} is requested for property ${propertyFound.title}. \nRegards, \nBeach Bunny House.`;
+      `Dear ${share?.currentOwnerDocID?.userID?.name}, It is to inform you a new ${category} is requested for property ${propertyFound.title} (Share Duration: ${share.availableInDuration.startDate.toDateString()} - ${share.availableInDuration.endDate.toDateString()}).Please go to the "Inspections" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${share.currentOwnerDocID.username} \nRegards, \nBeach Bunny House.`;
+
+     
 
     sendUpdateNotification(
       subject,
@@ -1958,7 +1961,7 @@ const handleRaiseRequestActionPropertyOwner = async (req, res) => {
         const userSubject = `Property ${raiseRequestFound.propertyDocID.title} ${raiseRequestFound.requestType} status`;
         const userBody = `Dear ${user.name}, \nProperty, ${
           raiseRequestFound.propertyDocID.title
-        }, ${raiseRequestFound.requestType.toLowerCase()} request is approved by the property owner. \nRegards, \nBeach Bunny House.`;
+        }, ${raiseRequestFound.requestType.toLowerCase()} request is approved by the property owner.Please go to the "Inspections" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${user.username} \nRegards, \nBeach Bunny House.`;
 
         sendUpdateNotification(
           userSubject,
@@ -2954,7 +2957,7 @@ const handlePropertyFeatured = async (req, res) => {
       );
 
       const notifySubject = `Property (${propertyFound.propertyID}) Featured`;
-      const notifyBody = `Dear ${userFound.name}, Your property \nTitle:${propertyFound.title} \nPropertyID:${propertyFound.propertyID} \nIs featured on our platform. \nRegards,\nBeach Bunny House. `;
+      const notifyBody = `Dear ${userFound.name}, Your property \nTitle:${propertyFound.title} \nPropertyID:${propertyFound.propertyID} \nIs featured on our platform.\n Click the link below to Check:\n https://www.beachbunnyhouse.com \nRegards,\nBeach Bunny House. `;
 
       sendUpdateNotification(
         notifySubject,
