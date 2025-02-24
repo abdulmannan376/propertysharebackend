@@ -11,11 +11,15 @@ const UserProfileSchema = new mongoose.Schema({
   dob: { type: String, default: null },
   profilePicURL: { type: String, default: "" },
   idCardPicsDir: { type: String, default: "" },
+  idAuthentic: {
+    type: Boolean,
+    default: false,
+  },
   idCardFrontAdded: {
     type: Boolean,
     default: false,
   },
-  idCardBackAdded: {
+  passportFrontAdded: {
     type: Boolean,
     default: false,
   },

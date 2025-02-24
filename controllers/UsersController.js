@@ -13,6 +13,14 @@ const Withdrawal = require("../models/WithdrawalSchema");
 const { processAdminApprovedWithdrawal } = require("./PaymentController");
 const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
+const OpenAIClient = require("../helpers/openaiClient");
+const fs = require("fs");
+const sharp = require("sharp");
+// Initialize the OpenAI client with your API key
+const Groq = require("groq-sdk");
+
+// Initialize Groq with your API key from the environment variable
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 function sendVerficationEmail(user, res) {
   const mailOptions = {
@@ -258,7 +266,11 @@ const userLogin = async (req, res) => {
 
     await userFound.save().then(() => {
       const subject = `Login activity.`;
-      const emailBody = `Did you Login from a new Device or Location? We noticed your Beachbunnyhouse account "${userFound.username || userFound.email}" \nwas accessed from a new IP address.\nWhen: ${new Date().toISOString()} (UTC)\nIP Address: ${ipAddress} Country: ${country} City: ${city}\n[Visit your Account](https://www.beachbunnyhouse.com/user/${userFound.username})\nDon't recognize this activity? Please [reset your password](https://www.beachbunnyhouse.com/reset-password) and [contact customer support](https://www.beachbunnyhouse.com/contactus) immediately. \nRegards,\n Bunny Beach House.
+      const emailBody = `Did you Login from a new Device or Location? We noticed your Beachbunnyhouse account "${
+        userFound.username || userFound.email
+      }" \nwas accessed from a new IP address.\nWhen: ${new Date().toISOString()} (UTC)\nIP Address: ${ipAddress} Country: ${country} City: ${city}\n[Visit your Account](https://www.beachbunnyhouse.com/user/${
+        userFound.username
+      })\nDon't recognize this activity? Please [reset your password](https://www.beachbunnyhouse.com/reset-password) and [contact customer support](https://www.beachbunnyhouse.com/contactus) immediately. \nRegards,\n Bunny Beach House.
       `;
 
       sendUpdateNotification(
@@ -1461,60 +1473,210 @@ const uploadProfilePic = async (req, res) => {
   }
 };
 
+const openai = new OpenAIClient(process.env.OPENAI_API_KEY);
+
 const uploadIDCardPic = async (req, res) => {
   try {
-    const body = req.body;
+    const { name, nicNumber, username, cardFace } = req.body;
 
-    const userFound = await Users.findOne({ username: body.username }).populate(
+    // Validate required fields
+    if (!name || !nicNumber || !username || !cardFace) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Missing required fields: name, nicNumber, username, or cardFace.",
+      });
+    }
+
+    console.log("cardFace:", cardFace);
+
+    const userFound = await Users.findOne({ username }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
     );
     if (!userFound) {
-      throw new Error("user not found");
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const userProfileFound = await UserProfile.findOne({
       userDocID: userFound._id,
     });
-
-    const uploadPath = `uploads/IdentityCards/${body.username}/`;
-
-    if (body.cardFace === "Front") {
-      await UserProfile.updateOne(
-        { _id: userProfileFound._id },
-        {
-          $set: {
-            idCardPicsDir: uploadPath,
-            idCardFrontAdded: true,
-          },
-        }
-      );
-    } else if (body.cardFace === "Back") {
-      await UserProfile.updateOne(
-        { _id: userProfileFound._id },
-        {
-          $set: {
-            idCardPicsDir: uploadPath,
-            idCardBackAdded: true,
-          },
-        }
-      );
+    if (!userProfileFound) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User profile not found" });
     }
 
-    res.status(201).json({
-      message: "Id Card Pic Updated.",
-      success: true,
-      body: uploadPath,
+    // Define the upload path for the images
+    const uploadPath = `uploads/IdentityCards/${username}/`;
+    console.log("Image upload path:", uploadPath);
+    // Construct the image URL
+    const imageUrl = `${process.env.Backend_Url}/uploads/IdentityCards/${username}/${cardFace}.png`;
+    console.log("imageUrl:", imageUrl);
+
+    // Prepare the prompt for the vision model
+    const prompt = `
+      Given the following text fields and an image reference, validate if the uploaded image is a valid ${cardFace} and check whether the details match after excluding "-" from the ID.
+      
+      Text Fields:
+        - Name: ${name}
+        - ID: ${nicNumber}
+        - Type: ${cardFace}
+      
+      Return only a JSON object with the following structure:
+      {
+        "nameMatch": <boolean>,
+        "idMatch": <boolean>,
+        "typeMatch": <boolean>,
+        "details": {
+          "name": "Expected: <expected name>, Provided: <provided name>",
+          "id": "Expected: <expected ID>, Provided: <provided ID>",
+          "type": "Expected: <expected type>, Provided: <provided type>"
+        }
+      }
+      
+      Analyze the image and text fields, compare the provided values with what you observe, and fill in the details accordingly.
+    `;
+
+    // Build the message content
+    const messages = [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: prompt,
+          },
+          {
+            type: "image_url",
+            image_url: { url: imageUrl },
+          },
+        ],
+      },
+    ];
+
+    // Call the chat completion endpoint with the vision model
+    const chatCompletion = await groq.chat.completions.create({
+      messages,
+      model: "llama-3.2-11b-vision-preview", // or use "llama-3.2-90b-vision-preview"
+      temperature: 0,
+      max_completion_tokens: 2000,
+      top_p: 1,
+      stream: false,
+      stop: null,
     });
+
+    const responseContent = chatCompletion.choices[0].message.content;
+    console.log("Chat response:", responseContent);
+
+       // Extract and parse the JSON portion from the response
+       let jsonString = "";
+       if (responseContent.includes("*Answer*:")) {
+         // If the response contains "*Answer*:", use the JSON object after it.
+         jsonString = responseContent.split("*Answer*:")[1].trim();
+       } else {
+         // Fallback: extract from the first "{" to the last "}"
+         const jsonStart = responseContent.indexOf("{");
+         const jsonEnd = responseContent.lastIndexOf("}");
+         if (jsonStart === -1 || jsonEnd === -1) {
+           return res.status(500).json({
+             success: false,
+             message: "Invalid response format from image validation service.",
+           });
+         }
+         jsonString = responseContent.substring(jsonStart, jsonEnd + 1);
+       }
+   
+       let responseObj;
+       try {
+         responseObj = JSON.parse(jsonString);
+       } catch (parseError) {
+         console.error("Error parsing JSON from response:", parseError);
+         return res.status(500).json({
+           success: false,
+           message: "Failed to parse image validation response.",
+         });
+       }
+   
+
+    // Determine if the image validation passed
+    const validationPassed =
+      responseObj.nameMatch && responseObj.idMatch && responseObj.typeMatch;
+    let updateData = {};
+
+    if (validationPassed) {
+      console.log("The uploaded image is valid.");
+      if (cardFace === "IDCardFront") {
+        updateData = {
+          idCardPicsDir: uploadPath,
+          idCardFrontAdded: true,
+          idAuthentic: true,
+        };
+      } else if (cardFace === "PassportFront") {
+        updateData = {
+          idCardPicsDir: uploadPath,
+          passportFrontAdded: true,
+          idAuthentic: true,
+        };
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Unsupported card face type.",
+        });
+      }
+    } else {
+      console.log(
+        "The uploaded image is not a valid ID card. Please upload a valid ID card."
+      );
+      if (cardFace === "IDCardFront") {
+        updateData = {
+          idCardFrontAdded: false,
+        };
+      } else if (cardFace === "PassportFront") {
+        updateData = {
+          passportFrontAdded: false,
+        };
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Unsupported card face type.",
+        });
+      }
+      
+    }
+
+    // Update the user profile accordingly
+    await UserProfile.updateOne(
+      { _id: userProfileFound._id },
+      { $set: updateData }
+    );
+
+    if (validationPassed) {
+      return res.status(200).json({
+        success: true,
+        message: "ID card verified and profile updated.",
+        body: uploadPath,
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: `${cardFace} validation failed.`,
+      });
+    }
   } catch (error) {
-    console.log(`Error: ${error}`, "\nlocation: ", {
+    const currentDateString = new Date().toISOString();
+    console.error("Error in uploadIDCardPic:", error, {
       function: "uploadIDCardPic",
       fileLocation: "controllers/UserController.js",
       timestamp: currentDateString,
     });
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error, success: false });
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
 
@@ -1544,7 +1706,9 @@ const updateUserProfileDetails = async (req, res) => {
       userProfileFound.nationality = body.nationality;
       userProfileFound.religion = body.religion;
       userProfileFound.bloodGroup = body.bloodGroup;
-      if (userProfileFound.profileCompletePercentage <= 25) {
+      console.log("userProfileFound.idAuthentic==>",userProfileFound.idAuthentic);
+      
+      if (userProfileFound.profileCompletePercentage <= 25 && userProfileFound.idAuthentic) {
         userProfileFound.profileCompletePercentage = 25;
       }
     } else if (action === "Contact Details") {
@@ -1592,7 +1756,8 @@ const updateUserProfileDetails = async (req, res) => {
         userProfileFound.dob &&
         userProfileFound.nicNumber &&
         userProfileFound.nationality &&
-        userProfileFound.religion
+        userProfileFound.religion &&
+        userProfileFound.idAuthentic
     );
 
     const isContactDetailsComplete = Boolean(
