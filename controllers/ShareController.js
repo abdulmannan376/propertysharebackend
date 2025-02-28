@@ -854,7 +854,7 @@ const handleShareByCategory = async (req, res) => {
       const subject = "Property Share status updated.";
       const body = `Dear ${
         userFound.name
-      }, Your share status updated for ${category.toLowerCase()}.Click the link below to Check:\n https://www.beachbunnyhouse.com/buy-shares/property/${propertyFound?.propertyID} \nRegards, \nBeach Bunny House. \nRegards, \nBeach Bunny House.`;
+      }, Your share status updated for ${category.toLowerCase()}.Click the link below to Check:\n https://www.beachbunnyhouse.com/buy-shares/property/${propertyFound?.propertyID} \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
