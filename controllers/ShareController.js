@@ -854,7 +854,9 @@ const handleShareByCategory = async (req, res) => {
       const subject = "Property Share status updated.";
       const body = `Dear ${
         userFound.name
-      }, Your share status updated for ${category.toLowerCase()}.Click the link below to Check:\n https://www.beachbunnyhouse.com/buy-shares/property/${propertyFound?.propertyID} \nRegards, \nBeach Bunny House.`;
+      }, Your share status updated for ${category.toLowerCase()}.Click the link below to Check:\n https://www.beachbunnyhouse.com/buy-shares/property/${
+        propertyFound?.propertyID
+      } \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
@@ -946,7 +948,7 @@ const getSharesByCategory = async (req, res) => {
 
 const reserveShare = async (req, res) => {
   try {
-    const { username, shareID } = req.body;
+    const { username, shareID,price } = req.body;
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
@@ -989,8 +991,28 @@ const reserveShare = async (req, res) => {
     await propertyFound.save();
 
     console.log(propertyFound.stakesOccupied);
+    // Payment Processing Logic
+    const companyFeePercentage =
+      parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
+    const companyFee = Math.ceil(
+      parseInt(price) * companyFeePercentage
+    );
 
-    propertyShareFound.save().then(() => {
+    const newPayment = new Payments({
+      gatewayTransactionID: "",
+      purpose: `Property: ${propertyShareFound.propertyDocID.propertyID} Share Reservation Payment.`,
+      category: "Buy Share",
+      userDocID: userFound._id,
+      initiatedBy: userFound._id, // Since the buyer is initiating the reservation
+      totalAmount: price,
+      payingAmount: price,
+      companyFee: companyFee,
+      status: "Pending", // Mark as pending until the user completes payment
+      shareDocID: propertyShareFound._id,
+    });
+
+    await newPayment.save();
+    await propertyShareFound.save().then(() => {
       const recipient = userFound.email;
       const subject = "Successfull Reservation of Share.";
       const body = `Dear ${userFound.name}, \nThis email is to confirm your reservation of a share in property with Title: ${propertyShareFound.propertyDocID?.title}. This reservation will be removed from your reservations after 2 days from now please confirm you purchase as soon as possible. \n Please go to the "Reservations" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${userFound.username} \nRegards, \nBeach Bunny Houes.`;
@@ -1896,7 +1918,9 @@ const shareRentAction = async (data, session, action) => {
       const subject = "Payment Expired for Rental Share";
       const body = `Dear ${buyerFound.name}, 
       
-      We regret to inform you that your payment for rental share in the property titled "${shareFound.propertyDocID?.title}" has expired. the allowed payment window of 6 hours has now passed.\n The payment was initiated on ${shareOfferFound.createdAt.toDateString()} at ${shareOfferFound.createdAt.toLocaleTimeString()}, and the allowed payment window of 6 hours has now passed.\n As a result, your rental request has been canceled. \nIf you wish to re-initiate the process, please visit the property page again and submit a new rent share request. \nThank you for understanding. \nRegards,\nBeach Bunny House`;
+      We regret to inform you that your payment for rental share in the property titled "${
+        shareFound.propertyDocID?.title
+      }" has expired. the allowed payment window of 6 hours has now passed.\n The payment was initiated on ${shareOfferFound.createdAt.toDateString()} at ${shareOfferFound.createdAt.toLocaleTimeString()}, and the allowed payment window of 6 hours has now passed.\n As a result, your rental request has been canceled. \nIf you wish to re-initiate the process, please visit the property page again and submit a new rent share request. \nThank you for understanding. \nRegards,\nBeach Bunny House`;
 
       sendUpdateNotification(
         subject,
@@ -2497,7 +2521,9 @@ const shareSellAction = async (data, session, action) => {
       The payment was initiated on ${shareOfferFound.createdAt.toDateString()} at ${shareOfferFound.createdAt.toLocaleTimeString()}, and the allowed payment window of 6 hours has now passed.
       As a result, your purchase request has been canceled.
       
-      If you wish to re-initiate the process, please visit the property page  again https://www.beachbunnyhouse.com/buy-shares/property/${shareFound.propertyDocID?.propertyID} and submit a new purchase request.
+      If you wish to re-initiate the process, please visit the property page  again https://www.beachbunnyhouse.com/buy-shares/property/${
+        shareFound.propertyDocID?.propertyID
+      } and submit a new purchase request.
       
       Thank you for understanding. 
       
@@ -2695,10 +2721,14 @@ const handleShareSellOfferAction = async (req, res) => {
         );
       } else if (action === "cancelled") {
         const ownerNotificationSubject = `Property Share Rent Offer Cancelled`;
-        const ownerNotificationBody = `Dear ${sharePrevOwnerFound.name}, \nYour share rent offer has been cancelled of title: ${
+        const ownerNotificationBody = `Dear ${
+          sharePrevOwnerFound.name
+        }, \nYour share rent offer has been cancelled of title: ${
           propertyShareFound.propertyDocID.title
         } property's share. \nDuration: ${propertyShareFound.availableInDuration.startDate.toDateString()} - ${propertyShareFound.availableInDuration.endDate.toDateString()}
-        \n at price: $${shareOfferFound.price}. \nRegards, \nBeach Bunny House.`;
+        \n at price: $${
+          shareOfferFound.price
+        }. \nRegards, \nBeach Bunny House.`;
         sendUpdateNotification(
           ownerNotificationSubject,
           ownerNotificationBody,
@@ -3171,7 +3201,7 @@ async function handleShareReservation() {
     if (sharesListAboutToExpire.length > 0) {
       sharesListAboutToExpire.map((share) => {
         const subject = `Property Reservation Reminder`;
-        const body = `Dear ${share.reservedByUser.name}, \nYou have reserved a share in ${share.property.title}. Please proceed to pay as it will be removed from reservation soon. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment.\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${share.reservedByUser.username} \nRegards, \nBeach Bunny House.`;
+        const body = `Dear ${share.reservedByUser.username}, \nYou have reserved a share in ${share.property.title}. Please proceed to pay as it will be removed from reservation soon. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment.\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${share.reservedByUser.username} \nRegards, \nBeach Bunny House.`;
 
         // console.log(share);
         sendUpdateNotification(
@@ -3188,6 +3218,21 @@ async function handleShareReservation() {
     }
     if (sharesListOfExpired.length > 0) {
       for (const share of sharesListOfExpired) {
+     // Find a single pending payment for the share with category "Buy Share"
+     const payment = await Payments.findOne({
+      status: "Pending",
+      shareDocID: share._id,
+      category: { $in: ["Buy Share"] },
+    });
+
+    if (payment) {
+      await Payments.updateOne(
+        { _id: payment._id },
+        { $set: { status: "Expired" } }
+      );
+    }
+        
+        // come here for expire of the payment for share reservation 
         const subject = `Property Reservation Expired.`;
         const body = `Dear ${share.reservedByUser.name}, \nYour share reservation in ${share.property.title} is expired. \nRegards, \nBeach Bunny House.`;
 

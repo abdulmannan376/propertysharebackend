@@ -218,7 +218,7 @@ const testCheckout = async (body, session) => {
         });
 
         await newWithdrawalRequest.save({ session });
-        
+
         // await Users.updateOne(
         //   {
         //     _id: paymentFound.initiatedBy,
@@ -230,32 +230,31 @@ const testCheckout = async (body, session) => {
         //     },
         //   }
         // );
-/////////////////////test tommorow///////////////////////////////
-// const withdrawalList = await Withdrawal.find(
-//   { userDocID: userFound._id, status: { $in: ["Pending"] } },
-//   { amount: 1 } // Fetch only the amount field for efficiency
-// );
+        /////////////////////test tommorow///////////////////////////////
+        // const withdrawalList = await Withdrawal.find(
+        //   { userDocID: userFound._id, status: { $in: ["Pending"] } },
+        //   { amount: 1 } // Fetch only the amount field for efficiency
+        // );
 
-// // Calculate total pending withdrawals
-// const totalPendingWithdrawals = withdrawalList.reduce(
-//   (sum, withdrawal) => sum + withdrawal.amount,
-//   0
-// );
-// console.log("Total Pending Withdrawals:", totalPendingWithdrawals);
+        // // Calculate total pending withdrawals
+        // const totalPendingWithdrawals = withdrawalList.reduce(
+        //   (sum, withdrawal) => sum + withdrawal.amount,
+        //   0
+        // );
+        // console.log("Total Pending Withdrawals:", totalPendingWithdrawals);
 
-// await Users.updateOne(
-//   {
-//     _id: ownerFound._id,
-//   },
-//   {
-//     $set: {
-//       availBalnc: totalPendingWithdrawals + amount,
-//     },
-//   },
-//   // { session }
-// );
-/////////////////////test tommorow///////////////////////////////
-
+        // await Users.updateOne(
+        //   {
+        //     _id: ownerFound._id,
+        //   },
+        //   {
+        //     $set: {
+        //       availBalnc: totalPendingWithdrawals + amount,
+        //     },
+        //   },
+        //   // { session }
+        // );
+        /////////////////////test tommorow///////////////////////////////
       } else {
         console.log("in else");
         const { shareID } = body;
@@ -273,7 +272,9 @@ const testCheckout = async (body, session) => {
 
         const ownerFound = await Users.findOne({
           username: shareFound.propertyDocID.publishedBy,
-        }).session(session);
+        })
+          .populate("userProfile")
+          .session(session);
         // console.log(userFound);
 
         const companyFeePercentage =
@@ -599,7 +600,6 @@ const handlePendingOfferPayments = async () => {
 
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
 
-
     const paymentsList = await Payments.find({
       status: "Pending",
       category: { $in: ["Rent Offer", "Sell Offer"] },
@@ -733,6 +733,14 @@ const pendingPaymentTransaction = async (req, res) => {
       }
     } else if (category === "Raised Request") {
       const controllerResult = await handleRaisedRequestPaymentAction(
+        data,
+        session
+      );
+      if (controllerResult instanceof Error) {
+        throw controllerResult;
+      }
+    } else if (category === "Buy Share") {
+      const controllerResult = await buyShare(
         data,
         session
       );
