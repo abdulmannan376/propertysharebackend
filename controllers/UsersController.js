@@ -227,7 +227,7 @@ const userLogin = async (req, res) => {
         await userFound.save(); // Save the user data
 
         const subject = `Reset Password Verification Code: ${verificationCode}`;
-        const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.`;
+        const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nThankyou. \nRegards, \nBeach Bunny House.`;
 
         // Send email notification
         sendUpdateNotification(
@@ -345,7 +345,7 @@ const userSignUp = async (req, res) => {
     await newUserProfile.save();
     newUser.save().then(() => {
       const subject = `Email Verification Code: ${verificationCode}`;
-      const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nWe are excited to have you on board. \nRegards,\n Bunny Beach House.`;
+      const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nThankyou. \nRegards, \nBeach Bunny House.\nWe are excited to have you on board. \nRegards,\n Bunny Beach House.`;
       sendUpdateNotification(
         subject,
         emailBody,
@@ -392,28 +392,46 @@ const resetPasswordGenCode = async (req, res) => {
         .status(400)
         .json({ message: "User dont exsist", success: false });
     }
-
+    
     const verificationCode = Math.round(Math.random() * 1000000);
 
     userFound.resetPasswordVerificationCode = verificationCode;
     userFound.resetPasswordVerified = false;
-    //  userFound.save();
-
     await userFound.save().then(() => {
       const subject = `Reset Password Verification Code: ${verificationCode}`;
-      const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.`;
-      // sendUpdateNotification(
-      //   subject,
-      //   emailBody,
-      //   userFound.userDefaultSettingID.notifyUpdates,
-      //   userFound.username
-      // );
-      sendEmail(userFound.email, subject, emailBody);
+      const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nThankyou. \nRegards, \nBeach Bunny House.`;
+      sendUpdateNotification(
+        subject,
+        emailBody,
+        userFound.userDefaultSettingID.notifyUpdates,
+        userFound.username
+      );
       res.status(201).json({
         message: `A verification code sent to email.`,
         success: true,
       });
     });
+    // const verificationCode = Math.round(Math.random() * 1000000);
+
+    // userFound.resetPasswordVerificationCode = verificationCode;
+    // userFound.resetPasswordVerified = false;
+    // //  userFound.save();
+
+    // await userFound.save().then(() => {
+    //   const subject = `Reset Password Verification Code: ${verificationCode}`;
+    //   const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nThankyou. \nRegards, \nBeach Bunny House.`;
+    //   // sendUpdateNotification(
+    //   //   subject,
+    //   //   emailBody,
+    //   //   userFound.userDefaultSettingID.notifyUpdates,
+    //   //   userFound.username
+    //   // );
+    //   sendEmail(userFound.email, subject, emailBody);
+    //   res.status(201).json({
+    //     message: `A verification code sent to email.`,
+    //     success: true,
+    //   });
+    // });
   } catch (error) {
     console.log(`Error: ${error}`, "location: ", {
       function: "resetPasswordGenCode",
@@ -516,7 +534,7 @@ const genNewResetPasswordCode = async (req, res) => {
     userFound.resetPasswordVerified = false;
     await userFound.save().then(() => {
       const subject = `Reset Password Verification Code: ${verificationCode}`;
-      const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.`;
+      const emailBody = `Hello, welcome to our service! Please add this code ${verificationCode} as it will expire after 2 hours.\nThankyou. \nRegards, \nBeach Bunny House.`;
       sendUpdateNotification(
         subject,
         emailBody,
@@ -1454,6 +1472,79 @@ const uploadProfilePic = async (req, res) => {
     const uploadPath = `uploads/ProfilePics/${body.username}/`;
     userProfileFound.profilePicURL = uploadPath;
 
+    let imageUrl = `${process.env.Backend_Url}/uploads/ProfilePics/${body.username}/profile-pic.png`;
+      // "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=2574&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+    const prompt = `
+    Validate whether the uploaded image is a proper profile picture and not a document, ID card, or any unrelated image. With face visible
+    Return a JSON object:
+    {
+      "validProfilePic": <boolean>,
+      "reason": "<validation reason>"
+    }
+    `;
+
+    // Build the message content
+    const messages = [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: imageUrl } },
+        ],
+      },
+    ];
+    // Call AI validation model (similar to `uploadIDCardPic`)
+    const chatCompletion = await groq.chat.completions.create({
+      messages,
+      model: "llama-3.2-11b-vision-preview",
+      temperature: 0,
+      max_completion_tokens: 1000,
+      top_p: 1,
+      stream: false,
+      stop: null,
+    });
+
+    const responseContent = chatCompletion.choices[0].message.content;
+    console.log("Chat response:🚀", responseContent);
+
+    // Extract and parse JSON response
+    let jsonString = responseContent.includes("*Answer*:")
+      ? responseContent.split("*Answer*:")[1].trim()
+      : responseContent.substring(
+          responseContent.indexOf("{"),
+          responseContent.lastIndexOf("}") + 1
+        );
+
+    let responseObj;
+    try {
+      responseObj = JSON.parse(jsonString);
+    } catch (parseError) {
+      console.error("Error parsing JSON:", parseError);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to parse image validation response.",
+      });
+    }
+
+    if (!responseObj.validProfilePic) {
+     
+      userProfileFound.validProfilePic = false;
+      const uploadedImagePath = `uploads/ProfilePics/${body.username}/profile-pic.png`;
+      if (fs.existsSync(uploadedImagePath)) {
+        fs.unlinkSync(uploadedImagePath);
+      }
+      await userProfileFound.save();
+      return res.status(400).json({
+        success: false,
+        message: `Profile picture validation failed: ${responseObj.reason}`,
+      });
+    }
+
+    // Update profile picture path
+    // Update profile picture and validation status
+    userProfileFound.profilePicURL = uploadPath;
+    userProfileFound.validProfilePic = true; // Set validProfilePic to true
+
     await userProfileFound.save();
 
     res.status(201).json({
@@ -1571,35 +1662,34 @@ const uploadIDCardPic = async (req, res) => {
     const responseContent = chatCompletion.choices[0].message.content;
     console.log("Chat response:", responseContent);
 
-       // Extract and parse the JSON portion from the response
-       let jsonString = "";
-       if (responseContent.includes("*Answer*:")) {
-         // If the response contains "*Answer*:", use the JSON object after it.
-         jsonString = responseContent.split("*Answer*:")[1].trim();
-       } else {
-         // Fallback: extract from the first "{" to the last "}"
-         const jsonStart = responseContent.indexOf("{");
-         const jsonEnd = responseContent.lastIndexOf("}");
-         if (jsonStart === -1 || jsonEnd === -1) {
-           return res.status(500).json({
-             success: false,
-             message: "Invalid response format from image validation service.",
-           });
-         }
-         jsonString = responseContent.substring(jsonStart, jsonEnd + 1);
-       }
-   
-       let responseObj;
-       try {
-         responseObj = JSON.parse(jsonString);
-       } catch (parseError) {
-         console.error("Error parsing JSON from response:", parseError);
-         return res.status(500).json({
-           success: false,
-           message: "Failed to parse image validation response.",
-         });
-       }
-   
+    // Extract and parse the JSON portion from the response
+    let jsonString = "";
+    if (responseContent.includes("*Answer*:")) {
+      // If the response contains "*Answer*:", use the JSON object after it.
+      jsonString = responseContent.split("*Answer*:")[1].trim();
+    } else {
+      // Fallback: extract from the first "{" to the last "}"
+      const jsonStart = responseContent.indexOf("{");
+      const jsonEnd = responseContent.lastIndexOf("}");
+      if (jsonStart === -1 || jsonEnd === -1) {
+        return res.status(500).json({
+          success: false,
+          message: "Invalid response format from image validation service.",
+        });
+      }
+      jsonString = responseContent.substring(jsonStart, jsonEnd + 1);
+    }
+
+    let responseObj;
+    try {
+      responseObj = JSON.parse(jsonString);
+    } catch (parseError) {
+      console.error("Error parsing JSON from response:", parseError);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to parse image validation response.",
+      });
+    }
 
     // Determine if the image validation passed
     const validationPassed =
@@ -1644,7 +1734,6 @@ const uploadIDCardPic = async (req, res) => {
           message: "Unsupported card face type.",
         });
       }
-      
     }
 
     // Update the user profile accordingly
@@ -1706,9 +1795,15 @@ const updateUserProfileDetails = async (req, res) => {
       userProfileFound.nationality = body.nationality;
       userProfileFound.religion = body.religion;
       userProfileFound.bloodGroup = body.bloodGroup;
-      console.log("userProfileFound.idAuthentic==>",userProfileFound.idAuthentic);
-      
-      if (userProfileFound.profileCompletePercentage <= 25 && userProfileFound.idAuthentic) {
+      console.log(
+        "userProfileFound.idAuthentic==>",
+        userProfileFound.idAuthentic
+      );
+
+      if (
+        userProfileFound.profileCompletePercentage <= 25 &&
+        userProfileFound.idAuthentic
+      ) {
         userProfileFound.profileCompletePercentage = 25;
       }
     } else if (action === "Contact Details") {
