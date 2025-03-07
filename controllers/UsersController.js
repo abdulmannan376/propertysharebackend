@@ -1609,7 +1609,7 @@ const uploadIDCardPic = async (req, res) => {
 
     // Prepare the prompt for the vision model
     const prompt = `
-      Given the following text fields and an image reference, validate if the uploaded image is a valid ${cardFace} and check whether the details match after excluding "-" from the ID, ID Number should be exactly same.
+      Given the following text fields and an image reference, validate if the uploaded image is a valid ${cardFace} and check whether the details match after excluding "-" from the ID, id should be exactly same.
       
       Text Fields:
         - Name: ${name}
@@ -1623,7 +1623,7 @@ const uploadIDCardPic = async (req, res) => {
         "typeMatch": <boolean>,
         "details": {
           "name": "Expected: <expected name>, Provided Name: ${name}",
-          "id": "Expected: <expected ID>, provided ID: ${nicNumber} (id Number should be exactly same)",
+          "id": "Expected: <expected ID>, provided ID: ${nicNumber} ",
           "type": "Expected: <expected type>, Provided Type: ${cardFace}"
         }
       }
