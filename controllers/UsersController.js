@@ -1623,7 +1623,7 @@ const uploadIDCardPic = async (req, res) => {
         "typeMatch": <boolean>,
         "details": {
           "name": "Expected: <expected name>, Provided Name: ${name}",
-          "id": "Expected: <expected ID>, provided ID: ${nicNumber} ",
+          "id": "Expected: <expected ID>, provided ID: ${nicNumber} (id should be exactly same)",
           "type": "Expected: <expected type>, Provided Type: ${cardFace}"
         }
       }
