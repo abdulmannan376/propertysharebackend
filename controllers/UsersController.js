@@ -1496,7 +1496,7 @@ const uploadProfilePic = async (req, res) => {
     // Call AI validation model (similar to `uploadIDCardPic`)
     const chatCompletion = await groq.chat.completions.create({
       messages,
-      model: "llama-3.2-11b-vision-preview",
+      model: "meta-llama/llama-4-scout-17b-16e-instruct",
       temperature: 0,
       max_completion_tokens: 1000,
       top_p: 1,
@@ -1651,7 +1651,7 @@ const uploadIDCardPic = async (req, res) => {
     // Call the chat completion endpoint with the vision model
     const chatCompletion = await groq.chat.completions.create({
       messages,
-      model: "llama-3.2-11b-vision-preview", // or use "llama-3.2-90b-vision-preview"
+      model: "meta-llama/llama-4-scout-17b-16e-instruct", // or use "llama-3.2-90b-vision-preview"
       temperature: 0,
       max_completion_tokens: 2000,
       top_p: 1,
