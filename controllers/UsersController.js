@@ -1611,6 +1611,7 @@ const uploadIDCardPic = async (req, res) => {
 
     // Prepare the prompt for the vision model
     const prompt = `
+      You are an image‐validation service.
       Given the following text fields and an image reference, validate if the uploaded image is a valid ${cardFace} and check whether the details match after excluding "-" from the ID, id should be exactly same.
       
       Text Fields:
@@ -1618,12 +1619,12 @@ const uploadIDCardPic = async (req, res) => {
         - ID: ${nicNumber}
         - Type: ${cardFace}
       
-      Return only a JSON object with the following structure:
+      **Output nothing but the exact JSON object** with four keys:
       {
-        "nameMatch": <boolean>,
-        "idMatch": <boolean>,
-        "typeMatch": <boolean>,
-        "details": {
+        1. "nameMatch": <true|false>,
+        2. "idMatch": <true|false>,
+        3. "typeMatch": <true|false>,
+        4. "details": {
           "name": "Expected: <expected name>, Provided Name: ${name}",
           "id": "Expected: <expected ID>, provided ID: ${nicNumber} (id should be exactly same)",
           "type": "Expected: <expected type>, Provided Type: ${cardFace}"
