@@ -1474,14 +1474,16 @@ const uploadProfilePic = async (req, res) => {
 
     let imageUrl = `${process.env.Backend_Url}/uploads/ProfilePics/${body.username}/profile-pic.png`;
       // "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=2574&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
-    const prompt = `
-    Validate whether the uploaded image is a proper profile picture and not a document, ID card, or any unrelated image. With face visible
-    Return a JSON object:
-    {
-      "validProfilePic": <boolean>,
-      "reason": "<validation reason>"
-    }
-    `;
+      const prompt = `
+      You are an image‐validation service.  
+      Validate whether this image is a proper profile picture (face clearly visible).  
+      **Output nothing but the exact JSON object** with two keys:
+        1. "validProfilePic": <true|false>
+        2. "reason": "<string explaining your decision>"
+      
+      Image URL: ${imageUrl}
+      `;
+      
 
     // Build the message content
     const messages = [
@@ -1653,7 +1655,7 @@ const uploadIDCardPic = async (req, res) => {
       messages,
       model: "meta-llama/llama-4-scout-17b-16e-instruct", // or use "llama-3.2-90b-vision-preview"
       temperature: 0,
-      max_completion_tokens: 2000,
+      max_completion_tokens: 1000,
       top_p: 1,
       stream: false,
       stop: null,
