@@ -1472,75 +1472,75 @@ const uploadProfilePic = async (req, res) => {
     const uploadPath = `uploads/ProfilePics/${body.username}/`;
     userProfileFound.profilePicURL = uploadPath;
 
-    let imageUrl = `${process.env.Backend_Url}/uploads/ProfilePics/${body.username}/profile-pic.png`;
-      // "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=2574&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
-      const prompt = `
-      You are an image‐validation service.  
-      Validate whether this image is a proper profile picture (face clearly visible).  
-      **Output nothing but the exact JSON object** with two keys:
-        1. "validProfilePic": <true|false>
-        2. "reason": "<string explaining your decision>"
+    // let imageUrl = `${process.env.Backend_Url}/uploads/ProfilePics/${body.username}/profile-pic.png`;
+    //   // "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=2574&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+    //   const prompt = `
+    //   You are an image‐validation service.  
+    //   Validate whether this image is a proper profile picture (face clearly visible).  
+    //   **Output nothing but the exact JSON object** with two keys:
+    //     1. "validProfilePic": <true|false>
+    //     2. "reason": "<string explaining your decision>"
       
-      Image URL: ${imageUrl}
-      `;
+    //   Image URL: ${imageUrl}
+    //   `;
       
 
-    // Build the message content
-    const messages = [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: prompt },
-          { type: "image_url", image_url: { url: imageUrl } },
-        ],
-      },
-    ];
-    // Call AI validation model (similar to `uploadIDCardPic`)
-    const chatCompletion = await groq.chat.completions.create({
-      messages,
-      model: "meta-llama/llama-4-scout-17b-16e-instruct",
-      temperature: 0,
-      max_completion_tokens: 1000,
-      top_p: 1,
-      stream: false,
-      stop: null,
-    });
+    // // Build the message content
+    // const messages = [
+    //   {
+    //     role: "user",
+    //     content: [
+    //       { type: "text", text: prompt },
+    //       { type: "image_url", image_url: { url: imageUrl } },
+    //     ],
+    //   },
+    // ];
+    // // Call AI validation model (similar to `uploadIDCardPic`)
+    // const chatCompletion = await groq.chat.completions.create({
+    //   messages,
+    //   model: "meta-llama/llama-4-scout-17b-16e-instruct",
+    //   temperature: 0,
+    //   max_completion_tokens: 1000,
+    //   top_p: 1,
+    //   stream: false,
+    //   stop: null,
+    // });
 
-    const responseContent = chatCompletion.choices[0].message.content;
-    console.log("Chat response:🚀", responseContent);
+    // const responseContent = chatCompletion.choices[0].message.content;
+    // console.log("Chat response:🚀", responseContent);
 
-    // Extract and parse JSON response
-    let jsonString = responseContent.includes("*Answer*:")
-      ? responseContent.split("*Answer*:")[1].trim()
-      : responseContent.substring(
-          responseContent.indexOf("{"),
-          responseContent.lastIndexOf("}") + 1
-        );
+    // // Extract and parse JSON response
+    // let jsonString = responseContent.includes("*Answer*:")
+    //   ? responseContent.split("*Answer*:")[1].trim()
+    //   : responseContent.substring(
+    //       responseContent.indexOf("{"),
+    //       responseContent.lastIndexOf("}") + 1
+    //     );
 
-    let responseObj;
-    try {
-      responseObj = JSON.parse(jsonString);
-    } catch (parseError) {
-      console.error("Error parsing JSON:", parseError);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to parse image validation response.",
-      });
-    }
+    // let responseObj;
+    // try {
+    //   responseObj = JSON.parse(jsonString);
+    // } catch (parseError) {
+    //   console.error("Error parsing JSON:", parseError);
+    //   return res.status(500).json({
+    //     success: false,
+    //     message: "Failed to parse image validation response.",
+    //   });
+    // }
 
-    if (!responseObj.validProfilePic) {
+    // if (!responseObj.validProfilePic) {
      
-      userProfileFound.validProfilePic = false;
-      const uploadedImagePath = `uploads/ProfilePics/${body.username}/profile-pic.png`;
-      if (fs.existsSync(uploadedImagePath)) {
-        fs.unlinkSync(uploadedImagePath);
-      }
-      await userProfileFound.save();
-      return res.status(400).json({
-        success: false,
-        message: `Profile picture validation failed: ${responseObj.reason}`,
-      });
-    }
+    //   userProfileFound.validProfilePic = false;
+    //   const uploadedImagePath = `uploads/ProfilePics/${body.username}/profile-pic.png`;
+    //   if (fs.existsSync(uploadedImagePath)) {
+    //     fs.unlinkSync(uploadedImagePath);
+    //   }
+    //   await userProfileFound.save();
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: `Profile picture validation failed: ${responseObj.reason}`,
+    //   });
+    // }
 
     // Update profile picture path
     // Update profile picture and validation status
@@ -1573,13 +1573,13 @@ const uploadIDCardPic = async (req, res) => {
     const { name, nicNumber, username, cardFace } = req.body;
 
     // Validate required fields
-    if (!name || !nicNumber || !username || !cardFace) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Missing required fields: name, nicNumber, username, or cardFace.",
-      });
-    }
+    // if (!name || !nicNumber || !username || !cardFace) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message:
+    //       "Missing required fields: name, nicNumber, username, or cardFace.",
+    //   });
+    // }
 
     console.log("cardFace:", cardFace);
 
@@ -1606,101 +1606,101 @@ const uploadIDCardPic = async (req, res) => {
     const uploadPath = `uploads/IdentityCards/${username}/`;
     console.log("Image upload path:", uploadPath);
     // Construct the image URL
-    const imageUrl = `${process.env.Backend_Url}/uploads/IdentityCards/${username}/${cardFace}.png`;
-    console.log("imageUrl:", imageUrl);
+    // const imageUrl = `${process.env.Backend_Url}/uploads/IdentityCards/${username}/${cardFace}.png`;
+    // console.log("imageUrl:", imageUrl);
 
-    // Prepare the prompt for the vision model
-    const prompt = `
-      You are an image‐validation service.
-      Given the following text fields and an image reference, validate if the uploaded image is a valid ${cardFace} and check whether the details match after excluding "-" from the ID, id should be exactly same.
+    // // Prepare the prompt for the vision model
+    // const prompt = `
+    //   You are an image‐validation service.
+    //   Given the following text fields and an image reference, validate if the uploaded image is a valid ${cardFace} and check whether the details match after excluding "-" from the ID, id should be exactly same.
       
-      Text Fields:
-        - Name: ${name}
-        - ID: ${nicNumber}
-        - Type: ${cardFace}
+    //   Text Fields:
+    //     - Name: ${name}
+    //     - ID: ${nicNumber}
+    //     - Type: ${cardFace}
       
-      **Output nothing but the exact JSON object** with four keys:
-      {
-        1. "nameMatch": <true|false>,
-        2. "idMatch": <true|false>,
-        3. "typeMatch": <true|false>,
-        4. "details": {
-          "name": "Expected: <expected name>, Provided Name: ${name}",
-          "id": "Expected: <expected ID>, provided ID: ${nicNumber} (id should be exactly same)",
-          "type": "Expected: <expected type>, Provided Type: ${cardFace}"
-        }
-      }
+    //   **Output nothing but the exact JSON object** with four keys:
+    //   {
+    //     1. "nameMatch": <true|false>,
+    //     2. "idMatch": <true|false>,
+    //     3. "typeMatch": <true|false>,
+    //     4. "details": {
+    //       "name": "Expected: <expected name>, Provided Name: ${name}",
+    //       "id": "Expected: <expected ID>, provided ID: ${nicNumber} (id should be exactly same)",
+    //       "type": "Expected: <expected type>, Provided Type: ${cardFace}"
+    //     }
+    //   }
       
-      Analyze the image and text fields, compare the provided values (id should be exactly same) with what you observe, and fill in the details accordingly.
-    `;
+    //   Analyze the image and text fields, compare the provided values (id should be exactly same) with what you observe, and fill in the details accordingly.
+    // `;
 
-    // Build the message content
-    const messages = [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: prompt,
-          },
-          {
-            type: "image_url",
-            image_url: { url: imageUrl },
-          },
-        ],
-      },
-    ];
+    // // Build the message content
+    // const messages = [
+    //   {
+    //     role: "user",
+    //     content: [
+    //       {
+    //         type: "text",
+    //         text: prompt,
+    //       },
+    //       {
+    //         type: "image_url",
+    //         image_url: { url: imageUrl },
+    //       },
+    //     ],
+    //   },
+    // ];
 
-    // Call the chat completion endpoint with the vision model
-    const chatCompletion = await groq.chat.completions.create({
-      messages,
-      model: "meta-llama/llama-4-scout-17b-16e-instruct", // or use "llama-3.2-90b-vision-preview"
-      temperature: 0,
-      max_completion_tokens: 1000,
-      top_p: 1,
-      stream: false,
-      stop: null,
-    });
+    // // Call the chat completion endpoint with the vision model
+    // const chatCompletion = await groq.chat.completions.create({
+    //   messages,
+    //   model: "meta-llama/llama-4-scout-17b-16e-instruct", // or use "llama-3.2-90b-vision-preview"
+    //   temperature: 0,
+    //   max_completion_tokens: 1000,
+    //   top_p: 1,
+    //   stream: false,
+    //   stop: null,
+    // });
 
-    const responseContent = chatCompletion.choices[0].message.content;
-    console.log("Chat response:", responseContent);
+    // const responseContent = chatCompletion.choices[0].message.content;
+    // console.log("Chat response:", responseContent);
 
-    // Extract and parse the JSON portion from the response
-    let jsonString = "";
-    if (responseContent.includes("*Answer*:")) {
-      // If the response contains "*Answer*:", use the JSON object after it.
-      jsonString = responseContent.split("*Answer*:")[1].trim();
-    } else {
-      // Fallback: extract from the first "{" to the last "}"
-      const jsonStart = responseContent.indexOf("{");
-      const jsonEnd = responseContent.lastIndexOf("}");
-      if (jsonStart === -1 || jsonEnd === -1) {
-        return res.status(500).json({
-          success: false,
-          message: "Invalid response format from image validation service.",
-        });
-      }
-      jsonString = responseContent.substring(jsonStart, jsonEnd + 1);
-    }
+    // // Extract and parse the JSON portion from the response
+    // let jsonString = "";
+    // if (responseContent.includes("*Answer*:")) {
+    //   // If the response contains "*Answer*:", use the JSON object after it.
+    //   jsonString = responseContent.split("*Answer*:")[1].trim();
+    // } else {
+    //   // Fallback: extract from the first "{" to the last "}"
+    //   const jsonStart = responseContent.indexOf("{");
+    //   const jsonEnd = responseContent.lastIndexOf("}");
+    //   if (jsonStart === -1 || jsonEnd === -1) {
+    //     return res.status(500).json({
+    //       success: false,
+    //       message: "Invalid response format from image validation service.",
+    //     });
+    //   }
+    //   jsonString = responseContent.substring(jsonStart, jsonEnd + 1);
+    // }
 
-    let responseObj;
-    try {
-      responseObj = JSON.parse(jsonString);
-    } catch (parseError) {
-      console.error("Error parsing JSON from response:", parseError);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to parse image validation response.",
-      });
-    }
+    // let responseObj;
+    // try {
+    //   responseObj = JSON.parse(jsonString);
+    // } catch (parseError) {
+    //   console.error("Error parsing JSON from response:", parseError);
+    //   return res.status(500).json({
+    //     success: false,
+    //     message: "Failed to parse image validation response.",
+    //   });
+    // }
 
-    // Determine if the image validation passed
-    const validationPassed =
-      responseObj.nameMatch && responseObj.idMatch && responseObj.typeMatch;
-    let updateData = {};
+    // // Determine if the image validation passed
+    // const validationPassed =
+    //   responseObj.nameMatch && responseObj.idMatch && responseObj.typeMatch;
+   let updateData = {};
 
-    if (validationPassed) {
-      console.log("The uploaded image is valid.");
+    // if (validationPassed) {
+      // console.log("The uploaded image is valid.");
       if (cardFace === "IDCardFront") {
         updateData = {
           idCardPicsDir: uploadPath,
@@ -1719,25 +1719,25 @@ const uploadIDCardPic = async (req, res) => {
           message: "Unsupported card face type.",
         });
       }
-    } else {
-      console.log(
-        "The uploaded image is not a valid ID card. Please upload a valid ID card."
-      );
-      if (cardFace === "IDCardFront") {
-        updateData = {
-          idCardFrontAdded: false,
-        };
-      } else if (cardFace === "PassportFront") {
-        updateData = {
-          passportFrontAdded: false,
-        };
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: "Unsupported card face type.",
-        });
-      }
-    }
+    // } else {
+    //   console.log(
+    //     "The uploaded image is not a valid ID card. Please upload a valid ID card."
+    //   );
+    //   if (cardFace === "IDCardFront") {
+    //     updateData = {
+    //       idCardFrontAdded: false,
+    //     };
+    //   } else if (cardFace === "PassportFront") {
+    //     updateData = {
+    //       passportFrontAdded: false,
+    //     };
+    //   } else {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message: "Unsupported card face type.",
+    //     });
+    //   }
+    // }
 
     // Update the user profile accordingly
     await UserProfile.updateOne(
@@ -1745,18 +1745,18 @@ const uploadIDCardPic = async (req, res) => {
       { $set: updateData }
     );
 
-    if (validationPassed) {
+    // if (validationPassed) {
       return res.status(200).json({
         success: true,
         message: "ID card verified and profile updated.",
         body: uploadPath,
       });
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: `${cardFace} validation failed.`,
-      });
-    }
+    // } else {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: `${cardFace} validation failed.`,
+    //   });
+    // }
   } catch (error) {
     const currentDateString = new Date().toISOString();
     console.error("Error in uploadIDCardPic:", error, {
