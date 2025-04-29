@@ -28,7 +28,24 @@ const fs = require("fs");
 //   });
 // }
 
+// const allowedMimes = ["image/png", "image/jpeg", "image/jpg"];
+// const uploadUserProFilePic = multer({
+//   storage,
+//   fileFilter: (req, file, cb) => {
+//     if (allowedMimes.includes(file.mimetype)) {
+//       cb(null, true);
+//     } else {
+//       cb(
+//         new Error(
+//           "Unsupported file type. Only PNG, JPG and JPEG are allowed."
+//         ),
+//         false
+//       );
+//     }
+//   },
+// });
 // Configure storage for Multer
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadPath = `uploads/ProfilePics/${req.body.username}/`;

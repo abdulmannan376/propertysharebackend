@@ -1456,6 +1456,7 @@ const getUserProfileDetails = async (req, res) => {
 const uploadProfilePic = async (req, res) => {
   try {
     const body = req.body;
+// console.log("body.username",req.file);
 
     const userFound = await Users.findOne({ username: body.username }).populate(
       "userDefaultSettingID",
@@ -1469,8 +1470,9 @@ const uploadProfilePic = async (req, res) => {
       userDocID: userFound._id,
     });
 
-    const uploadPath = `uploads/ProfilePics/${body.username}/`;
-    userProfileFound.profilePicURL = uploadPath;
+    // const uploadPath = `uploads/ProfilePics/${body.username}/`;
+    const uploadPath = `uploads/ProfilePics/${body.username}/${req.file.filename}`;
+    // userProfileFound.profilePicURL = uploadPath;
 
     // let imageUrl = `${process.env.Backend_Url}/uploads/ProfilePics/${body.username}/profile-pic.png`;
     //   // "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=2574&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
@@ -1556,7 +1558,7 @@ const uploadProfilePic = async (req, res) => {
     });
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
-      function: "getUserProfileDetails",
+      function: "uploadProfilePic",
       fileLocation: "controllers/UserController.js",
       timestamp: currentDateString,
     });
