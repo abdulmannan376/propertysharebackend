@@ -11,6 +11,7 @@ const UserProfileSchema = new mongoose.Schema({
   dob: { type: String, default: null },
   profilePicURL: { type: String, default: "" },
   idCardPicsDir: { type: String, default: "" },
+  passportPicsDir: { type: String, default: "" },
   validProfilePic: {
     type: Boolean,
     default: false,

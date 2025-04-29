@@ -29,6 +29,7 @@ const fs = require("fs");
 // }
 
 // Configure storage for Multer
+// storage setup (you already have most of this)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadPath = path.join(
@@ -39,32 +40,23 @@ const storage = multer.diskStorage({
       req.body.username
     );
     fs.mkdirSync(uploadPath, { recursive: true });
-    // No more wiping the whole folder!
-    // Just pass back the path
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    const filename = `${req.body.cardFace}${ext}`;
-    const uploadPath = path.join(
+    const filename = `${req.body.cardFace}${ext}`;         // e.g. "IDCardFront.jpg"
+    const fullFilePath = path.join(
       __dirname,
       "..",
       "uploads",
       "IdentityCards",
-      req.body.username
+      req.body.username,
+      filename
     );
-    const fullFilePath = path.join(uploadPath, filename);
-
-    // if an old IDCardFront.png (or PassportFront.png) already exists, delete it
-    if (fs.existsSync(fullFilePath)) {
-      fs.unlinkSync(fullFilePath);
-    }
-
+    if (fs.existsSync(fullFilePath)) fs.unlinkSync(fullFilePath);
     cb(null, filename);
   },
 });
-
-
-const uploadIDCard = multer({ storage: storage });
+const uploadIDCard = multer({ storage });
 
 module.exports = uploadIDCard;

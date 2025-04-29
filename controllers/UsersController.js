@@ -15,6 +15,7 @@ const currentDateMilliseconds = Date.now();
 const currentDateString = new Date(currentDateMilliseconds).toLocaleString();
 const OpenAIClient = require("../helpers/openaiClient");
 const fs = require("fs");
+const path = require("path");
 const sharp = require("sharp");
 // Initialize the OpenAI client with your API key
 const Groq = require("groq-sdk");
@@ -1573,7 +1574,8 @@ const openai = new OpenAIClient(process.env.OPENAI_API_KEY);
 const uploadIDCardPic = async (req, res) => {
   try {
     const { name, nicNumber, username, cardFace } = req.body;
-
+    const { filename } = req.file; // e.g. "IDCardFront.jpg"
+    // const imagePath = 
     // Validate required fields
     // if (!name || !nicNumber || !username || !cardFace) {
     //   return res.status(400).json({
@@ -1605,7 +1607,13 @@ const uploadIDCardPic = async (req, res) => {
     }
 
     // Define the upload path for the images
-    const uploadPath = `uploads/IdentityCards/${username}/`;
+    // const uploadPath = `uploads/IdentityCards/${username}/`;
+    const uploadPath = path.posix.join(
+      "uploads",
+      "IdentityCards",
+      username,
+      filename
+    ); // -> "uploads/IdentityCards/check1/IDCardFront.jpg"
     console.log("Image upload path:", uploadPath);
     // Construct the image URL
     // const imageUrl = `${process.env.Backend_Url}/uploads/IdentityCards/${username}/${cardFace}.png`;
@@ -1711,7 +1719,7 @@ const uploadIDCardPic = async (req, res) => {
         };
       } else if (cardFace === "PassportFront") {
         updateData = {
-          idCardPicsDir: uploadPath,
+          passportPicsDir: uploadPath,
           passportFrontAdded: true,
           idAuthentic: true,
         };
