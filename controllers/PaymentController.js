@@ -41,28 +41,26 @@ const GetClientToken = async (req, res) => {
     });
   }
 };
+console.log("process.env.PAYPAL_MODE",process.env.PAYPAL_MODE);
 
 const baseUrl = {
   sandbox: "https://api-m.sandbox.paypal.com",
+  live:    "https://api-m.paypal.com"
 };
-const createPayPalClient = () => {
-  return axios.create({
-    // baseURL: process.env.PAYPAL_MODE === "sandbox"
-    //   ?
-    baseURL: "https://api-m.sandbox.paypal.com",
-    // : "https://api-m.paypal.com",
-    auth: {
-      username: process.env.PAYPAL_CLIENT_ID,
-      password: process.env.PAYPAL_CLIENT_SECRET,
-    },
-  });
-};
+
+const createPayPalClient = () => axios.create({
+  baseURL: baseUrl[process.env.PAYPAL_MODE || "sandbox"],
+  auth: {
+    username: process.env.PAYPAL_CLIENT_ID,
+    password: process.env.PAYPAL_CLIENT_SECRET,
+  },
+});
 async function generateAccessToken() {
   try {
     const auth = Buffer.from(
       `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
     ).toString("base64");
-    const response = await fetch(`${baseUrl.sandbox}/v1/oauth2/token`, {
+    const response = await fetch(`${baseUrl[process.env.PAYPAL_MODE]}/v1/oauth2/token`, {
       method: "POST",
       body: "grant_type=client_credentials",
       headers: {
@@ -82,7 +80,7 @@ async function generateAccessToken() {
 async function createOrder(paymentSource, amount) {
   try {
     const accessToken = await generateAccessToken();
-    const url = `${baseUrl.sandbox}/v2/checkout/orders`;
+    const url = `${baseUrl[process.env.PAYPAL_MODE]}/v2/checkout/orders`;
 
     const response = await fetch(url, {
       method: "POST",
@@ -127,7 +125,7 @@ async function createOrder(paymentSource, amount) {
 async function capturePayment(orderId) {
   // console.log("orderID: ", orderId);
   const accessToken = await generateAccessToken();
-  const url = `${baseUrl.sandbox}/v2/checkout/orders/${orderId}/capture`;
+  const url = `${baseUrl[process.env.PAYPAL_MODE]}/v2/checkout/orders/${orderId}/capture`;
   const response = await fetch(url, {
     method: "POST",
     headers: {
