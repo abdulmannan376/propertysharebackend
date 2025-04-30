@@ -49,7 +49,7 @@ const genNewVerificationCode = async (req, res) => {
   try {
     const { email } = req.body;
     console.log("email: ", req.body);
-    const verificationCode = Math.round(Math.random() * 1000000);
+    const verificationCode = Math.floor(100000 + Math.random() * 900000);
     const userFound = await Users.findOne({ email: email }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
@@ -221,7 +221,7 @@ const userLogin = async (req, res) => {
         .json({ message: "Wrong password", success: false });
     }
     if (!userFound.emailVerified) {
-      const verificationCode = Math.round(Math.random() * 1000000);
+      const verificationCode = Math.floor(100000 + Math.random() * 900000);
       userFound.emailVerificationCode = verificationCode;
 
       try {
@@ -323,7 +323,7 @@ const userSignUp = async (req, res) => {
     }
 
     const { password } = body;
-    const verificationCode = Math.round(Math.random() * 1000000);
+    const verificationCode = Math.floor(100000 + Math.random() * 900000);
     body.password = CryptoJS.AES.encrypt(password, process.env.PASSWORD_SECRET);
     const newUserDefaultSetting = new UserDefaultSettings();
     const newUserProfile = new UserProfile();
@@ -394,7 +394,7 @@ const resetPasswordGenCode = async (req, res) => {
         .json({ message: "User dont exsist", success: false });
     }
     
-    const verificationCode = Math.round(Math.random() * 1000000);
+    const verificationCode = Math.floor(100000 + Math.random() * 900000);
 
     userFound.resetPasswordVerificationCode = verificationCode;
     userFound.resetPasswordVerified = false;
@@ -412,7 +412,7 @@ const resetPasswordGenCode = async (req, res) => {
         success: true,
       });
     });
-    // const verificationCode = Math.round(Math.random() * 1000000);
+    // const verificationCode = Math.floor(100000 + Math.random() * 900000);
 
     // userFound.resetPasswordVerificationCode = verificationCode;
     // userFound.resetPasswordVerified = false;
@@ -519,7 +519,7 @@ const genNewResetPasswordCode = async (req, res) => {
   try {
     const { email } = req.body;
     console.log("email: ", req.body.email);
-    // const verificationCode = Math.round(Math.random() * 1000000);
+    // const verificationCode = Math.floor(100000 + Math.random() * 900000);
     const userFound = await Users.findOne({ email: email }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
@@ -529,7 +529,7 @@ const genNewResetPasswordCode = async (req, res) => {
         .status(400)
         .json({ message: "Error occured. Try again", success: false });
     }
-    const verificationCode = Math.round(Math.random() * 1000000);
+    const verificationCode = Math.floor(100000 + Math.random() * 900000);
 
     userFound.resetPasswordVerificationCode = verificationCode;
     userFound.resetPasswordVerified = false;
