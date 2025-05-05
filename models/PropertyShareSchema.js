@@ -5,6 +5,7 @@ const PropertyShareSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  publishedByUser: { type: String, required: true, desc: "username" },
   propertyDocID: {
     type: mongoose.Types.ObjectId,
     required: true,

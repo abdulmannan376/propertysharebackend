@@ -359,97 +359,208 @@ const getBuySharesDetailByUsername = async (req, res) => {
 };
 
 const getSharesByProperty = async (req, res) => {
-  try {
-    const { key, status } = req.params;
-    const { category } = req.query;
+  const { username } = req.query;
+  console.log("username", username);
 
-    const propertySharesFound = await PropertyShares.find({
-      propertyDocID: key,
-      utilisedStatus: status,
-      onRent: false,
-      onSale: false,
-      onSwap: false,
-    })
-      .populate("currentOwnerDocID", "username")
-      .exec();
+  if (username) {
+    try {
+      const { key, status } = req.params;
+      const { category, username } = req.query;
 
-    if (!propertySharesFound || propertySharesFound.length === 0) {
-      return res
-        .status(200)
-        .json({ message: "No shares available.", success: true });
-    }
+      const propertySharesFound = await PropertyShares.find({
+        propertyDocID: key,
+        publishedByUser: username,
+        utilisedStatus: "Listed",
+        onRent: false,
+        onSale: false,
+        onSwap: false,
+      })
+        .populate("currentOwnerDocID", "username")
+        .exec();
 
-    let propertyShareExpectOwner = [];
+      if (!propertySharesFound || propertySharesFound.length === 0) {
+        return res
+          .status(200)
+          .json({ message: "No shares available.", success: true });
+      }
 
-    if (category && category === "Rent") {
-      propertyShareExpectOwner = propertySharesFound;
-    } else {
-      propertyShareExpectOwner = propertySharesFound.filter((share) => {
-        return !share.shareID.endsWith("00");
+      let propertyShareExpectOwner = [];
+
+      if (category && category === "Rent") {
+        propertyShareExpectOwner = propertySharesFound;
+      } else {
+        propertyShareExpectOwner = propertySharesFound.filter((share) => {
+          return !share.shareID.endsWith("00");
+        });
+      }
+
+      res.status(200).json({
+        message: "Fetch successfull",
+        success: true,
+        body: propertyShareExpectOwner,
+      });
+    } catch (error) {
+      console.log(`Error: ${error}`, "\nlocation: ", {
+        function: "getSharesByProperty",
+        fileLocation: "controllers/ShareController.js",
+        timestamp: currentDateString,
+      });
+      res.status(500).json({
+        message: error.message || "Internal Server Error",
+        error: error,
+        success: false,
       });
     }
+  } else {
+    try {
+      const { key, status } = req.params;
+      const { category, username } = req.query;
 
-    res.status(200).json({
-      message: "Fetch successfull",
-      success: true,
-      body: propertyShareExpectOwner,
-    });
-  } catch (error) {
-    console.log(`Error: ${error}`, "\nlocation: ", {
-      function: "getSharesByProperty",
-      fileLocation: "controllers/ShareController.js",
-      timestamp: currentDateString,
-    });
-    res.status(500).json({
-      message: error.message || "Internal Server Error",
-      error: error,
-      success: false,
-    });
+      const propertySharesFound = await PropertyShares.find({
+        propertyDocID: key,
+        utilisedStatus: status,
+        onRent: false,
+        onSale: false,
+        onSwap: false,
+      })
+        .populate("currentOwnerDocID", "username")
+        .exec();
+
+      if (!propertySharesFound || propertySharesFound.length === 0) {
+        return res
+          .status(200)
+          .json({ message: "No shares available.", success: true });
+      }
+
+      let propertyShareExpectOwner = [];
+
+      if (category && category === "Rent") {
+        propertyShareExpectOwner = propertySharesFound;
+      } else {
+        propertyShareExpectOwner = propertySharesFound.filter((share) => {
+          return !share.shareID.endsWith("00");
+        });
+      }
+
+      res.status(200).json({
+        message: "Fetch successfull",
+        success: true,
+        body: propertyShareExpectOwner,
+      });
+    } catch (error) {
+      console.log(`Error: ${error}`, "\nlocation: ", {
+        function: "getSharesByProperty",
+        fileLocation: "controllers/ShareController.js",
+        timestamp: currentDateString,
+      });
+      res.status(500).json({
+        message: error.message || "Internal Server Error",
+        error: error,
+        success: false,
+      });
+    }
   }
 };
 
 const getSharesByUsername = async (req, res) => {
   try {
     const { username, propertyID } = req.params;
-
-    const shareholderFound = await Shareholders.findOne({ username: username });
-
-    if (!shareholderFound) {
-      return res
-        .status(400)
-        .json({ message: "No Purchases found.", success: false });
-    }
-
     const propertyFound = await Properties.findOne({ propertyID: propertyID });
+    if (propertyFound.publishedBy === username) {
+    const propertyFound = await Properties.findOne({ propertyID: propertyID });
+    const shareholderFound = await Shareholders.findOne({
+      username: username,
+    });
+      // const sharesByUsername = await PropertyShares.find({
+      //   propertyDocID: propertyFound._id,
+      //   publishedByUser: username,
+      //   utilisedStatus: "Listed",
+      //   // utilisedStatus: { $in: ["Listed", "Purchased"] },
+      // })
+      //   .populate(
+      //     "propertyDocID",
+      //     "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+      //   )
+      //   .exec();
 
-    const sharesByUsername = await PropertyShares.find({
-      propertyDocID: propertyFound._id,
-      currentOwnerDocID: shareholderFound._id,
-      utilisedStatus: "Purchased",
-    })
-      .populate(
-        "propertyDocID",
-        "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
-      )
-      .exec();
-    // const propertySharesFound = await PropertyShares.find({
-    //   propertyDocID: key,
-    //   utilisedStatus: status,
-    //   onRent: false,
-    //   onSale: false,
-    //   onSwap: false,
-    // })
-    //   .populate("currentOwnerDocID", "username")
-    //   .exec();
-    const sharesListWithoutOwner = sharesByUsername.filter((share) => {
-      return !share.shareID.endsWith("00");
-    });
-    console.log("sharesListWithoutOwner==>", sharesListWithoutOwner);
-    res.status(200).json({
-      message: "Fetched",
-      success: true,
-      body: sharesListWithoutOwner,
-    });
+      const [listedShares, purchasedShares] = await Promise.all([
+        PropertyShares.find({
+          propertyDocID: propertyFound._id,
+          publishedByUser: username,
+          utilisedStatus: "Listed",
+        })
+          .populate(
+            "propertyDocID",
+            "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+          )
+          .exec(),
+      
+        PropertyShares.find({
+          propertyDocID: propertyFound._id,
+          currentOwnerDocID: shareholderFound._id,
+          utilisedStatus: "Purchased",
+        })
+          .populate(
+            "propertyDocID",
+            "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+          )
+          .exec(),
+      ]);
+      
+      // merge into one array
+      const sharesByUsername = [...listedShares, ...purchasedShares];
+
+      const sharesListWithoutOwner = sharesByUsername.filter((share) => {
+        return !share.shareID.endsWith("00");
+      });
+      console.log("sharesListWithoutOwner==>", sharesListWithoutOwner);
+      res.status(200).json({
+        message: "Fetched",
+        success: true,
+        body: sharesListWithoutOwner,
+      });
+    } else {
+      const shareholderFound = await Shareholders.findOne({
+        username: username,
+      });
+
+      if (!shareholderFound) {
+        return res
+          .status(400)
+          .json({ message: "No Purchases found.", success: false });
+      }
+
+      // const propertyFound = await Properties.findOne({ propertyID: propertyID });
+
+      const sharesByUsername = await PropertyShares.find({
+        propertyDocID: propertyFound._id,
+        currentOwnerDocID: shareholderFound._id,
+        utilisedStatus: "Purchased",
+      })
+        .populate(
+          "propertyDocID",
+          "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
+        )
+        .exec();
+      // const propertySharesFound = await PropertyShares.find({
+      //   propertyDocID: key,
+      //   utilisedStatus: status,
+      //   onRent: false,
+      //   onSale: false,
+      //   onSwap: false,
+      // })
+      //   .populate("currentOwnerDocID", "username")
+      //   .exec();
+      const sharesListWithoutOwner = sharesByUsername.filter((share) => {
+        return !share.shareID.endsWith("00");
+      });
+      console.log("sharesListWithoutOwner==>", sharesListWithoutOwner);
+      res.status(200).json({
+        message: "Fetched",
+        success: true,
+        body: sharesListWithoutOwner,
+      });
+    }
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "getSharesByUsername",
@@ -709,8 +820,45 @@ async function notifyWishlistUsers(propertyID, propertyTitle, category) {
 const handleShareByCategory = async (req, res) => {
   try {
     const { shareID, username, category, price, action } = req.body;
+    const propertyShareFound1 = await PropertyShares.findOne({
+      shareID: shareID,
+    });
+    const shareholderFound = await Shareholders.findOne({
+      username: username,
+    });
+    let propertyShareFound = "";
+    const propertyFound = await Properties.findOne({
+      _id: propertyShareFound1.propertyDocID,
+    });
+    if (propertyShareFound1.publishedByUser === username && propertyShareFound1.utilisedStatus !== "Purchased") {
+      // console.log("not comed inside propertyShareFound1 if");
+      
+      (propertyShareFound1.currentOwnerDocID = shareholderFound._id),
+        (propertyShareFound1.utilisedStatus = "Purchased"),
+        await propertyShareFound1.save();
+  
+      propertyShareFound = propertyShareFound1;
 
-    console.log(req.body);
+      const stakesOccupied = propertyFound.stakesOccupied;
+      await Properties.updateOne(
+        { _id: propertyFound._id },
+        {
+          $set: {
+            stakesOccupied: stakesOccupied + 1,
+          },
+        },
+      );
+    }
+    if (propertyShareFound1.publishedByUser === username && propertyShareFound1.utilisedStatus === "Purchased"){
+      if(propertyShareFound1.onSale){
+        propertyShareFound= propertyShareFound1
+      }else if(propertyShareFound1.onRent){
+        propertyShareFound= propertyShareFound1
+      }else if(propertyShareFound1.onSwap){
+        propertyShareFound= propertyShareFound1
+      }
+    }
+    console.log("req.body",req.body);
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
@@ -718,34 +866,43 @@ const handleShareByCategory = async (req, res) => {
     if (!userFound) {
       return res.status(400).json({ message: "Try again.", success: false });
     }
-
-    const shareholderFound = await Shareholders.findOne({ username: username });
     if (!shareholderFound) {
       return res.status(403).json({
         message: "No purchase found with this share.",
         success: false,
       });
     }
-
-    const propertyShareFound = await PropertyShares.findOne({
-      shareID: shareID,
-      currentOwnerDocID: shareholderFound._id,
-      utilisedStatus: "Purchased",
-    });
+    if (propertyShareFound1.publishedByUser !== username) {
+      propertyShareFound = await PropertyShares.findOne({
+        shareID: shareID,
+        currentOwnerDocID: shareholderFound._id,
+        utilisedStatus: "Purchased",
+      });
+    }
     if (!propertyShareFound) {
       throw new Error(`property share not available for ${category}.`);
     }
 
-    const propertyFound = await Properties.findOne({
-      _id: propertyShareFound.propertyDocID,
-    });
+
 
     if (category === "Rent") {
       if (propertyShareFound.onRent) {
         propertyFound.stakesOnRent -= 1;
 
         propertyShareFound.onRent = false;
-
+        if (propertyShareFound.publishedByUser === username) {
+          propertyShareFound.currentOwnerDocID = null;
+          propertyShareFound.utilisedStatus = "Listed";
+          const stakesOccupied = propertyFound.stakesOccupied;
+          await Properties.updateOne(
+            { _id: propertyFound._id },
+            {
+              $set: {
+                stakesOccupied: stakesOccupied - 1,
+              },
+            },
+          );
+        }
         const shareOfferList = await ShareOffers.find({
           shareDocID: propertyShareFound._id,
           category: "Rent",
@@ -775,11 +932,25 @@ const handleShareByCategory = async (req, res) => {
         propertyShareFound.priceByCategory = price;
       }
     } else if (category === "Sell") {
+      console.log("propertyShareFound",propertyShareFound);
+      
       if (propertyShareFound.onSale) {
         propertyFound.stakesOnSale -= 1;
 
         propertyShareFound.onSale = false;
-
+        if (propertyShareFound.publishedByUser === username) {
+          propertyShareFound.currentOwnerDocID = null;
+          propertyShareFound.utilisedStatus = "Listed";
+          const stakesOccupied = propertyFound.stakesOccupied;
+          await Properties.updateOne(
+            { _id: propertyFound._id },
+            {
+              $set: {
+                stakesOccupied: stakesOccupied - 1,
+              },
+            },
+          );
+        }
         const shareOfferList = await ShareOffers.find({
           shareDocID: propertyShareFound._id,
           category: "Sell",
@@ -828,8 +999,22 @@ const handleShareByCategory = async (req, res) => {
         await Promise.all(updatedShareOfferListPromises);
 
         propertyShareFound.onSwap = false;
+          if (propertyShareFound.publishedByUser === username) {
+          propertyShareFound.currentOwnerDocID = null;
+          propertyShareFound.utilisedStatus = "Listed";
+          const stakesOccupied = propertyFound.stakesOccupied;
+          await Properties.updateOne(
+            { _id: propertyFound._id },
+            {
+              $set: {
+                stakesOccupied: stakesOccupied - 1,
+              },
+            },
+          );
+        }
       } else {
         propertyShareFound.onSwap = true;
+      
       }
     }
 
@@ -844,11 +1029,13 @@ const handleShareByCategory = async (req, res) => {
             price
           );
         } else {
+          if(propertyShareFound.onSale){
           createNewShareOfferForAdmin(
             propertyShareFound.shareID,
             category,
             price
           );
+        }
         }
       }
       const subject = "Property Share status updated.";
@@ -870,6 +1057,7 @@ const handleShareByCategory = async (req, res) => {
         success: true,
       });
     });
+    // }
   } catch (error) {
     console.log(`Error: ${error}`, "\nlocation: ", {
       function: "rentShare",
@@ -948,7 +1136,7 @@ const getSharesByCategory = async (req, res) => {
 
 const reserveShare = async (req, res) => {
   try {
-    const { username, shareID,price } = req.body;
+    const { username, shareID, price } = req.body;
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
@@ -994,9 +1182,7 @@ const reserveShare = async (req, res) => {
     // Payment Processing Logic
     const companyFeePercentage =
       parseInt(process.env.COMPANY_FEE_PERCENTAGE) / 100;
-    const companyFee = Math.ceil(
-      parseInt(price) * companyFeePercentage
-    );
+    const companyFee = Math.ceil(parseInt(price) * companyFeePercentage);
 
     const newPayment = new Payments({
       gatewayTransactionID: "",
@@ -3218,21 +3404,21 @@ async function handleShareReservation() {
     }
     if (sharesListOfExpired.length > 0) {
       for (const share of sharesListOfExpired) {
-     // Find a single pending payment for the share with category "Buy Share"
-     const payment = await Payments.findOne({
-      status: "Pending",
-      shareDocID: share._id,
-      category: { $in: ["Buy Share"] },
-    });
+        // Find a single pending payment for the share with category "Buy Share"
+        const payment = await Payments.findOne({
+          status: "Pending",
+          shareDocID: share._id,
+          category: { $in: ["Buy Share"] },
+        });
 
-    if (payment) {
-      await Payments.updateOne(
-        { _id: payment._id },
-        { $set: { status: "Expired" } }
-      );
-    }
-        
-        // come here for expire of the payment for share reservation 
+        if (payment) {
+          await Payments.updateOne(
+            { _id: payment._id },
+            { $set: { status: "Expired" } }
+          );
+        }
+
+        // come here for expire of the payment for share reservation
         const subject = `Property Reservation Expired.`;
         const body = `Dear ${share.reservedByUser.name}, \nYour share reservation in ${share.property.title} is expired. \nRegards, \nBeach Bunny House.`;
 

@@ -478,6 +478,7 @@ const addNewProperty = async (req, res) => {
         },
         propertyDocID: newProperty._id,
         shareID: `${newProperty.propertyID}${shareIndex}`,
+        publishedByUser:body.username
       });
       // console.log("1");
       await newPropertyShare.save();
