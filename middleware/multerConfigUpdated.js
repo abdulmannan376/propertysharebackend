@@ -1,61 +1,8 @@
+// middleware/multerConfigUpdated.js
+// ─────────────────────────────────────
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 
-// Function to reorganize files in the directory
-function reorganizeFiles(directory, deleteIndices = []) {
-  console.log(directory, deleteIndices);
-  const files = fs
-    .readdirSync(directory)
-    .filter((file) => file.startsWith("image-"));
-  // Delete files as per indices provided
-  deleteIndices.sort((a, b) => b - a); // Sort indices in descending order for deletion
-  deleteIndices.forEach((index) => {
-    const filePath = path.join(directory, files[index]);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  });
-  // Rename remaining files to maintain sequence
-  const remainingFiles = fs
-    .readdirSync(directory)
-    .filter((file) => file.startsWith("image-"));
-  remainingFiles.forEach((file, index) => {
-    const newFileName = `image-${index + 1}${path.extname(file)}`;
-    const oldFilePath = path.join(directory, file);
-    const newFilePath = path.join(directory, newFileName);
-    fs.renameSync(oldFilePath, newFilePath);
-  });
-}
+// In-memory storage so we can hand a Buffer to sharp()
+const storage = multer.memoryStorage();
 
-// Configure storage for Multer
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const body = req.body;
-    const uploadPath = `uploads/Inspections/${body.propertyID}/${body.shareID}/${body.inspectionID}`;
-    // Ensure the upload directory exists
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    // Delete specified images before saving new ones
-    if (req.body.deleteImageList) {
-      reorganizeFiles(uploadPath, req.body.deleteImageList.map(Number));
-    }
-    console.log(req.body);
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const body = req.body;
-    const directory = `uploads/Inspections/${body.propertyID}/${body.shareID}/${body.inspectionID}/`;
-    const files = fs
-      .readdirSync(directory)
-      .filter((file) => file.startsWith("image-"));
-    const imageNumber = files.length + 1; // Assign next number in sequence
-    const filename = `image-${imageNumber}${path.extname(file.originalname)}`;
-    cb(null, filename);
-  },
-});
-
-const updatedUpload = multer({ storage: storage });
-
-module.exports = updatedUpload;
+module.exports = multer({ storage });

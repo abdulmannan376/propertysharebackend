@@ -11,6 +11,7 @@ const { default: slugify } = require("slugify");
 const fs = require("fs");
 const fsPromises = require("fs/promises"); // Use promises version for async operations
 const path = require("path");
+const sharp = require("sharp");
 const { match } = require("assert");
 const compCities = require("countrycitystatejson");
 const Shareholders = require("../models/ShareholderSchema");
@@ -478,7 +479,7 @@ const addNewProperty = async (req, res) => {
         },
         propertyDocID: newProperty._id,
         shareID: `${newProperty.propertyID}${shareIndex}`,
-        publishedByUser:body.username
+        publishedByUser: body.username,
       });
       // console.log("1");
       await newPropertyShare.save();
@@ -886,7 +887,9 @@ async function openInspections() {
       }).populate("userDefaultSettingID", "notifyUpdates");
 
       const subject = `Share Inspection Status`;
-      const body = `Dear ${user.name}, \nYour Property Share titled "${share.propertyDocID?.title}" (Share Duration: ${share.propertyDocID.availableInDuration.startDate.toDateString()} - ${share.propertyDocID.availableInDuration.endDate.toDateString()}) has started its inspection process because the end date has been reached and the inspection is pending submission. \nRegards, \nBeach Bunny House.`;
+      const body = `Dear ${user.name}, \nYour Property Share titled "${
+        share.propertyDocID?.title
+      }" (Share Duration: ${share.propertyDocID.availableInDuration.startDate.toDateString()} - ${share.propertyDocID.availableInDuration.endDate.toDateString()}) has started its inspection process because the end date has been reached and the inspection is pending submission. \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
@@ -1066,60 +1069,168 @@ const fetchShareInspectionByUsername = async (req, res) => {
   }
 };
 
+/**
+ * After multer has saved each file (named image-*.png),
+ * convert the on-disk bytes to true PNG (lossless) with metadata.
+ */
+// async function convertFilesToPng(files) {
+//   await Promise.all(
+//     files.map(async (file) => {
+//       const p = file.path; // e.g. uploads/.../image-3.png
+//       // read/convert/write back
+//       const buffer = await sharp(p)
+//         .withMetadata()      // preserve EXIF, DPI, orientation
+//         .toFormat("png")     // format-only change
+//         .toBuffer();
+//       fs.writeFileSync(p, buffer);
+//     })
+//   );
+// }
+
+// const handleInspectionSubmission = async (req, res) => {
+//   try {
+//     const {
+//       username,
+//       inspectionID,
+//       propertyID,
+//       shareID,
+//       propertyTitle,
+//       userName,
+//       comment,
+//     } = req.body;
+
+//     // 1) Load user & inspection
+//     const userFound = await Users.findOne({ username })
+//       .populate("userDefaultSettingID", "notifyUpdates");
+//     const inspectionFound = await PropertyInspection.findOne({ inspectionID });
+//     if (!inspectionFound) throw new Error("Inspection not found.");
+
+//     // 2) Immediately convert every newly saved file to PNG
+//     await convertFilesToPng(req.files);
+
+//     // 3) Update imageDirURL & count
+//     const uploadPath = `uploads/Inspections/${propertyID}/${shareID}/${inspectionFound.inspectionID}`;
+//     inspectionFound.imageDirURL = uploadPath;
+//     inspectionFound.imageCount = fs
+//       .readdirSync(uploadPath)
+//       .filter(f => f.startsWith("image-")).length;
+
+//     // 4) Other existing logic
+//     // inspectionFound.commentsByShareholder = comment;
+//     // inspectionFound.status = "In Progress";
+//     await inspectionFound.save();
+
+//     // 5) Notify
+//     // const subject = `Inspection for property (${propertyTitle})`;
+//     // const emailBody = 
+//     //   `Hello ${userName},\n` +
+//     //   `Your inspection has been submitted and will be reviewed by other shareholders. ` +
+//     //   `Once it passes an 80% approval vote, your inspection will close successfully.\n\n` +
+//     //   `Regards,\nBunny Beach House.`;
+
+//     // sendUpdateNotification(
+//     //   subject,
+//     //   emailBody,
+//     //   userFound.userDefaultSettingID.notifyUpdates,
+//     //   username
+//     // );
+
+//     // return res.status(200).json({
+//     //   message: "Inspection images updated successfully.",
+//     //   success: true,
+//     // });
+//   } catch (error) {
+//     console.error("handleInspectionSubmission error:", error);
+//     return res.status(500).json({
+//       message: error.message || "Internal Server Error",
+//       success: false,
+//     });
+//   }
+// };
+
+
+/**
+ * Deletes all existing image-*.png (or any extension) in a folder.
+ */
+function clearAllImages(directory) {
+  if (!fs.existsSync(directory)) return;
+  fs.readdirSync(directory)
+    .filter(f => f.startsWith("image-"))
+    .forEach(f => fs.unlinkSync(path.join(directory, f)));
+}
+
 const handleInspectionSubmission = async (req, res) => {
   try {
-    const body = req.body;
-    const files = req.files;
+    const {
+      username,
+      inspectionID,
+      propertyID,
+      shareID,
+      propertyTitle,
+      userName,   // for emailBody
+      comment,
+    } = req.body;
+    const files = req.files; // each has a .buffer
 
-    console.log(body);
+    // 1) Load user & inspection
+    const userFound = await Users.findOne({ username })
+      .populate("userDefaultSettingID", "notifyUpdates");
+    const inspectionFound = await PropertyInspection.findOne({ inspectionID });
+    if (!inspectionFound) throw new Error("Inspection not found.");
 
-    const userFound = await Users.findOne({ username: body.username }).populate(
-      "userDefaultSettingID",
-      "notifyUpdates"
+    // 2) Prepare folder, clear out old images
+    const uploadPath = `uploads/Inspections/${propertyID}/${shareID}/${inspectionFound.inspectionID}`;
+    fs.mkdirSync(uploadPath, { recursive: true });
+    clearAllImages(uploadPath);
+
+    // 3) Convert+save each new buffer → PNG with metadata preserved
+    await Promise.all(
+      files.map(async (file, idx) => {
+        if (!file.buffer) {
+          throw new Error("Missing file.buffer—check your Multer config");
+        }
+        const outName = `image-${idx + 1}.png`;
+        const outPath = path.join(uploadPath, outName);
+
+        await sharp(file.buffer)
+          .withMetadata()       // preserve EXIF, orientation, DPI
+          .toFormat("png")      // switch format only
+          .toFile(outPath);
+      })
     );
 
-    const inspectionFound = await PropertyInspection.findOne({
-      inspectionID: body.inspectionID,
-    });
-    if (!inspectionFound) {
-      throw new Error("inspection not found.");
-    }
-
-    const uploadPath = `uploads/Inspections/${body.propertyID}/${body.shareID}/${inspectionFound.inspectionID}`;
-
-    // Update property with new information
+    // 4) Update the inspection document
     inspectionFound.imageDirURL = uploadPath;
     inspectionFound.imageCount = fs
       .readdirSync(uploadPath)
-      .filter((file) => file.startsWith("image-")).length;
-
-    inspectionFound.commentsByShareholder = body.comment;
+      .filter(f => f.startsWith("image-")).length;
+    inspectionFound.commentsByShareholder = comment;
     inspectionFound.status = "In Progress";
     await inspectionFound.save();
 
-    const subject = `Inspection for property (${body.propertyTitle})`;
-    const emailBody = `Hello ${body.userName},\nYour inspection is submitted and will be reviewed by other shareholders. Once it passes 80% successfull vote your inspection closes successfully.\nRegards,\nBunny Beach House.`;
+    // 5) Send notification
+    const subject = `Inspection for property (${propertyTitle})`;
+    const emailBody =
+      `Hello ${userName},\n` +
+      `Your inspection is submitted and will be reviewed by other shareholders. ` +
+      `Once it passes 80% successful vote your inspection closes successfully.\n\n` +
+      `Regards,\nBunny Beach House.`;
 
     sendUpdateNotification(
       subject,
       emailBody,
       userFound.userDefaultSettingID.notifyUpdates,
-      body.username
+      username
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Inspection images updated successfully.",
       success: true,
     });
   } catch (error) {
-    console.log(`Error: ${error}`, "\nlocation: ", {
-      function: "handleInspectionSubmission",
-      fileLocation: "controllers/PropertyController.js",
-      timestamp: currentDateString,
-    });
-    res.status(500).json({
+    console.error("handleInspectionSubmission error:", error);
+    return res.status(500).json({
       message: error.message || "Internal Server Error",
-      error: error,
       success: false,
     });
   }
@@ -1347,9 +1458,13 @@ async function notifyPropertyShareOwnerByPropertyID(
       emailSubject || `Property ${propertyFound.title} ${category} requested`;
     const body =
       emailBody ||
-      `Dear ${share?.currentOwnerDocID?.userID?.name}, It is to inform you a new ${category} is requested for property ${propertyFound.title} (Share Duration: ${share.availableInDuration.startDate.toDateString()} - ${share.availableInDuration.endDate.toDateString()}).Please go to the "Inspections" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${share.currentOwnerDocID.username} \nRegards, \nBeach Bunny House.`;
-
-     
+      `Dear ${
+        share?.currentOwnerDocID?.userID?.name
+      }, It is to inform you a new ${category} is requested for property ${
+        propertyFound.title
+      } (Share Duration: ${share.availableInDuration.startDate.toDateString()} - ${share.availableInDuration.endDate.toDateString()}).Please go to the "Inspections" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${
+        share.currentOwnerDocID.username
+      } \nRegards, \nBeach Bunny House.`;
 
     sendUpdateNotification(
       subject,
@@ -1413,16 +1528,38 @@ const getInspectionDetail = async (req, res) => {
   }
 };
 
+// same logic you had in middleware
+function reorganizeFiles(directory, deleteIndices = []) {
+  const files = fs
+    .readdirSync(directory)
+    .filter((file) => file.startsWith("image-"));
+  deleteIndices
+    .map(Number)
+    .sort((a, b) => b - a)
+    .forEach((idx) => {
+      const fp = path.join(directory, files[idx]);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    });
+  fs
+    .readdirSync(directory)
+    .filter((f) => f.startsWith("image-"))
+    .forEach((file, i) => {
+      const newName = `image-${i + 1}${path.extname(file)}`;
+      fs.renameSync(
+        path.join(directory, file),
+        path.join(directory, newName)
+      );
+    });
+}
+
 const genRaiseRequest = async (req, res) => {
   try {
-    const { propertyID, username, title, details, price, type, URLsList } =
+    const { propertyID, username, title, details, price, type, URLsList, deleteImageList } =
       req.body;
+    const files = req.files; // now with .buffer only
 
-    const files = req.files;
-
-    const shareholderFound = await Shareholders.findOne({
-      username: username,
-    }).populate({
+    // 1) Lookup shareholder & property (unchanged)
+    const shareholderFound = await Shareholders.findOne({ username }).populate({
       path: "userID",
       model: "users",
       select: "name userDefaultSettingID",
@@ -1432,32 +1569,24 @@ const genRaiseRequest = async (req, res) => {
         select: "notifyUpdates",
       },
     });
+    if (!shareholderFound) throw new Error("No record found.");
 
-    if (!shareholderFound) {
-      throw new Error("No record found.");
-    }
-
-    const propertyFound = await Properties.findOne({
-      propertyID: propertyID,
-    }).populate({
+    const propertyFound = await Properties.findOne({ propertyID }).populate({
       path: "shareDocIDList",
       model: "property_shares",
       select: "shareID currentOwnerDocID",
     });
-    if (!propertyFound) {
-      throw new Error("property not found.");
-    }
+    if (!propertyFound) throw new Error("property not found.");
 
-    console.log(propertyFound);
-    const ownerShare = propertyFound.shareDocIDList.filter((share) => {
-      return share.shareID.endsWith("00");
-    });
+    const ownerShare = propertyFound.shareDocIDList.filter((s) =>
+      s.shareID.endsWith("00")
+    );
 
-    console.log(ownerShare);
+    // 2) Make the RaiseRequest doc
     const newRaiseRequest = new RaiseRequest({
-      title: title,
+      title,
       estimatedPrice: price,
-      details: details,
+      details,
       requestType: type,
       propertyDocID: propertyFound._id,
       shareholderDocID: shareholderFound._id,
@@ -1465,34 +1594,42 @@ const genRaiseRequest = async (req, res) => {
       propertyOwnerDocID: ownerShare[0].currentOwnerDocID,
     });
 
+    // 3) Build and prepare the upload folder
     const today = new Date();
+    const folderName = `${today.getDate() + 1}-${today.getMonth()}-${today.getFullYear()}`;
+    const uploadPath = `uploads/RaiseRequest/${propertyID}/${folderName}/`;
+    fs.mkdirSync(uploadPath, { recursive: true });
 
-    const uploadPath = `uploads/RaiseRequest/${propertyID}/${
-      today.getDate() + 1
-    }-${today.getMonth()}-${today.getFullYear()}/`;
+    // run your delete/reorg from deleteImageList exactly as before
+    if (deleteImageList) reorganizeFiles(uploadPath, deleteImageList);
 
-    // Update property with new information
+    // 4) Write every incoming buffer → PNG files named image-1.png, image-2.png, …
     if (files.length > 0) {
+      await Promise.all(
+        files.map((file, idx) => {
+          const outName = `image-${idx + 1}.png`;
+          const outPath = path.join(uploadPath, outName);
+          return sharp(file.buffer)
+            .withMetadata()
+            .png()
+            .toFile(outPath);
+        })
+      );
+
       newRaiseRequest.imageDir = uploadPath;
-      newRaiseRequest.imageCount = fs
-        .readdirSync(uploadPath)
-        .filter((file) => file.startsWith("image-")).length;
+      newRaiseRequest.imageCount = files.length;
     }
 
-    await newRaiseRequest.save().then(() => {
-      notifyPropertyShareOwnerByPropertyID(propertyID, type);
-    });
+    // 5) Save + notify
+    await newRaiseRequest.save();
+    notifyPropertyShareOwnerByPropertyID(propertyID, type);
 
-    res.status(201).json({ message: "New Request added.", success: true });
+    return res.status(201).json({ message: "New Request added.", success: true });
   } catch (error) {
-    console.log(`Error: ${error}`, "\nlocation: ", {
-      function: "genRaiseRequest",
-      fileLocation: "controllers/PropertyController.js",
-      timestamp: currentDateString,
-    });
-    res.status(500).json({
+    console.error("Error in genRaiseRequest:", error);
+    return res.status(500).json({
       message: error.message || "Internal Server Error",
-      error: error,
+      error,
       success: false,
     });
   }
@@ -1502,7 +1639,7 @@ const fetchRaisedRequestByUsername = async (req, res) => {
   try {
     const { username, type, action } = req.params;
 
-    console.log("req.perms",req.params);
+    console.log("req.perms", req.params);
     const shareholderFound = await Shareholders.findOne({ username: username });
     if (!shareholderFound) {
       throw new Error(`No record of ${type} Request found.`);
@@ -1962,7 +2099,9 @@ const handleRaiseRequestActionPropertyOwner = async (req, res) => {
         const userSubject = `Property ${raiseRequestFound.propertyDocID.title} ${raiseRequestFound.requestType} status`;
         const userBody = `Dear ${user.name}, \nProperty, ${
           raiseRequestFound.propertyDocID.title
-        }, ${raiseRequestFound.requestType.toLowerCase()} request is approved by the property owner.Please go to the "Inspections" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${user.username} \nRegards, \nBeach Bunny House.`;
+        }, ${raiseRequestFound.requestType.toLowerCase()} request is approved by the property owner.Please go to the "Inspections" tab \n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${
+          user.username
+        } \nRegards, \nBeach Bunny House.`;
 
         sendUpdateNotification(
           userSubject,
@@ -2021,83 +2160,83 @@ async function handleVotingDaysOfRaisedRequest() {
   }
 }
 
+/**
+ * Delete all existing image-*.png (or any extension) in a folder.
+ */
+function clearAllImages(directory) {
+  if (!fs.existsSync(directory)) return;
+  fs.readdirSync(directory)
+    .filter((f) => f.startsWith("image-"))
+    .forEach((f) => fs.unlinkSync(path.join(directory, f)));
+}
+
 const addPropertyImages = async (req, res) => {
   try {
-    const body = req.body;
-    const files = req.files;
+    const { propertyID, pinnedImage, userRole, userName, email } = req.body;
 
-    console.log(body);
-    const propertyFound = await Properties.findOne({
-      propertyID: body.propertyID,
-    });
-
+    // 1) Lookup property
+    const propertyFound = await Properties.findOne({ propertyID });
     if (!propertyFound) {
       return res
         .status(400)
         .json({ message: "Property not found", success: false });
     }
 
-    const uploadPath = `uploads/${body.propertyID}/`;
-    // Ensure the upload directory exists
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
+    // 2) Prepare upload folder, then clear all existing images
+    const uploadPath = `uploads/${propertyID}/`;
+    fs.mkdirSync(uploadPath, { recursive: true });
+    clearAllImages(uploadPath);
+
+    // 3) Convert + save each new upload → PNG, starting from 1
+    await Promise.all(
+      req.files.map(async (file, idx) => {
+        if (!file.buffer) {
+          throw new Error("Missing file.buffer—check your Multer config");
+        }
+        const imageIndex = idx + 1;
+        const outName = `image-${imageIndex}.png`;
+        const outPath = path.join(uploadPath, outName);
+
+        await sharp(file.buffer)
+          .withMetadata() // keep original metadata
+          .toFormat("png") // exactly switch format to PNG
+          .toFile(outPath);
+      })
+    );
+
+    // 4) Update pinned image if provided
+    if (pinnedImage != null) {
+      propertyFound.pinnedImageIndex = parseInt(pinnedImage, 10);
     }
 
-    // Save new files (assuming diskStorage is used and files are automatically saved)
-    const imageCount = propertyFound.imageCount;
-    files.forEach((file, index) => {
-      console.log("in addpropertyimages file: ", file);
-      const newFilename = `image-${imageCount + index + 1}${path.extname(
-        file.originalname
-      )}`;
-
-      const oldPath = file.path;
-      const newPath = path.join(uploadPath, newFilename);
-
-      // Rename file to maintain naming convention
-      fs.renameSync(oldPath, newPath);
-    });
-
-    // Handle deletion of specified images
-    if (body.deleteImageList && body.deleteImageList?.length) {
-      reorganizeFiles(uploadPath, body.deleteImageList.map(Number));
-    }
-
-    if (body.pinnedImage) {
-      propertyFound.pinnedImageIndex = parseInt(body.pinnedImage);
-    }
-
-    // Update property with new information
+    // 5) Recount + listing status + save
     propertyFound.imageDirURL = uploadPath;
     propertyFound.imageCount = fs
       .readdirSync(uploadPath)
-      .filter((file) => file.startsWith("image-")).length;
+      .filter((f) => f.startsWith("image-")).length;
     propertyFound.listingStatus =
-      body.userRole === "admin" ? "live" : "pending approval";
+      userRole === "admin" ? "live" : "pending approval";
 
     await propertyFound.save();
 
-    const subject = `Property (${body.propertyID}) status of listing.`;
+    // 6) Send notification email
+    const subject = `Property (${propertyID}) status of listing.`;
     const emailBody =
-      body.userRole === "admin"
-        ? `Hello ${body.userName},\nYour property with title: ${propertyFound.title}, is successfully live on our platform.\nRegards,\nBunny Beach House.`
-        : `Hello ${body.userName},\nYour property with title: ${body.title}, is under review for approval.\nRegards,\nBunny Beach House.`;
+      userRole === "admin"
+        ? `Hello ${userName},\nYour property "${propertyFound.title}" is now live on our platform.\nRegards,\nBunny Beach House.`
+        : `Hello ${userName},\nYour property "${propertyFound.title}" is under review for approval.\nRegards,\nBunny Beach House.`;
 
-    sendEmail(body.email, subject, emailBody);
+    sendEmail(email, subject, emailBody);
 
-    res.status(200).json({
-      message: "Property images updated successfully.",
+    // 7) Final response
+    return res.status(200).json({
+      message: "Property images replaced successfully.",
       success: true,
     });
   } catch (error) {
-    console.error(`Error in addPropertyImages: ${error}\n`, {
-      function: "addPropertyImages",
-      fileLocation: "controllers/PropertyController.js",
-      timestamp: new Date().toISOString(),
-    });
-    res.status(500).json({
+    console.error("addPropertyImages error:", error);
+    return res.status(500).json({
       message: error.message || "Internal Server Error",
-      error: error,
       success: false,
     });
   }
@@ -2352,23 +2491,23 @@ const getFeaturedProperty = async (req, res) => {
 
     pipeline.push({ $match: matchQuery });
     if (category && category === "rent") {
-    // Lookup to join with the PropertyShares collection
-    pipeline.push({
-      $lookup: {
-        from: "property_shares", // Collection name for shares
-        localField: "_id", // `_id` in the `properties` collection
-        foreignField: "propertyDocID", // Link field in `property_shares`
-        as: "shares", // Output field containing the matching shares
-      },
-    });
+      // Lookup to join with the PropertyShares collection
+      pipeline.push({
+        $lookup: {
+          from: "property_shares", // Collection name for shares
+          localField: "_id", // `_id` in the `properties` collection
+          foreignField: "propertyDocID", // Link field in `property_shares`
+          as: "shares", // Output field containing the matching shares
+        },
+      });
 
-    // Add a $match stage to filter for properties with shares on rent
-    pipeline.push({
-      $match: {
-        "shares.onRent": true,
-      },
-    });
-  }
+      // Add a $match stage to filter for properties with shares on rent
+      pipeline.push({
+        $match: {
+          "shares.onRent": true,
+        },
+      });
+    }
     // Lookup to join with the PropertyAmenities collection
     pipeline.push({
       $lookup: {
@@ -2515,22 +2654,22 @@ const getMostViewedProperties = async (req, res) => {
     pipeline.push({ $match: matchQuery });
     // Lookup to join with the PropertyShares collection
     if (category && category === "rent") {
-    pipeline.push({
-      $lookup: {
-        from: "property_shares", // Collection name for shares
-        localField: "_id", // `_id` in the `properties` collection
-        foreignField: "propertyDocID", // Link field in `property_shares`
-        as: "shares", // Output field containing the matching shares
-      },
-    });
+      pipeline.push({
+        $lookup: {
+          from: "property_shares", // Collection name for shares
+          localField: "_id", // `_id` in the `properties` collection
+          foreignField: "propertyDocID", // Link field in `property_shares`
+          as: "shares", // Output field containing the matching shares
+        },
+      });
 
-    // Add a $match stage to filter for properties with shares on rent
-    pipeline.push({
-      $match: {
-        "shares.onRent": true,
-      },
-    });
-  }
+      // Add a $match stage to filter for properties with shares on rent
+      pipeline.push({
+        $match: {
+          "shares.onRent": true,
+        },
+      });
+    }
     // Lookup to join with the PropertyAmenities collection
     pipeline.push({
       $lookup: {
@@ -2681,22 +2820,22 @@ const getRecentlyAddedProperties = async (req, res) => {
     pipeline.push({ $match: matchQuery });
     // Lookup to join with the PropertyShares collection
     if (category && category === "rent") {
-    pipeline.push({
-      $lookup: {
-        from: "property_shares", // Collection name for shares
-        localField: "_id", // `_id` in the `properties` collection
-        foreignField: "propertyDocID", // Link field in `property_shares`
-        as: "shares", // Output field containing the matching shares
-      },
-    });
+      pipeline.push({
+        $lookup: {
+          from: "property_shares", // Collection name for shares
+          localField: "_id", // `_id` in the `properties` collection
+          foreignField: "propertyDocID", // Link field in `property_shares`
+          as: "shares", // Output field containing the matching shares
+        },
+      });
 
-    // Add a $match stage to filter for properties with shares on rent
-    pipeline.push({
-      $match: {
-        "shares.onRent": true,
-      },
-    });
-  }
+      // Add a $match stage to filter for properties with shares on rent
+      pipeline.push({
+        $match: {
+          "shares.onRent": true,
+        },
+      });
+    }
     // Lookup to join with the PropertyAmenities collection
     pipeline.push({
       $lookup: {
@@ -3211,28 +3350,29 @@ async function calPropertyDurationCompletion() {
     "shareDocIDList.availableInDuration.endDate": currentMidnight,
     listingStatus: "live",
   }).populate({
-      path: "shareDocIDList",
-      model: "property_shares",
-      select: "availableInDuration shareID _id currentOwnerDocID utilisedStatus originalOwnerDocID",
+    path: "shareDocIDList",
+    model: "property_shares",
+    select:
+      "availableInDuration shareID _id currentOwnerDocID utilisedStatus originalOwnerDocID",
+    populate: {
+      path: "currentOwnerDocID",
+      model: "shareholders",
+      select: "userID username",
       populate: {
-        path: "currentOwnerDocID",
-        model: "shareholders",
-        select: "userID username",
+        path: "userID",
+        model: "users",
+        select: "name userDefaultSettingID",
         populate: {
-          path: "userID",
-          model: "users",
-          select: "name userDefaultSettingID",
-          populate: {
-            path: "userDefaultSettingID",
-            model: "user_default_settings",
-            select: "notifyUpdates",
-          },
+          path: "userDefaultSettingID",
+          model: "user_default_settings",
+          select: "notifyUpdates",
         },
       },
-    });
+    },
+  });
 
-  const filteredProperties = properties.filter(property =>
-    property.shareDocIDList.some(share => share.utilisedStatus === "On Swap")
+  const filteredProperties = properties.filter((property) =>
+    property.shareDocIDList.some((share) => share.utilisedStatus === "On Swap")
   );
 
   for (const property of filteredProperties) {
@@ -3258,24 +3398,28 @@ async function calPropertyDurationCompletion() {
           if (originalOwner) {
             // Add to purchased if not present
             const isInPurchased = originalOwner.purchasedShareIDList.some(
-              entry => entry.shareDocID.toString() === share._id.toString()
+              (entry) => entry.shareDocID.toString() === share._id.toString()
             );
             if (!isInPurchased) {
-              originalOwner.purchasedShareIDList.push({ shareDocID: share._id });
+              originalOwner.purchasedShareIDList.push({
+                shareDocID: share._id,
+              });
             }
             // Remove from sold
-            originalOwner.soldShareIDList = originalOwner.soldShareIDList.filter(
-              entry => entry.shareDocID.toString() !== share._id.toString()
-            );
+            originalOwner.soldShareIDList =
+              originalOwner.soldShareIDList.filter(
+                (entry) => entry.shareDocID.toString() !== share._id.toString()
+              );
             await originalOwner.save();
           }
 
           // Update previous owner's purchased list
           const previousOwner = await Shareholders.findById(previousOwnerId);
           if (previousOwner) {
-            previousOwner.purchasedShareIDList = previousOwner.purchasedShareIDList.filter(
-              entry => entry.shareDocID.toString() !== share._id.toString()
-            );
+            previousOwner.purchasedShareIDList =
+              previousOwner.purchasedShareIDList.filter(
+                (entry) => entry.shareDocID.toString() !== share._id.toString()
+              );
             await previousOwner.save();
           }
         } catch (error) {
@@ -3286,7 +3430,7 @@ async function calPropertyDurationCompletion() {
     }
   }
   // Find properties where the last share's end date is at current midnight
-   properties = await Properties.find({
+  properties = await Properties.find({
     "shareDocIDList.availableInDuration.endDate": currentMidnight,
     listingStatus: "live",
   }).populate({
@@ -3312,7 +3456,7 @@ async function calPropertyDurationCompletion() {
 
   for (const property of properties) {
     const shareList = property.shareDocIDList;
-    console.log("propertyFound ===> ",property?.shareDocIDList);
+    console.log("propertyFound ===> ", property?.shareDocIDList);
 
     // Rotate the share list (e.g., move the first element to the last position)
     const rotatedShareList = [...shareList.slice(1), shareList[0]];
@@ -3375,7 +3519,7 @@ async function calPropertyDurationCompletion() {
     }
 
     // Log the updated share list to see the new dates after rotation and rearrangement
-    console.log("rotatedShareList==>",rotatedShareList);
+    console.log("rotatedShareList==>", rotatedShareList);
   }
 }
 
