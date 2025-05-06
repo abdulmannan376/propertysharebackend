@@ -1178,26 +1178,31 @@ const handleInspectionSubmission = async (req, res) => {
     const inspectionFound = await PropertyInspection.findOne({ inspectionID });
     if (!inspectionFound) throw new Error("Inspection not found.");
 
-    // 2) Prepare folder, clear out old images
+    // 2) Prepare folder
     const uploadPath = `uploads/Inspections/${propertyID}/${shareID}/${inspectionFound.inspectionID}`;
     fs.mkdirSync(uploadPath, { recursive: true });
-    clearAllImages(uploadPath);
 
-    // 3) Convert+save each new buffer → PNG with metadata preserved
-    await Promise.all(
-      files.map(async (file, idx) => {
-        if (!file.buffer) {
-          throw new Error("Missing file.buffer—check your Multer config");
-        }
-        const outName = `image-${idx + 1}.png`;
-        const outPath = path.join(uploadPath, outName);
+    // Only clear + replace images if there are new files
+    if (files && files.length > 0) {
+      // clear out old images
+      clearAllImages(uploadPath);
 
-        await sharp(file.buffer)
-          .withMetadata()       // preserve EXIF, orientation, DPI
-          .toFormat("png")      // switch format only
-          .toFile(outPath);
-      })
-    );
+      // 3) Convert+save each new buffer → PNG with metadata preserved
+      await Promise.all(
+        files.map(async (file, idx) => {
+          if (!file.buffer) {
+            throw new Error("Missing file.buffer—check your Multer config");
+          }
+          const outName = `image-${idx + 1}.png`;
+          const outPath = path.join(uploadPath, outName);
+
+          await sharp(file.buffer)
+            .withMetadata()       // preserve EXIF, orientation, DPI
+            .toFormat("png")      // switch format only
+            .toFile(outPath);
+        })
+      );
+    }
 
     // 4) Update the inspection document
     inspectionFound.imageDirURL = uploadPath;
@@ -1224,7 +1229,7 @@ const handleInspectionSubmission = async (req, res) => {
     );
 
     return res.status(200).json({
-      message: "Inspection images updated successfully.",
+      message: "Inspection uploaded successfully.",
       success: true,
     });
   } catch (error) {
@@ -1235,6 +1240,7 @@ const handleInspectionSubmission = async (req, res) => {
     });
   }
 };
+
 
 const handleInspectionAction = async (req, res) => {
   try {
@@ -1554,9 +1560,17 @@ function reorganizeFiles(directory, deleteIndices = []) {
 
 const genRaiseRequest = async (req, res) => {
   try {
-    const { propertyID, username, title, details, price, type, URLsList, deleteImageList } =
-      req.body;
-    const files = req.files; // now with .buffer only
+    const {
+      propertyID,
+      username,
+      title,
+      details,
+      price,
+      type,
+      URLsList,
+      deleteImageList,
+    } = req.body;
+    const files = Array.isArray(req.files) ? req.files : []; // ← default to []
 
     // 1) Lookup shareholder & property (unchanged)
     const shareholderFound = await Shareholders.findOne({ username }).populate({
@@ -1603,7 +1617,7 @@ const genRaiseRequest = async (req, res) => {
     // run your delete/reorg from deleteImageList exactly as before
     if (deleteImageList) reorganizeFiles(uploadPath, deleteImageList);
 
-    // 4) Write every incoming buffer → PNG files named image-1.png, image-2.png, …
+    // 4) If there are new files, write them; otherwise skip entirely
     if (files.length > 0) {
       await Promise.all(
         files.map((file, idx) => {
@@ -1634,6 +1648,7 @@ const genRaiseRequest = async (req, res) => {
     });
   }
 };
+
 
 const fetchRaisedRequestByUsername = async (req, res) => {
   try {
@@ -2182,27 +2197,31 @@ const addPropertyImages = async (req, res) => {
         .json({ message: "Property not found", success: false });
     }
 
-    // 2) Prepare upload folder, then clear all existing images
     const uploadPath = `uploads/${propertyID}/`;
     fs.mkdirSync(uploadPath, { recursive: true });
-    clearAllImages(uploadPath);
 
-    // 3) Convert + save each new upload → PNG, starting from 1
-    await Promise.all(
-      req.files.map(async (file, idx) => {
-        if (!file.buffer) {
-          throw new Error("Missing file.buffer—check your Multer config");
-        }
-        const imageIndex = idx + 1;
-        const outName = `image-${imageIndex}.png`;
-        const outPath = path.join(uploadPath, outName);
+    // Only clear + replace images if there are new files
+    if (req.files && req.files.length > 0) {
+      // 2) Clear all existing images
+      clearAllImages(uploadPath);
 
-        await sharp(file.buffer)
-          .withMetadata() // keep original metadata
-          .toFormat("png") // exactly switch format to PNG
-          .toFile(outPath);
-      })
-    );
+      // 3) Convert + save each new upload → PNG, starting from 1
+      await Promise.all(
+        req.files.map(async (file, idx) => {
+          if (!file.buffer) {
+            throw new Error("Missing file.buffer—check your Multer config");
+          }
+          const imageIndex = idx + 1;
+          const outName = `image-${imageIndex}.png`;
+          const outPath = path.join(uploadPath, outName);
+
+          await sharp(file.buffer)
+            .withMetadata() // keep original metadata
+            .toFormat("png") // exactly switch format to PNG
+            .toFile(outPath);
+        })
+      );
+    }
 
     // 4) Update pinned image if provided
     if (pinnedImage != null) {
@@ -2230,7 +2249,7 @@ const addPropertyImages = async (req, res) => {
 
     // 7) Final response
     return res.status(200).json({
-      message: "Property images replaced successfully.",
+      message: "Property images processed successfully.",
       success: true,
     });
   } catch (error) {
@@ -2241,6 +2260,7 @@ const addPropertyImages = async (req, res) => {
     });
   }
 };
+
 
 const deleteAllImages = async (req, res) => {
   try {
