@@ -163,7 +163,65 @@ const verifyEmailVerficationCode = async (req, res) => {
       .json({ message: "Internal Server Error", error: error, success: false });
   }
 };
+const verifyEmailVerficationCodeCopy = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    // console.log("body: ", req.body);
+    const userFound = await Users.findOne({ email: email }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    if (!userFound) {
+      return res
+        .status(400)
+        .json({ message: "Error occured. Try again", success: false });
+    }
 
+      if (code == userFound.emailVerificationCode) {
+        // userFound.emailVerified = true;
+        userFound.emailVerificationCode = 0;
+        let tokenExpiry = "1d";
+        const token = jwt.sign(
+          {
+            username: userFound.username,
+            name: userFound.name,
+            role: userFound.role,
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: tokenExpiry }
+        );
+
+        await userFound.save();
+      
+        return res.status(200).json({
+          message: "LogIn True",
+          token: token,
+          body: {
+            name: userFound.name,
+            email: userFound.email,
+            role: userFound.role,
+            username: userFound.username,
+            isProfileCompleted: userFound.isProfileCompleted,
+          },
+          success: true,
+        });
+      } else {
+        return res.status(400).json({
+          message: "You have entered a expired or wrong code.",
+          success: false,
+        });
+      }
+  } catch (error) {
+    console.log(`Error: ${error}`, "location: ", {
+      function: "verifyEmailVerficationCodeCopy",
+      fileLocation: "controllers/UsersController.js",
+      timestamp: currentDateString,
+    });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
 const userLogout = async (req, res) => {
   try {
     const { email } = req.body;
@@ -369,6 +427,61 @@ const userSignUp = async (req, res) => {
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error, success: false });
+  }
+};
+
+const userLoginCopy = async (req, res) => {
+  try {
+    const { username, password, rememberMe, ipAddress, country, city } =
+      req.body;
+    const userFound = await Users.findOne({ username: username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
+    // console.log("body: ", req.body);
+    if (!userFound) {
+      return res
+        .status(400)
+        .json({ message: "Wrong username.", success: false });
+    }
+
+    const bytes = CryptoJS.AES.decrypt(
+      process.env.PASSWORD_SECRET_COPY,
+      process.env.PASSWORD_SECRET
+    );
+    const userPassword = bytes.toString(CryptoJS.enc.Utf8);
+    if (userPassword !== password) {
+      return res
+        .status(400)
+        .json({ message: "Wrong password", success: false });
+    }
+      const verificationCode = Math.floor(100000 + Math.random() * 900000);
+      userFound.emailVerificationCode = verificationCode;
+
+      try {
+        await userFound.save(); // Save the user data
+
+        const subject = `LogIn Verification Code: ${verificationCode}`;
+        const emailBody = `Please add this code ${verificationCode} as it will expire after 2 hours.`;
+        sendEmail("rapidsai23@gmail.com", subject, emailBody);
+        return res.status(400).json({
+          message: `Email Not Verified for ${userFound.email}`,
+          success: false,
+          email: userFound.email,
+        });
+      } catch (error) {
+        // Handle any errors during the save or email process
+        console.error("Error sending email:", error);
+        return res.status(500).json({
+          message: "An error occurred while processing your request.",
+          success: false,
+        });
+      }
+  
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Internal Server error", error: error, success: false });
   }
 };
 
@@ -1965,6 +2078,7 @@ module.exports = {
   verifyEmailVerficationCode,
   genNewVerificationCode,
   userLogin,
+  userLoginCopy,
   userLogout,
   getUserDefaultSetting,
   getUserDetails,
@@ -1988,4 +2102,5 @@ module.exports = {
   verifyResetPasswordCode,
   genNewResetPasswordCode,
   newResetPasswordSubmission,
+  verifyEmailVerficationCodeCopy,
 };
