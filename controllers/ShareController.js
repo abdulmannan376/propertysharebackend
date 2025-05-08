@@ -2006,9 +2006,9 @@ const shareRentAction = async (data, session, action) => {
         shareOfferFound.price
       } \nThe buyer,${
         buyerFound.name
-      }, has completed the payment. The amount will be deposited into your account shortly. for confirmition after one hour check Pending Withdrawals in setting \n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${
+      }, has completed the payment. The amount will be deposited into your account shortly. for confirmition after one hour. \n Please go to the "Withdrawal Management" tab, then to "Pending Withdrawals" tab \n Click the link below to check:\nhttps://www.beachbunnyhouse.com/user/${
         buyerFound?.username
-      } \n \nRegards, \nBeach Bunny House.`;
+      } \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
@@ -2604,7 +2604,9 @@ const shareSellAction = async (data, session, action) => {
         shareOfferFound.price
       } \n The buyer,${
         buyerFound.name
-      }, has completed the payment. The amount will be deposited into your account shortly. \nRegards, \nBeach Bunny House.`;
+      }, has completed the payment. The amount will be deposited into your account shortly.\n Please go to the "Withdrawal Management" tab, then to "Pending Withdrawals" tab \n Click the link below to check:\nhttps://www.beachbunnyhouse.com/user/${
+        sellerFound?.username
+      } \nRegards, \nBeach Bunny House.`;
 
       sendUpdateNotification(
         subject,
