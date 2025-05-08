@@ -1366,7 +1366,7 @@ const genNewShareOffer = async (req, res) => {
 
     newShareOffer.save().then(() => {
       const userNotificationSubject = `Property share ${category} offer sent`;
-      const userNotificationBody = `Dear ${userFound.name}, \nYour offer for share ${category} is sent to user: ${ownerFound.username} with price: $${shareFound.priceByCategory}. \n Please go to the "Offers" tab, then to "Sent".\n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${userFound.username} \nRegards, \nBeach Bunny Houes.`;
+      const userNotificationBody = `Dear ${userFound.name}, \nYour offer for share ${category} is sent to user: ${ownerFound.username} with price: $${shareFound.priceByCategory}. \n Please go to the "Offers" tab, then to "Sent" then "${category}".\n Click the link below to Check:\nhttps://www.beachbunnyhouse.com/user/${userFound.username} \nRegards, \nBeach Bunny Houes.`;
 
       sendUpdateNotification(
         userNotificationSubject,
