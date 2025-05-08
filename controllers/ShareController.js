@@ -467,10 +467,12 @@ const getSharesByUsername = async (req, res) => {
     const { username, propertyID } = req.params;
     const propertyFound = await Properties.findOne({ propertyID: propertyID });
     if (propertyFound.publishedBy === username) {
-    const propertyFound = await Properties.findOne({ propertyID: propertyID });
-    const shareholderFound = await Shareholders.findOne({
-      username: username,
-    });
+      const propertyFound = await Properties.findOne({
+        propertyID: propertyID,
+      });
+      const shareholderFound = await Shareholders.findOne({
+        username: username,
+      });
       // const sharesByUsername = await PropertyShares.find({
       //   propertyDocID: propertyFound._id,
       //   publishedByUser: username,
@@ -494,7 +496,7 @@ const getSharesByUsername = async (req, res) => {
             "propertyID imageDirURL imageCount title stakesOccupied totalStakes"
           )
           .exec(),
-      
+
         PropertyShares.find({
           propertyDocID: propertyFound._id,
           currentOwnerDocID: shareholderFound._id,
@@ -506,7 +508,7 @@ const getSharesByUsername = async (req, res) => {
           )
           .exec(),
       ]);
-      
+
       // merge into one array
       const sharesByUsername = [...listedShares, ...purchasedShares];
 
@@ -830,13 +832,23 @@ const handleShareByCategory = async (req, res) => {
     const propertyFound = await Properties.findOne({
       _id: propertyShareFound1.propertyDocID,
     });
-    if (propertyShareFound1.publishedByUser === username && propertyShareFound1.utilisedStatus !== "Purchased") {
+    if (
+      propertyShareFound1.publishedByUser === username &&
+      propertyShareFound1.utilisedStatus !== "Purchased"
+    ) {
       // console.log("not comed inside propertyShareFound1 if");
-      
-      (propertyShareFound1.currentOwnerDocID = shareholderFound._id),
-        (propertyShareFound1.utilisedStatus = "Purchased"),
-        await propertyShareFound1.save();
-  
+
+      // 1) mark the share as purchased
+      propertyShareFound1.currentOwnerDocID = shareholderFound._id;
+      propertyShareFound1.utilisedStatus = "Purchased";
+      // 2) add this share to the shareholder’s purchased list
+      const shareDocIDList = [
+        ...shareholderFound.purchasedShareIDList,
+        { shareDocID: propertyShareFound1._id },
+      ];
+      shareholderFound.purchasedShareIDList = shareDocIDList;
+      await propertyShareFound1.save();
+      await shareholderFound.save();
       propertyShareFound = propertyShareFound1;
 
       const stakesOccupied = propertyFound.stakesOccupied;
@@ -846,19 +858,22 @@ const handleShareByCategory = async (req, res) => {
           $set: {
             stakesOccupied: stakesOccupied + 1,
           },
-        },
+        }
       );
     }
-    if (propertyShareFound1.publishedByUser === username && propertyShareFound1.utilisedStatus === "Purchased"){
-      if(propertyShareFound1.onSale){
-        propertyShareFound= propertyShareFound1
-      }else if(propertyShareFound1.onRent){
-        propertyShareFound= propertyShareFound1
-      }else if(propertyShareFound1.onSwap){
-        propertyShareFound= propertyShareFound1
+    if (
+      propertyShareFound1.publishedByUser === username &&
+      propertyShareFound1.utilisedStatus === "Purchased"
+    ) {
+      if (propertyShareFound1.onSale) {
+        propertyShareFound = propertyShareFound1;
+      } else if (propertyShareFound1.onRent) {
+        propertyShareFound = propertyShareFound1;
+      } else if (propertyShareFound1.onSwap) {
+        propertyShareFound = propertyShareFound1;
       }
     }
-    console.log("req.body",req.body);
+    console.log("req.body", req.body);
     const userFound = await Users.findOne({ username: username }).populate(
       "userDefaultSettingID",
       "notifyUpdates"
@@ -883,8 +898,6 @@ const handleShareByCategory = async (req, res) => {
       throw new Error(`property share not available for ${category}.`);
     }
 
-
-
     if (category === "Rent") {
       if (propertyShareFound.onRent) {
         propertyFound.stakesOnRent -= 1;
@@ -900,8 +913,17 @@ const handleShareByCategory = async (req, res) => {
               $set: {
                 stakesOccupied: stakesOccupied - 1,
               },
-            },
+            }
           );
+          // c) remove from this shareholder’s purchased list
+          shareholderFound.purchasedShareIDList =
+            shareholderFound.purchasedShareIDList.filter(
+              (item) =>
+                item.shareDocID.toString() !== propertyShareFound._id.toString()
+            );
+
+          // d) persist shareholder change
+          await shareholderFound.save();
         }
         const shareOfferList = await ShareOffers.find({
           shareDocID: propertyShareFound._id,
@@ -932,8 +954,8 @@ const handleShareByCategory = async (req, res) => {
         propertyShareFound.priceByCategory = price;
       }
     } else if (category === "Sell") {
-      console.log("propertyShareFound",propertyShareFound);
-      
+      console.log("propertyShareFound", propertyShareFound);
+
       if (propertyShareFound.onSale) {
         propertyFound.stakesOnSale -= 1;
 
@@ -948,8 +970,18 @@ const handleShareByCategory = async (req, res) => {
               $set: {
                 stakesOccupied: stakesOccupied - 1,
               },
-            },
+            }
           );
+
+          // c) remove from this shareholder’s purchased list
+          shareholderFound.purchasedShareIDList =
+            shareholderFound.purchasedShareIDList.filter(
+              (item) =>
+                item.shareDocID.toString() !== propertyShareFound._id.toString()
+            );
+
+          // d) persist shareholder change
+          await shareholderFound.save();
         }
         const shareOfferList = await ShareOffers.find({
           shareDocID: propertyShareFound._id,
@@ -999,7 +1031,7 @@ const handleShareByCategory = async (req, res) => {
         await Promise.all(updatedShareOfferListPromises);
 
         propertyShareFound.onSwap = false;
-          if (propertyShareFound.publishedByUser === username) {
+        if (propertyShareFound.publishedByUser === username) {
           propertyShareFound.currentOwnerDocID = null;
           propertyShareFound.utilisedStatus = "Listed";
           const stakesOccupied = propertyFound.stakesOccupied;
@@ -1009,12 +1041,21 @@ const handleShareByCategory = async (req, res) => {
               $set: {
                 stakesOccupied: stakesOccupied - 1,
               },
-            },
+            }
           );
+
+          // c) remove from this shareholder’s purchased list
+          shareholderFound.purchasedShareIDList =
+            shareholderFound.purchasedShareIDList.filter(
+              (item) =>
+                item.shareDocID.toString() !== propertyShareFound._id.toString()
+            );
+
+          // d) persist shareholder change
+          await shareholderFound.save();
         }
       } else {
         propertyShareFound.onSwap = true;
-      
       }
     }
 
@@ -1029,13 +1070,13 @@ const handleShareByCategory = async (req, res) => {
             price
           );
         } else {
-          if(propertyShareFound.onSale){
-          createNewShareOfferForAdmin(
-            propertyShareFound.shareID,
-            category,
-            price
-          );
-        }
+          if (propertyShareFound.onSale) {
+            createNewShareOfferForAdmin(
+              propertyShareFound.shareID,
+              category,
+              price
+            );
+          }
         }
       }
       const subject = "Property Share status updated.";
@@ -1382,7 +1423,9 @@ const genNewShareOffer = async (req, res) => {
         shareFound.propertyDocID.title
       } to ${category === "Sell" ? "Buy" : category}, with your price: $${
         shareFound.priceByCategory
-      }. \n Please go to the "Offers" tab, then to "Received" then "${category === "Sell" ? "Buy" : category}" tab. click Link to Approve: https://www.beachbunnyhouse.com/user/${
+      }. \n Please go to the "Offers" tab, then to "Received" then "${
+        category === "Sell" ? "Buy" : category
+      }" tab. click Link to Approve: https://www.beachbunnyhouse.com/user/${
         ownerFound.username
       } \nRegards, \nBeach Bunny House.`;
 
