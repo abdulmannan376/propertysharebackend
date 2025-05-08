@@ -1382,7 +1382,7 @@ const genNewShareOffer = async (req, res) => {
         shareFound.propertyDocID.title
       } to ${category === "Sell" ? "Buy" : category}, with your price: $${
         shareFound.priceByCategory
-      }.\n Please go to the "Offers" tab, then to "Received" then ${category} tab. click Link to Approve: https://www.beachbunnyhouse.com/user/${
+      }.\n Please go to the "Offers" tab, then to "Received" then "${category === "Sell" ? "Buy" : category}" tab. click Link to Approve: https://www.beachbunnyhouse.com/user/${
         ownerFound.username
       } \nRegards, \nBeach Bunny House.`;
 
