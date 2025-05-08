@@ -2213,7 +2213,7 @@ const handleShareRentOfferAction = async (req, res) => {
 
         ////it is going wrong///////////
         const ownerNotificationSubject = `Property Share Rent Offer Accepted`;
-        const ownerNotificationBody = `Dear ${secondShareholder.name}, \nYour share rent offer has been accepted by user: ${userFound.username} at price: $${shareOfferFound.price}. Payment Pending. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment. It will expire in 6 hours\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${secondShareholder.username} \nRegards, \nBeach Bunny House.`;
+        const ownerNotificationBody = `Dear ${secondShareholder.name}, \nYour share rent offer has been accepted by user: ${userFound.username} at price: $${shareOfferFound.price}. Payment Pending. \n Please go to the "Bills and Payment" tab, then to "Pending Payments" to clear the payment. It will expire in 6 hours\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${secondShareholder.username} \nRegards, \nBeach Bunny House.`;
 
         sendUpdateNotification(
           userNotificationsubject,
@@ -2858,7 +2858,7 @@ const handleShareSellOfferAction = async (req, res) => {
           shareOfferFound.price
         } \nPrevious Owner Username: ${
           sharePrevOwnerFound.username
-        } Payment Pending. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment. It will expire in\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${
+        } Payment Pending. \n Please go to the "Bills and Payment" tab, then to "Pending Payments" to clear the payment. It will expire in\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${
           buyerFound.username
         } \nRegards, \nBeach Bunny House`;
 
@@ -3387,7 +3387,7 @@ async function handleShareReservation() {
     if (sharesListAboutToExpire.length > 0) {
       sharesListAboutToExpire.map((share) => {
         const subject = `Property Reservation Reminder`;
-        const body = `Dear ${share.reservedByUser.username}, \nYou have reserved a share in ${share.property.title}. Please proceed to pay as it will be removed from reservation soon. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment.\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${share.reservedByUser.username} \nRegards, \nBeach Bunny House.`;
+        const body = `Dear ${share.reservedByUser.username}, \nYou have reserved a share in ${share.property.title}. Please proceed to pay as it will be removed from reservation soon. \n Please go to the "Bills and Payment" tab, then to "Pending Payments" to clear the payment.\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${share.reservedByUser.username} \nRegards, \nBeach Bunny House.`;
 
         // console.log(share);
         sendUpdateNotification(

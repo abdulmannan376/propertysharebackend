@@ -562,7 +562,7 @@ const genPayment = async (req, res) => {
     await newPayment.save();
 
     const recipientEmailSubject = `Payment Action Required`;
-    const recipientEmailBody = `Dear ${recipient.name}, \nA payment is generated against your username following are the details:\nTotal Amount: ${totalAmount} \nDiscount: ${discountAmount} \nSubtotal Amount: ${payingAmount} \nPurpose of payment: ${purpose} Payment Pending. \n Please go to the "Bills and Payments" tab, then to "Pending Payments" to clear the payment. It will expire in 6 hours\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${recipient.username} \nRegards, \nBeach Bunny House.`;
+    const recipientEmailBody = `Dear ${recipient.name}, \nA payment is generated against your username following are the details:\nTotal Amount: ${totalAmount} \nDiscount: ${discountAmount} \nSubtotal Amount: ${payingAmount} \nPurpose of payment: ${purpose} Payment Pending. \n Please go to the "Bills and Payment" tab, then to "Pending Payments" to clear the payment. It will expire in 6 hours\n Click the link below to pay:\nhttps://www.beachbunnyhouse.com/user/${recipient.username} \nRegards, \nBeach Bunny House.`;
 
     sendUpdateNotification(
       recipientEmailSubject,
