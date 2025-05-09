@@ -142,6 +142,7 @@ PropertySchema.pre("save", async function (next) {
   }
   next();
 });
+PropertySchema.index({ location: '2dsphere' });
 
 const Properties = mongoose.model("properties", PropertySchema);
 

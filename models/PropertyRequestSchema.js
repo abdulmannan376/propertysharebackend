@@ -94,7 +94,7 @@ PropertyRequestSchema.pre("save", async function (next) {
   }
   next();
 });
-
+PropertyRequestSchema.index({ location: '2dsphere' });
 const PropertyRequest = mongoose.model(
   "property_requestes",
   PropertyRequestSchema
