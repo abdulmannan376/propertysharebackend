@@ -3241,7 +3241,7 @@ async function handleDraftProperties() {
 const handlePropertyStatus = async (req, res) => {
   try {
     const { propertyID, action, username } = req.body;
-
+let finalStatus = "";
     const propertyFound = await Properties.findOne({
       propertyID: propertyID,
     }).populate({
@@ -3257,6 +3257,7 @@ const handlePropertyStatus = async (req, res) => {
 
     if (propertyFound.shareDocIDList[0].currentOwnerDocID.username === username)
       if (action === "Feature") {
+        finalStatus = propertyFound.status === "Featured" ? "removed from" : "added to";
         await Properties.updateOne(
           {
             _id: propertyFound._id,
@@ -3271,6 +3272,7 @@ const handlePropertyStatus = async (req, res) => {
           }
         );
       } else if (action === "Hide") {
+      finalStatus =   propertyFound.listingStatus === "hidden" ? "Deactivated" : "Activated";
         await Properties.updateOne(
           {
             _id: propertyFound._id,
@@ -3282,7 +3284,20 @@ const handlePropertyStatus = async (req, res) => {
             },
           }
         );
-      } else {
+      }else if (action === "Buy") {
+      finalStatus = propertyFound.buyStatus === "Inactive" ? "Activated" : "Deactivated";
+        await Properties.updateOne(
+          {
+            _id: propertyFound._id,
+          },
+          {
+            $set: {
+              buyStatus:
+                propertyFound.buyStatus === "Inactive" ? "Active" : "Inactive",
+            },
+          }
+        );
+      }else {
         return res
           .status(403)
           .json({ message: "Forbidden or No action provided", success: false });
@@ -3299,8 +3314,8 @@ const handlePropertyStatus = async (req, res) => {
       throw new Error("user not found");
     }
 
-    const subject = `Property (${propertyFound.title}) ${action} update`;
-    const body = `Dear ${userFound.name}, \nYour action: ${action} has been updated for property: ${propertyFound.title}. \n Click the link below to Check:\n https://www.beachbunnyhouse.com/buy-shares/property/${propertyFound?.propertyID} \nRegards, \nBeach Bunny House.`;
+    const subject = `Property (${propertyFound.title}) ${finalStatus} ${action} update`;
+    const body = `Dear ${userFound.name}, \nYour action: ${finalStatus} ${action} has been updated for property: ${propertyFound.title}. \n Click the link below to Check:\n https://www.beachbunnyhouse.com/buy-shares/property/${propertyFound?.propertyID} \nRegards, \nBeach Bunny House.`;
 
     sendUpdateNotification(
       subject,

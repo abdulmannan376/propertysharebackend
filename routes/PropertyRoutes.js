@@ -55,6 +55,7 @@ router.put(
 );
 router.put("/update-property-status", PropertyController.handlePropertyStatus);
 
+
 //PATCH
 router.patch(
   "/update-property-status",

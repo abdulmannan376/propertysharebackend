@@ -56,6 +56,11 @@ const PropertySchema = new mongoose.Schema(
       enum: ["Featured", "Non-Featured"],
       default: "Non-Featured",
     },
+    buyStatus: {
+      type: String,
+      enum: ["Active", "Inactive"],
+      default: "Inactive",
+    },
     featuredEndDate: {
       type: {
         date: Date,
@@ -142,7 +147,7 @@ PropertySchema.pre("save", async function (next) {
   }
   next();
 });
-PropertySchema.index({ location: '2dsphere' });
+PropertySchema.index({ location: "2dsphere" });
 
 const Properties = mongoose.model("properties", PropertySchema);
 

@@ -829,6 +829,7 @@ const handleShareByCategory = async (req, res) => {
       username: username,
     });
     let propertyShareFound = "";
+    let openForStatus = "";
     const propertyFound = await Properties.findOne({
       _id: propertyShareFound1.propertyDocID,
     });
@@ -900,6 +901,7 @@ const handleShareByCategory = async (req, res) => {
 
     if (category === "Rent") {
       if (propertyShareFound.onRent) {
+        openForStatus = "closed";
         propertyFound.stakesOnRent -= 1;
 
         propertyShareFound.onRent = false;
@@ -942,6 +944,7 @@ const handleShareByCategory = async (req, res) => {
 
         await Promise.all(updatedShareOfferListPromises);
       } else {
+        openForStatus = "open";
         notifyWishlistUsers(
           propertyFound.propertyID,
           propertyFound.title,
@@ -957,6 +960,7 @@ const handleShareByCategory = async (req, res) => {
       console.log("propertyShareFound", propertyShareFound);
 
       if (propertyShareFound.onSale) {
+        openForStatus = "closed";
         propertyFound.stakesOnSale -= 1;
 
         propertyShareFound.onSale = false;
@@ -1000,6 +1004,7 @@ const handleShareByCategory = async (req, res) => {
 
         await Promise.all(updatedShareOfferListPromises);
       } else {
+        openForStatus = "open";
         notifyWishlistUsers(
           propertyFound.propertyID,
           propertyFound.title,
@@ -1013,6 +1018,7 @@ const handleShareByCategory = async (req, res) => {
       }
     } else if (category === "Swap") {
       if (propertyShareFound.onSwap) {
+        openForStatus = "closed";
         const shareOfferList = await ShareOffers.find({
           shareDocID: propertyShareFound._id,
           category: "Swap",
@@ -1055,6 +1061,7 @@ const handleShareByCategory = async (req, res) => {
           await shareholderFound.save();
         }
       } else {
+         openForStatus = "open";
         propertyShareFound.onSwap = true;
       }
     }
@@ -1079,10 +1086,10 @@ const handleShareByCategory = async (req, res) => {
           }
         }
       }
-      const subject = "Property Share status updated.";
+      const subject = `Property Share status updated to ${openForStatus} for ${category.toLowerCase()}`;
       const body = `Dear ${
         userFound.name
-      }, Your share status updated for ${category.toLowerCase()}.Click the link below to Check:\n https://www.beachbunnyhouse.com/buy-shares/property/${
+      }, Your share status updated to ${openForStatus} for ${category.toLowerCase()}.Click the link below to Check:\n https://www.beachbunnyhouse.com/buy-shares/property/${
         propertyFound?.propertyID
       } \nRegards, \nBeach Bunny House.`;
 
@@ -1094,7 +1101,7 @@ const handleShareByCategory = async (req, res) => {
       );
 
       res.status(200).json({
-        message: `Successfull for ${category.toLowerCase()}.`,
+        message: `Successfull ${openForStatus} for ${category.toLowerCase()}.`,
         success: true,
       });
     });
