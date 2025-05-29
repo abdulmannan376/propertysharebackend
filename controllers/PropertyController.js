@@ -790,33 +790,116 @@ const handlePropertyAction = async (req, res) => {
     });
   }
 };
+// function reorganizeFiles(directory, deleteIndices = []) {
+//   // console.log(directory, deleteIndices);
+//   const files = fs
+//     .readdirSync(directory)
+//     .filter((file) => file.startsWith("image-"));
+//   // Delete files as per indices provided
+//   deleteIndices.sort((a, b) => b - a); // Sort indices in descending order for deletion
+//   deleteIndices.forEach((index) => {
+//     const filePath = path.join(directory, files[parseInt(index) - 1]);
+//     if (fs.existsSync(filePath)) {
+//       fs.unlinkSync(filePath);
+//     }
+//   });
+//   // Rename remaining files to maintain sequence
+//   const remainingFiles = fs
+//     .readdirSync(directory)
+//     .filter((file) => file.startsWith("image-"));
+//   remainingFiles.forEach((file, index) => {
+//     const newFileName = `image-${index + 1}${path.extname(file)}`;
+//     const oldFilePath = path.join(directory, file);
+//     const newFilePath = path.join(directory, newFileName);
+//     fs.renameSync(oldFilePath, newFilePath);
+//   });
+// }
+
 
 // Function to reorganize files in the directory
 function reorganizeFiles(directory, deleteIndices = []) {
-  // console.log(directory, deleteIndices);
-  const files = fs
-    .readdirSync(directory)
-    .filter((file) => file.startsWith("image-"));
-  // Delete files as per indices provided
-  deleteIndices.sort((a, b) => b - a); // Sort indices in descending order for deletion
-  deleteIndices.forEach((index) => {
-    const filePath = path.join(directory, files[parseInt(index) - 1]);
+  console.log('▶️ [reorganizeFiles] directory:', directory);
+  console.log('▶️ [reorganizeFiles] deleteIndices (raw):', deleteIndices);
+
+  // 1) Read all image files
+  let files;
+  try {
+    files = fs.readdirSync(directory).filter((f) => f.startsWith('image-'));
+  } catch (err) {
+    console.error(`❌ [reorganizeFiles] cannot read directory ${directory}:`, err);
+    return;
+  }
+  console.log('▶️ [reorganizeFiles] found files:', files);
+
+  if (files.length === 0) {
+    console.warn('⚠️ [reorganizeFiles] no image-* files to process—exiting.');
+    return;
+  }
+
+  // 2) Normalize & filter indices into valid 1..files.length
+  const valid = Array.from(
+    new Set(
+      deleteIndices
+        .map((i) => {
+          const n = Number(i);
+          return Number.isInteger(n) ? n : null;
+        })
+        .filter((n) => n !== null && n >= 1 && n <= files.length)
+    )
+  ).sort((a, b) => b - a); // descending
+
+  console.log('▶️ [reorganizeFiles] validIndices (filtered, descending):', valid);
+
+  // 3) Delete each valid index
+  valid.forEach((idx) => {
+    const fileName = files[idx - 1];
+    if (!fileName) {
+      console.warn(`⚠️ [reorganizeFiles] files[${idx - 1}] is undefined—skipping index ${idx}`);
+      return;
+    }
+    const filePath = path.join(directory, fileName);
+    console.log(`  ➡️ Deleting index ${idx}:`, { fileName, filePath });
+
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
+      console.log(`    ✔️ Deleted ${fileName}`);
+    } else {
+      console.warn(`    ⚠️ File does not exist: ${filePath}`);
     }
   });
-  // Rename remaining files to maintain sequence
-  const remainingFiles = fs
-    .readdirSync(directory)
-    .filter((file) => file.startsWith("image-"));
-  remainingFiles.forEach((file, index) => {
-    const newFileName = `image-${index + 1}${path.extname(file)}`;
-    const oldFilePath = path.join(directory, file);
-    const newFilePath = path.join(directory, newFileName);
-    fs.renameSync(oldFilePath, newFilePath);
-  });
-}
 
+  // 4) Re-list & rename remaining files
+  let remaining;
+  try {
+    remaining = fs.readdirSync(directory).filter((f) => f.startsWith('image-'));
+  } catch (err) {
+    console.error(`❌ [reorganizeFiles] cannot re-read directory ${directory}:`, err);
+    return;
+  }
+  remaining.sort((a, b) => {
+    const ai = Number(a.match(/^image-(\d+)/)?.[1]);
+    const bi = Number(b.match(/^image-(\d+)/)?.[1]);
+    return ai - bi;
+  });
+
+  console.log('▶️ [reorganizeFiles] remaining files before rename:', remaining);
+
+  remaining.forEach((oldName, i) => {
+    const newName = `image-${i + 1}${path.extname(oldName)}`;
+    const oldPath = path.join(directory, oldName);
+    const newPath = path.join(directory, newName);
+    if (oldPath !== newPath) {
+      console.log(`  🔄 Renaming ${oldName} → ${newName}`);
+      try {
+        fs.renameSync(oldPath, newPath);
+      } catch (err) {
+        console.error(`    ❌ Failed to rename ${oldName} → ${newName}:`, err);
+      }
+    }
+  });
+
+  console.log('▶️ [reorganizeFiles] done.');
+}
 async function openInspections() {
   try {
     console.log("openInspections cron runing");
@@ -1534,30 +1617,6 @@ const getInspectionDetail = async (req, res) => {
   }
 };
 
-// same logic you had in middleware
-function reorganizeFiles(directory, deleteIndices = []) {
-  const files = fs
-    .readdirSync(directory)
-    .filter((file) => file.startsWith("image-"));
-  deleteIndices
-    .map(Number)
-    .sort((a, b) => b - a)
-    .forEach((idx) => {
-      const fp = path.join(directory, files[idx]);
-      if (fs.existsSync(fp)) fs.unlinkSync(fp);
-    });
-  fs
-    .readdirSync(directory)
-    .filter((f) => f.startsWith("image-"))
-    .forEach((file, i) => {
-      const newName = `image-${i + 1}${path.extname(file)}`;
-      fs.renameSync(
-        path.join(directory, file),
-        path.join(directory, newName)
-      );
-    });
-}
-
 const genRaiseRequest = async (req, res) => {
   try {
     const {
@@ -2187,7 +2246,7 @@ function clearAllImages(directory) {
 
 const addPropertyImages = async (req, res) => {
   try {
-    const { propertyID, pinnedImage, userRole, userName, email } = req.body;
+    const { propertyID, pinnedImage,deleteImageList, userRole, userName, email } = req.body;
 
     // 1) Lookup property
     const propertyFound = await Properties.findOne({ propertyID });
@@ -2222,7 +2281,11 @@ const addPropertyImages = async (req, res) => {
         })
       );
     }
-
+// Handle deletion of specified images
+    if (deleteImageList != null && deleteImageList.length > 0) {
+      console.log("deleteImageList: ", deleteImageList," uploadPath: ", uploadPath);
+      reorganizeFiles(uploadPath, deleteImageList.map(Number));
+    }
     // 4) Update pinned image if provided
     if (pinnedImage != null) {
       propertyFound.pinnedImageIndex = parseInt(pinnedImage, 10);
@@ -2233,9 +2296,9 @@ const addPropertyImages = async (req, res) => {
     propertyFound.imageCount = fs
       .readdirSync(uploadPath)
       .filter((f) => f.startsWith("image-")).length;
-    propertyFound.listingStatus =
-      userRole === "admin" ? "live" : "pending approval";
-
+    // propertyFound.listingStatus =
+    //   userRole === "admin" ? "live" : "pending approval";
+propertyFound.listingStatus = "live"
     await propertyFound.save();
 
     // 6) Send notification email
