@@ -815,24 +815,26 @@ const handlePropertyAction = async (req, res) => {
 //   });
 // }
 
-
 // Function to reorganize files in the directory
 function reorganizeFiles(directory, deleteIndices = []) {
-  console.log('▶️ [reorganizeFiles] directory:', directory);
-  console.log('▶️ [reorganizeFiles] deleteIndices (raw):', deleteIndices);
+  console.log("▶️ [reorganizeFiles] directory:", directory);
+  console.log("▶️ [reorganizeFiles] deleteIndices (raw):", deleteIndices);
 
   // 1) Read all image files
   let files;
   try {
-    files = fs.readdirSync(directory).filter((f) => f.startsWith('image-'));
+    files = fs.readdirSync(directory).filter((f) => f.startsWith("image-"));
   } catch (err) {
-    console.error(`❌ [reorganizeFiles] cannot read directory ${directory}:`, err);
+    console.error(
+      `❌ [reorganizeFiles] cannot read directory ${directory}:`,
+      err
+    );
     return;
   }
-  console.log('▶️ [reorganizeFiles] found files:', files);
+  console.log("▶️ [reorganizeFiles] found files:", files);
 
   if (files.length === 0) {
-    console.warn('⚠️ [reorganizeFiles] no image-* files to process—exiting.');
+    console.warn("⚠️ [reorganizeFiles] no image-* files to process—exiting.");
     return;
   }
 
@@ -848,13 +850,20 @@ function reorganizeFiles(directory, deleteIndices = []) {
     )
   ).sort((a, b) => b - a); // descending
 
-  console.log('▶️ [reorganizeFiles] validIndices (filtered, descending):', valid);
+  console.log(
+    "▶️ [reorganizeFiles] validIndices (filtered, descending):",
+    valid
+  );
 
   // 3) Delete each valid index
   valid.forEach((idx) => {
     const fileName = files[idx - 1];
     if (!fileName) {
-      console.warn(`⚠️ [reorganizeFiles] files[${idx - 1}] is undefined—skipping index ${idx}`);
+      console.warn(
+        `⚠️ [reorganizeFiles] files[${
+          idx - 1
+        }] is undefined—skipping index ${idx}`
+      );
       return;
     }
     const filePath = path.join(directory, fileName);
@@ -871,9 +880,12 @@ function reorganizeFiles(directory, deleteIndices = []) {
   // 4) Re-list & rename remaining files
   let remaining;
   try {
-    remaining = fs.readdirSync(directory).filter((f) => f.startsWith('image-'));
+    remaining = fs.readdirSync(directory).filter((f) => f.startsWith("image-"));
   } catch (err) {
-    console.error(`❌ [reorganizeFiles] cannot re-read directory ${directory}:`, err);
+    console.error(
+      `❌ [reorganizeFiles] cannot re-read directory ${directory}:`,
+      err
+    );
     return;
   }
   remaining.sort((a, b) => {
@@ -882,7 +894,7 @@ function reorganizeFiles(directory, deleteIndices = []) {
     return ai - bi;
   });
 
-  console.log('▶️ [reorganizeFiles] remaining files before rename:', remaining);
+  console.log("▶️ [reorganizeFiles] remaining files before rename:", remaining);
 
   remaining.forEach((oldName, i) => {
     const newName = `image-${i + 1}${path.extname(oldName)}`;
@@ -898,7 +910,7 @@ function reorganizeFiles(directory, deleteIndices = []) {
     }
   });
 
-  console.log('▶️ [reorganizeFiles] done.');
+  console.log("▶️ [reorganizeFiles] done.");
 }
 async function openInspections() {
   try {
@@ -1205,7 +1217,7 @@ const fetchShareInspectionByUsername = async (req, res) => {
 
 //     // 5) Notify
 //     // const subject = `Inspection for property (${propertyTitle})`;
-//     // const emailBody = 
+//     // const emailBody =
 //     //   `Hello ${userName},\n` +
 //     //   `Your inspection has been submitted and will be reviewed by other shareholders. ` +
 //     //   `Once it passes an 80% approval vote, your inspection will close successfully.\n\n` +
@@ -1231,15 +1243,14 @@ const fetchShareInspectionByUsername = async (req, res) => {
 //   }
 // };
 
-
 /**
  * Deletes all existing image-*.png (or any extension) in a folder.
  */
 function clearAllImages(directory) {
   if (!fs.existsSync(directory)) return;
   fs.readdirSync(directory)
-    .filter(f => f.startsWith("image-"))
-    .forEach(f => fs.unlinkSync(path.join(directory, f)));
+    .filter((f) => f.startsWith("image-"))
+    .forEach((f) => fs.unlinkSync(path.join(directory, f)));
 }
 
 const handleInspectionSubmission = async (req, res) => {
@@ -1250,14 +1261,16 @@ const handleInspectionSubmission = async (req, res) => {
       propertyID,
       shareID,
       propertyTitle,
-      userName,   // for emailBody
+      userName, // for emailBody
       comment,
     } = req.body;
     const files = req.files; // each has a .buffer
 
     // 1) Load user & inspection
-    const userFound = await Users.findOne({ username })
-      .populate("userDefaultSettingID", "notifyUpdates");
+    const userFound = await Users.findOne({ username }).populate(
+      "userDefaultSettingID",
+      "notifyUpdates"
+    );
     const inspectionFound = await PropertyInspection.findOne({ inspectionID });
     if (!inspectionFound) throw new Error("Inspection not found.");
 
@@ -1280,8 +1293,8 @@ const handleInspectionSubmission = async (req, res) => {
           const outPath = path.join(uploadPath, outName);
 
           await sharp(file.buffer)
-            .withMetadata()       // preserve EXIF, orientation, DPI
-            .toFormat("png")      // switch format only
+            .withMetadata() // preserve EXIF, orientation, DPI
+            .toFormat("png") // switch format only
             .toFile(outPath);
         })
       );
@@ -1291,7 +1304,7 @@ const handleInspectionSubmission = async (req, res) => {
     inspectionFound.imageDirURL = uploadPath;
     inspectionFound.imageCount = fs
       .readdirSync(uploadPath)
-      .filter(f => f.startsWith("image-")).length;
+      .filter((f) => f.startsWith("image-")).length;
     inspectionFound.commentsByShareholder = comment;
     inspectionFound.status = "In Progress";
     await inspectionFound.save();
@@ -1323,7 +1336,6 @@ const handleInspectionSubmission = async (req, res) => {
     });
   }
 };
-
 
 const handleInspectionAction = async (req, res) => {
   try {
@@ -1669,7 +1681,9 @@ const genRaiseRequest = async (req, res) => {
 
     // 3) Build and prepare the upload folder
     const today = new Date();
-    const folderName = `${today.getDate() + 1}-${today.getMonth()}-${today.getFullYear()}`;
+    const folderName = `${
+      today.getDate() + 1
+    }-${today.getMonth()}-${today.getFullYear()}`;
     const uploadPath = `uploads/RaiseRequest/${propertyID}/${folderName}/`;
     fs.mkdirSync(uploadPath, { recursive: true });
 
@@ -1682,10 +1696,7 @@ const genRaiseRequest = async (req, res) => {
         files.map((file, idx) => {
           const outName = `image-${idx + 1}.png`;
           const outPath = path.join(uploadPath, outName);
-          return sharp(file.buffer)
-            .withMetadata()
-            .png()
-            .toFile(outPath);
+          return sharp(file.buffer).withMetadata().png().toFile(outPath);
         })
       );
 
@@ -1697,7 +1708,9 @@ const genRaiseRequest = async (req, res) => {
     await newRaiseRequest.save();
     notifyPropertyShareOwnerByPropertyID(propertyID, type);
 
-    return res.status(201).json({ message: "New Request added.", success: true });
+    return res
+      .status(201)
+      .json({ message: "New Request added.", success: true });
   } catch (error) {
     console.error("Error in genRaiseRequest:", error);
     return res.status(500).json({
@@ -1707,7 +1720,6 @@ const genRaiseRequest = async (req, res) => {
     });
   }
 };
-
 
 const fetchRaisedRequestByUsername = async (req, res) => {
   try {
@@ -2246,7 +2258,14 @@ function clearAllImages(directory) {
 
 const addPropertyImages = async (req, res) => {
   try {
-    const { propertyID, pinnedImage,deleteImageList, userRole, userName, email } = req.body;
+    const {
+      propertyID,
+      pinnedImage,
+      deleteImageList,
+      userRole,
+      userName,
+      email,
+    } = req.body;
 
     // 1) Lookup property
     const propertyFound = await Properties.findOne({ propertyID });
@@ -2281,9 +2300,14 @@ const addPropertyImages = async (req, res) => {
         })
       );
     }
-// Handle deletion of specified images
+    // Handle deletion of specified images
     if (deleteImageList != null && deleteImageList.length > 0) {
-      console.log("deleteImageList: ", deleteImageList," uploadPath: ", uploadPath);
+      console.log(
+        "deleteImageList: ",
+        deleteImageList,
+        " uploadPath: ",
+        uploadPath
+      );
       reorganizeFiles(uploadPath, deleteImageList.map(Number));
     }
     // 4) Update pinned image if provided
@@ -2296,9 +2320,19 @@ const addPropertyImages = async (req, res) => {
     propertyFound.imageCount = fs
       .readdirSync(uploadPath)
       .filter((f) => f.startsWith("image-")).length;
-    propertyFound.listingStatus =
-      userRole === "admin" ? "live" : "pending approval";
-// propertyFound.listingStatus = "live"
+    if (userRole === "admin") {
+      propertyFound.listingStatus = "live";
+    }
+    if (req.files && req.files.length > 0 ) {
+      console.log("in 1st IF");
+
+      if( propertyFound.listingStatus === "pending approval" || propertyFound.listingStatus === "draft" || propertyFound.listingStatus === "live" ) {
+      console.log("in 2nd IF");
+        propertyFound.listingStatus =
+        userRole === "admin" ? "live" : "pending approval";
+    }
+  }
+    // propertyFound.listingStatus = "live"
     await propertyFound.save();
 
     // 6) Send notification email
@@ -2323,7 +2357,6 @@ const addPropertyImages = async (req, res) => {
     });
   }
 };
-
 
 const deleteAllImages = async (req, res) => {
   try {
@@ -3304,7 +3337,7 @@ async function handleDraftProperties() {
 const handlePropertyStatus = async (req, res) => {
   try {
     const { propertyID, action, username } = req.body;
-let finalStatus = "";
+    let finalStatus = "";
     const propertyFound = await Properties.findOne({
       propertyID: propertyID,
     }).populate({
@@ -3320,7 +3353,8 @@ let finalStatus = "";
 
     if (propertyFound.shareDocIDList[0].currentOwnerDocID.username === username)
       if (action === "Feature") {
-        finalStatus = propertyFound.status === "Featured" ? "removed from" : "added to";
+        finalStatus =
+          propertyFound.status === "Featured" ? "removed from" : "added to";
         await Properties.updateOne(
           {
             _id: propertyFound._id,
@@ -3335,7 +3369,10 @@ let finalStatus = "";
           }
         );
       } else if (action === "Hide") {
-      finalStatus =   propertyFound.listingStatus === "hidden" ? "Deactivated" : "Activated";
+        finalStatus =
+          propertyFound.listingStatus === "hidden"
+            ? "Deactivated"
+            : "Activated";
         await Properties.updateOne(
           {
             _id: propertyFound._id,
@@ -3347,8 +3384,9 @@ let finalStatus = "";
             },
           }
         );
-      }else if (action === "Buy") {
-      finalStatus = propertyFound.buyStatus === "Inactive" ? "Activated" : "Deactivated";
+      } else if (action === "Buy") {
+        finalStatus =
+          propertyFound.buyStatus === "Inactive" ? "Activated" : "Deactivated";
         await Properties.updateOne(
           {
             _id: propertyFound._id,
@@ -3360,7 +3398,7 @@ let finalStatus = "";
             },
           }
         );
-      }else {
+      } else {
         return res
           .status(403)
           .json({ message: "Forbidden or No action provided", success: false });
