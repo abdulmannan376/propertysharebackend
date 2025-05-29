@@ -2296,9 +2296,9 @@ const addPropertyImages = async (req, res) => {
     propertyFound.imageCount = fs
       .readdirSync(uploadPath)
       .filter((f) => f.startsWith("image-")).length;
-    // propertyFound.listingStatus =
-    //   userRole === "admin" ? "live" : "pending approval";
-propertyFound.listingStatus = "live"
+    propertyFound.listingStatus =
+      userRole === "admin" ? "live" : "pending approval";
+// propertyFound.listingStatus = "live"
     await propertyFound.save();
 
     // 6) Send notification email
