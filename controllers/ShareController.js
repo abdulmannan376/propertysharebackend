@@ -215,7 +215,8 @@ const getBuySharesDetailByUsername = async (req, res) => {
     // console.log("sharesByUsername: ", sharesByUsername);
 
     const sharesListWithoutOwner = sharesByUsername.filter((share) => {
-      return !share?.shareID.endsWith("00") && share?.propertyDocID;
+      return  share?.propertyDocID;
+      // !share?.shareID.endsWith("00") &&
     });
 
     // console.log("sharesList: ", sharesListWithoutOwner);
