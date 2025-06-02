@@ -900,7 +900,7 @@ const handleShareByCategory = async (req, res) => {
             propertyFound.stakesOnRent--;
             shareDoc.onRent = false;
 
-            if (shareDoc.publishedByUser === username) {
+            if (shareDoc.publishedByUser === username && !shareDoc?.shareID.endsWith("00")) {
               shareDoc.currentOwnerDocID = null;
               shareDoc.utilisedStatus = "Listed";
               propertyFound.stakesOccupied--;
