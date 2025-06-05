@@ -126,7 +126,12 @@ const PropertyShareSchema = new mongoose.Schema({
     type: mongoose.Types.ObjectId,
     ref: "shareholders",
     default: null,
-  },  
+  },
+  swapPartnerShareID: {
+    type: mongoose.Types.ObjectId,
+    ref: "property_shares",
+    default: null
+  },
 });
 
 const PropertyShare = mongoose.model("property_shares", PropertyShareSchema);

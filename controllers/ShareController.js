@@ -3003,9 +3003,11 @@ const handleShareSwapOfferAction = async (req, res) => {
     if (action === "accepted") {
       firstShareFound.originalOwnerDocID = firstShareFound.currentOwnerDocID;
       firstShareFound.utilisedStatus = "On Swap";
+      firstShareFound.swapPartnerShareID = secondShareFound._id;
 
       secondShareFound.originalOwnerDocID = secondShareFound.currentOwnerDocID;
       secondShareFound.utilisedStatus = "On Swap";
+      secondShareFound.swapPartnerShareID = firstShareFound._id;
       const firstShareholderPurchaseList =
         firstShareholder.purchasedShareIDList;
 

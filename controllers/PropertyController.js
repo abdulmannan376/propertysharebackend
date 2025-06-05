@@ -2323,15 +2323,17 @@ const addPropertyImages = async (req, res) => {
     if (userRole === "admin") {
       propertyFound.listingStatus = "live";
     }
-    if (req.files && req.files.length > 0 ) {
-      console.log("in 1st IF");
+    if (req.files && req.files.length > 0) {
 
-      if( propertyFound.listingStatus === "pending approval" || propertyFound.listingStatus === "draft" || propertyFound.listingStatus === "live" ) {
-      console.log("in 2nd IF");
+      if (
+        propertyFound.listingStatus === "pending approval" ||
+        propertyFound.listingStatus === "draft" ||
+        propertyFound.listingStatus === "live"
+      ) {
         propertyFound.listingStatus =
-        userRole === "admin" ? "live" : "pending approval";
+          userRole === "admin" ? "live" : "pending approval";
+      }
     }
-  }
     // propertyFound.listingStatus = "live"
     await propertyFound.save();
 
@@ -2357,6 +2359,7 @@ const addPropertyImages = async (req, res) => {
     });
   }
 };
+
 
 const deleteAllImages = async (req, res) => {
   try {
@@ -3477,187 +3480,372 @@ const getPropertySharesByID = async (req, res) => {
   }
 };
 
-async function calPropertyDurationCompletion() {
-  const currentMidnight = new Date();
-  currentMidnight.setHours(23, 59, 59, 999);
-  console.log("cron job running");
+// async function calPropertyDurationCompletion() {
+//   const currentMidnight = new Date();
+//   currentMidnight.setHours(23, 59, 59, 999);
+//   console.log("cron job running");
 
-  let properties = await Properties.find({
-    "shareDocIDList.availableInDuration.endDate": currentMidnight,
-    listingStatus: "live",
-  }).populate({
-    path: "shareDocIDList",
-    model: "property_shares",
-    select:
-      "availableInDuration shareID _id currentOwnerDocID utilisedStatus originalOwnerDocID",
-    populate: {
-      path: "currentOwnerDocID",
-      model: "shareholders",
-      select: "userID username",
-      populate: {
-        path: "userID",
-        model: "users",
-        select: "name userDefaultSettingID",
-        populate: {
-          path: "userDefaultSettingID",
-          model: "user_default_settings",
-          select: "notifyUpdates",
-        },
-      },
-    },
+//   let properties = await Properties.find({
+//     "shareDocIDList.availableInDuration.endDate": currentMidnight,
+//     listingStatus: "live",
+//   }).populate({
+//     path: "shareDocIDList",
+//     model: "property_shares",
+//     select:
+//       "availableInDuration shareID _id currentOwnerDocID utilisedStatus originalOwnerDocID",
+//     populate: {
+//       path: "currentOwnerDocID",
+//       model: "shareholders",
+//       select: "userID username",
+//       populate: {
+//         path: "userID",
+//         model: "users",
+//         select: "name userDefaultSettingID",
+//         populate: {
+//           path: "userDefaultSettingID",
+//           model: "user_default_settings",
+//           select: "notifyUpdates",
+//         },
+//       },
+//     },
+//   });
+
+//   const filteredProperties = properties.filter((property) =>
+//     property.shareDocIDList.some((share) => share.utilisedStatus === "On Swap")
+//   );
+
+//   for (const property of filteredProperties) {
+//     const shareList = property.shareDocIDList;
+
+//     for (const share of shareList) {
+//       if (share.utilisedStatus === "On Swap") {
+//         console.log(`Restoring share ${share.shareID} to original owner`);
+
+//         const originalOwnerId = share.originalOwnerDocID;
+//         const previousOwnerId = share.currentOwnerDocID;
+
+//         // Revert share to original owner
+//         share.currentOwnerDocID = originalOwnerId;
+//         share.utilisedStatus = "Purchased"; // Or appropriate status
+//         share.originalOwnerDocID = null;
+
+//         try {
+//           await share.save();
+
+//           // Update original owner's purchased and sold lists
+//           const originalOwner = await Shareholders.findById(originalOwnerId);
+//           if (originalOwner) {
+//             // Add to purchased if not present
+//             const isInPurchased = originalOwner.purchasedShareIDList.some(
+//               (entry) => entry.shareDocID.toString() === share._id.toString()
+//             );
+//             if (!isInPurchased) {
+//               originalOwner.purchasedShareIDList.push({
+//                 shareDocID: share._id,
+//               });
+//             }
+//             // Remove from sold
+//             originalOwner.soldShareIDList =
+//               originalOwner.soldShareIDList.filter(
+//                 (entry) => entry.shareDocID.toString() !== share._id.toString()
+//               );
+//             await originalOwner.save();
+//           }
+
+//           // Update previous owner's purchased list
+//           const previousOwner = await Shareholders.findById(previousOwnerId);
+//           if (previousOwner) {
+//             previousOwner.purchasedShareIDList =
+//               previousOwner.purchasedShareIDList.filter(
+//                 (entry) => entry.shareDocID.toString() !== share._id.toString()
+//               );
+//             await previousOwner.save();
+//           }
+//         } catch (error) {
+//           console.error(`Error reverting share ${share._id}:`, error);
+//           continue;
+//         }
+//       }
+//     }
+//   }
+//   // Find properties where the last share's end date is at current midnight
+//   properties = await Properties.find({
+//     "shareDocIDList.availableInDuration.endDate": currentMidnight,
+//     listingStatus: "live",
+//   }).populate({
+//     path: "shareDocIDList",
+//     model: "property_shares",
+//     select: "availableInDuration shareID _id currentOwnerDocID",
+//     populate: {
+//       path: "currentOwnerDocID",
+//       model: "shareholders",
+//       select: "userID username",
+//       populate: {
+//         path: "userID",
+//         model: "users",
+//         select: "name userDefaultSettingID",
+//         populate: {
+//           path: "userDefaultSettingID",
+//           model: "user_default_settings",
+//           select: "notifyUpdates",
+//         },
+//       },
+//     },
+//   });
+
+//   for (const property of properties) {
+//     const shareList = property.shareDocIDList;
+//     console.log("propertyFound ===> ", property?.shareDocIDList);
+
+//     // Rotate the share list (e.g., move the first element to the last position)
+//     const rotatedShareList = [...shareList.slice(1), shareList[0]];
+
+//     // Update the dates based on the end date of the previous share
+//     for (let i = 0; i < rotatedShareList.length; i++) {
+//       let previousEndDate;
+
+//       if (i === 0) {
+//         // For the first share, use the end date of the last share before rotation
+//         previousEndDate =
+//           shareList[shareList.length - 1].availableInDuration.endDate;
+//       } else {
+//         // For other shares, use the end date of the previous share in the rotated list
+//         previousEndDate = rotatedShareList[i - 1].availableInDuration.endDate;
+//       }
+
+//       const currentDuration = rotatedShareList[i].availableInDuration;
+
+//       // Set the new start date to the day after the previous end date
+//       currentDuration.startDate = new Date(
+//         previousEndDate.getTime() + 24 * 60 * 60 * 1000
+//       ); // Adding 1 day
+
+//       currentDuration.startDateString = currentDuration.startDate
+//         .toISOString()
+//         .split("T")[0];
+
+//       // Adjust the end date to maintain the same duration as before
+//       const originalDuration =
+//         shareList[i].availableInDuration.endDate.getTime() -
+//         shareList[i].availableInDuration.startDate.getTime();
+//       currentDuration.endDate = new Date(
+//         currentDuration.startDate.getTime() + originalDuration
+//       );
+
+//       currentDuration.endDateString = currentDuration.endDate
+//         .toISOString()
+//         .split("T")[0];
+
+//       if (i === 0) {
+//         await PropertyShare.updateOne(
+//           { _id: shareList[0].availableInDuration.endDate },
+//           {
+//             $set: {
+//               availableInDuration: currentDuration,
+//             },
+//           }
+//         );
+//       } else {
+//         await PropertyShare.updateOne(
+//           { _id: rotatedShareList[i].availableInDuration.endDate },
+//           {
+//             $set: {
+//               availableInDuration: currentDuration,
+//             },
+//           }
+//         );
+//       }
+//     }
+
+//     // Log the updated share list to see the new dates after rotation and rearrangement
+//     console.log("rotatedShareList==>", rotatedShareList);
+//   }
+// }
+//////////////////////////start bumpOneShareToNextYear//////////////////////////////
+// ——————————————————————————————————————————————————————————————
+// 2. HELPER FUNCTION: bumpOneShareToNextYear
+function bumpOneShareToNextYear(share) {
+  const { startDate, endDate } = share.availableInDuration;
+
+  const nextStart = new Date(startDate);
+  nextStart.setFullYear(nextStart.getFullYear() + 1);
+
+  const nextEnd = new Date(endDate);
+  nextEnd.setFullYear(nextEnd.getFullYear() + 1);
+
+  share.availableInDuration.startDate = nextStart;
+  share.availableInDuration.endDate = nextEnd;
+  share.availableInDuration.startDateString = nextStart
+    .toISOString()
+    .slice(0, 10);
+  share.availableInDuration.endDateString = nextEnd.toISOString().slice(0, 10);
+}
+
+// ——————————————————————————————————————————————————————————————
+// 3. HELPER FUNCTION: restoreSwappedPair
+async function restoreSwappedPair(shareA, shareB) {
+  // ————— (1) Restore shareA to its original owner —————
+  console.log(`Restoring share ${shareA.shareID} …`);
+  const originalOwnerA = shareA.originalOwnerDocID;
+  const previousOwnerA = shareA.currentOwnerDocID;
+
+  shareA.currentOwnerDocID = originalOwnerA;
+  shareA.utilisedStatus = "Purchased"; // adjust if you use a different status
+  shareA.originalOwnerDocID = null;
+  shareA.onSwap = false;
+  shareA.swapPartnerShareID = null;
+
+  // Update Shareholders for shareA
+  if (originalOwnerA) {
+    const origOwnerA = await Shareholders.findById(originalOwnerA);
+    if (origOwnerA) {
+      if (
+        !origOwnerA.purchasedShareIDList.some(
+          (e) => e.shareDocID.toString() === shareA._id.toString()
+        )
+      ) {
+        origOwnerA.purchasedShareIDList.push({ shareDocID: shareA._id });
+      }
+      origOwnerA.soldShareIDList = origOwnerA.soldShareIDList.filter(
+        (e) => e.shareDocID.toString() !== shareA._id.toString()
+      );
+      await origOwnerA.save();
+    }
+  }
+  if (previousOwnerA) {
+    const prevOwnerA = await Shareholders.findById(previousOwnerA);
+    if (prevOwnerA) {
+      prevOwnerA.purchasedShareIDList = prevOwnerA.purchasedShareIDList.filter(
+        (e) => e.shareDocID.toString() !== shareA._id.toString()
+      );
+      await prevOwnerA.save();
+    }
+  }
+
+  // ————— (2) Restore shareB to its original owner —————
+  console.log(`Restoring share ${shareB.shareID} …`);
+  const originalOwnerB = shareB.originalOwnerDocID;
+  const previousOwnerB = shareB.currentOwnerDocID;
+
+  shareB.currentOwnerDocID = originalOwnerB;
+  shareB.utilisedStatus = "Purchased";
+  shareB.originalOwnerDocID = null;
+  shareB.onSwap = false;
+  shareB.swapPartnerShareID = null;
+
+  if (originalOwnerB) {
+    const origOwnerB = await Shareholders.findById(originalOwnerB);
+    if (origOwnerB) {
+      if (
+        !origOwnerB.purchasedShareIDList.some(
+          (e) => e.shareDocID.toString() === shareB._id.toString()
+        )
+      ) {
+        origOwnerB.purchasedShareIDList.push({ shareDocID: shareB._id });
+      }
+      origOwnerB.soldShareIDList = origOwnerB.soldShareIDList.filter(
+        (e) => e.shareDocID.toString() !== shareB._id.toString()
+      );
+      await origOwnerB.save();
+    }
+  }
+  if (previousOwnerB) {
+    const prevOwnerB = await Shareholders.findById(previousOwnerB);
+    if (prevOwnerB) {
+      prevOwnerB.purchasedShareIDList = prevOwnerB.purchasedShareIDList.filter(
+        (e) => e.shareDocID.toString() !== shareB._id.toString()
+      );
+      await prevOwnerB.save();
+    }
+  }
+
+  // ————— (3) Bump both shares’ availability into next year —————
+  bumpOneShareToNextYear(shareA);
+  bumpOneShareToNextYear(shareB);
+
+  // ————— (4) Save both shares final state —————
+  await shareA.save();
+  await shareB.save();
+
+  console.log(
+    `👉 ${shareA.shareID} & ${shareB.shareID} restored and bumped to next year.`
+  );
+}
+
+// ——————————————————————————————————————————————————————————————
+// 4. MAIN CRON JOB: forNextYearBumpExpiredShares
+async function forNextYearBumpExpiredShares() {
+  console.log("Running forNextYearBumpExpiredShares cron job…");
+
+  const now = new Date();
+  // propertyDocID: "683f11414fbd3f6d693af1fa", // replace with your actual propertyDocID
+
+  const expiredShares = await PropertyShare.find({
+    "availableInDuration.endDate": { $lt: now },
   });
 
-  const filteredProperties = properties.filter((property) =>
-    property.shareDocIDList.some((share) => share.utilisedStatus === "On Swap")
+  console.log(
+    `Found ${expiredShares.length} shares whose endDate < ${now.toISOString()}`
   );
 
-  for (const property of filteredProperties) {
-    const shareList = property.shareDocIDList;
+  const processedSwapIds = new Set();
 
-    for (const share of shareList) {
-      if (share.utilisedStatus === "On Swap") {
-        console.log(`Restoring share ${share.shareID} to original owner`);
+  for (let share of expiredShares) {
+    const shareIdStr = share._id.toString();
 
-        const originalOwnerId = share.originalOwnerDocID;
-        const previousOwnerId = share.currentOwnerDocID;
-
-        // Revert share to original owner
-        share.currentOwnerDocID = originalOwnerId;
-        share.utilisedStatus = "Purchased"; // Or appropriate status
-        share.originalOwnerDocID = null;
-
-        try {
-          await share.save();
-
-          // Update original owner's purchased and sold lists
-          const originalOwner = await Shareholders.findById(originalOwnerId);
-          if (originalOwner) {
-            // Add to purchased if not present
-            const isInPurchased = originalOwner.purchasedShareIDList.some(
-              (entry) => entry.shareDocID.toString() === share._id.toString()
-            );
-            if (!isInPurchased) {
-              originalOwner.purchasedShareIDList.push({
-                shareDocID: share._id,
-              });
-            }
-            // Remove from sold
-            originalOwner.soldShareIDList =
-              originalOwner.soldShareIDList.filter(
-                (entry) => entry.shareDocID.toString() !== share._id.toString()
-              );
-            await originalOwner.save();
-          }
-
-          // Update previous owner's purchased list
-          const previousOwner = await Shareholders.findById(previousOwnerId);
-          if (previousOwner) {
-            previousOwner.purchasedShareIDList =
-              previousOwner.purchasedShareIDList.filter(
-                (entry) => entry.shareDocID.toString() !== share._id.toString()
-              );
-            await previousOwner.save();
-          }
-        } catch (error) {
-          console.error(`Error reverting share ${share._id}:`, error);
-          continue;
-        }
-      }
+    // Skip if already processed as part of a swap pair
+    if (processedSwapIds.has(shareIdStr)) {
+      continue;
     }
-  }
-  // Find properties where the last share's end date is at current midnight
-  properties = await Properties.find({
-    "shareDocIDList.availableInDuration.endDate": currentMidnight,
-    listingStatus: "live",
-  }).populate({
-    path: "shareDocIDList",
-    model: "property_shares",
-    select: "availableInDuration shareID _id currentOwnerDocID",
-    populate: {
-      path: "currentOwnerDocID",
-      model: "shareholders",
-      select: "userID username",
-      populate: {
-        path: "userID",
-        model: "users",
-        select: "name userDefaultSettingID",
-        populate: {
-          path: "userDefaultSettingID",
-          model: "user_default_settings",
-          select: "notifyUpdates",
-        },
-      },
-    },
-  });
 
-  for (const property of properties) {
-    const shareList = property.shareDocIDList;
-    console.log("propertyFound ===> ", property?.shareDocIDList);
+    // (1) Non‐swapped: bump immediately
+    if (share.utilisedStatus !== "On Swap") {
+      console.log(`→ "${share.shareID}" is not onSwap. Bumping to next year…`);
+      bumpOneShareToNextYear(share);
+      await share.save();
+      continue;
+    }
 
-    // Rotate the share list (e.g., move the first element to the last position)
-    const rotatedShareList = [...shareList.slice(1), shareList[0]];
-
-    // Update the dates based on the end date of the previous share
-    for (let i = 0; i < rotatedShareList.length; i++) {
-      let previousEndDate;
-
-      if (i === 0) {
-        // For the first share, use the end date of the last share before rotation
-        previousEndDate =
-          shareList[shareList.length - 1].availableInDuration.endDate;
-      } else {
-        // For other shares, use the end date of the previous share in the rotated list
-        previousEndDate = rotatedShareList[i - 1].availableInDuration.endDate;
-      }
-
-      const currentDuration = rotatedShareList[i].availableInDuration;
-
-      // Set the new start date to the day after the previous end date
-      currentDuration.startDate = new Date(
-        previousEndDate.getTime() + 24 * 60 * 60 * 1000
-      ); // Adding 1 day
-
-      currentDuration.startDateString = currentDuration.startDate
-        .toISOString()
-        .split("T")[0];
-
-      // Adjust the end date to maintain the same duration as before
-      const originalDuration =
-        shareList[i].availableInDuration.endDate.getTime() -
-        shareList[i].availableInDuration.startDate.getTime();
-      currentDuration.endDate = new Date(
-        currentDuration.startDate.getTime() + originalDuration
+    // (2) Swapped: fetch partner
+    const partnerId = share.swapPartnerShareID;
+    if (!partnerId) {
+      console.warn(
+        `Share ${share.shareID} says onSwap=true but swapPartnerShareID is missing. Skipping.`
       );
-
-      currentDuration.endDateString = currentDuration.endDate
-        .toISOString()
-        .split("T")[0];
-
-      if (i === 0) {
-        await PropertyShare.updateOne(
-          { _id: shareList[0].availableInDuration.endDate },
-          {
-            $set: {
-              availableInDuration: currentDuration,
-            },
-          }
-        );
-      } else {
-        await PropertyShare.updateOne(
-          { _id: rotatedShareList[i].availableInDuration.endDate },
-          {
-            $set: {
-              availableInDuration: currentDuration,
-            },
-          }
-        );
-      }
+      continue;
+    }
+    const partner = await PropertyShare.findById(partnerId);
+    if (!partner) {
+      console.warn(
+        `Partner ${partnerId} not found for share ${share.shareID}. Skipping.`
+      );
+      continue;
     }
 
-    // Log the updated share list to see the new dates after rotation and rearrangement
-    console.log("rotatedShareList==>", rotatedShareList);
+    // (3) Only act if partner also expired
+    if (!(partner.availableInDuration.endDate < now)) {
+      console.log(
+        `→ Share ${share.shareID} expired, but partner ${partner.shareID} not yet expired. Skipping.`
+      );
+      continue;
+    }
+
+    // (4) Both expired → restore owners & bump both
+    console.log(
+      `→ Both sides of swap‐pair (${share.shareID} + ${partner.shareID}) expired. Restoring & bumping…`
+    );
+    await restoreSwappedPair(share, partner);
+
+    // (5) Mark both as processed so we don’t re‐handle them
+    processedSwapIds.add(shareIdStr);
+    processedSwapIds.add(partner._id.toString());
   }
+
+  console.log("forNextYearBumpExpiredShares finished.");
 }
+
+///////////////////////////////////////end bumpOneShareToNextYear///////////////////////////////////////
+
 
 module.exports = {
   testRun,
@@ -3691,7 +3879,8 @@ module.exports = {
   openInspections,
   handlePropertyStatus,
   getPropertySharesByID,
-  calPropertyDurationCompletion,
+  // calPropertyDurationCompletion,
+  forNextYearBumpExpiredShares,
   handleRaisedRequestPaymentAction,
   handlePropertyFeatured,
   featuredExpiry,
